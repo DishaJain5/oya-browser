@@ -25,6 +25,9 @@ const deadline = setTimeout(() => {
 let window, view, mouse;
 const keyboard = new Keyboard(process.platform);
 const evaluate = (source) => evaluateFrame(view.webContents.mainFrame, source);
+/** Wait for layout and a rendered frame before trusted input; a screenshot is not a paint barrier. */
+const painted = () =>
+  evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))');
 const FIXTURE = `<!doctype html><title>Recorder widgets</title>
 <style>
   .card .actions { display: none; }
@@ -71,14 +74,14 @@ async function recordingPage() {
   window.focus();
   view.webContents.focus();
   await evaluate(ANALYZER);
-  await view.webContents.capturePage();
+  await painted();
 }
 /** Locate fixture geometry in the native isolated world; no synthetic click events. */
 async function point(selector, index = 0) {
   const result = await evaluate(`(()=>{const el=document.querySelectorAll(${JSON.stringify(selector)})[${index}];
     if(!el)throw Error('Missing fixture target'); el.scrollIntoView({block:'center'});
     const r=el.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
-  await view.webContents.capturePage();
+  await painted();
   return result;
 }
 /** Deterministic native pointer input isolates recorder behavior from human-cadence path variations. */
