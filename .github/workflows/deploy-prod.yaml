@@ -49,6 +49,12 @@ jobs:
     - name: Install browser dependencies
       run: cd browser && npm ci
 
+    - name: Provision native Windows engine
+      run: node scripts/setup-native-desktop.mjs
+      env:
+        OYA_NATIVE_WINDOWS_X64_URL: ${{ vars.OYA_NATIVE_WINDOWS_X64_URL }}
+        OYA_NATIVE_WINDOWS_X64_SHA256: ${{ vars.OYA_NATIVE_WINDOWS_X64_SHA256 }}
+
     - name: Build NSIS installer
       run: cd browser && npm run dist:win -- --x64
 
@@ -107,6 +113,14 @@ jobs:
 
     - name: Install browser dependencies
       run: cd browser && npm ci
+
+    - name: Provision native macOS engines
+      run: node scripts/setup-native-desktop.mjs
+      env:
+        OYA_NATIVE_MACOS_ARM64_URL: ${{ vars.OYA_NATIVE_MACOS_ARM64_URL }}
+        OYA_NATIVE_MACOS_ARM64_SHA256: ${{ vars.OYA_NATIVE_MACOS_ARM64_SHA256 }}
+        OYA_NATIVE_MACOS_X64_URL: ${{ vars.OYA_NATIVE_MACOS_X64_URL }}
+        OYA_NATIVE_MACOS_X64_SHA256: ${{ vars.OYA_NATIVE_MACOS_X64_SHA256 }}
 
     # Our own keychain rather than electron-builder's: its throwaway keychain could
     # not be unlocked on the hosted runner ("SecKeychainUnlock: The user name or
