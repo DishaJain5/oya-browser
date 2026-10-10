@@ -62,6 +62,35 @@ describe('agentLoop', () => {
     assert.equal(browser.calls[0].action, 'list_bookmarks');
   });
 
+  for (const [name, args] of Object.entries({
+    key_chord: { key: 'Shift+Tab' },
+    edit_text: { operation: 'undo' },
+    scroll_at: { x: 20, y: 30, delta_x: 0, delta_y: 100 },
+    start_trace: {},
+    read_trace: { trace_id: 'fixture-trace', after: 1 },
+    stop_trace: { trace_id: 'fixture-trace' },
+  })) {
+    it(`offers ${name} to the server model, dispatches it, and returns its result`, async () => {
+      browser.disconnect();
+      const data = { trace_id: 'fixture-trace', events: [], next_cursor: 1, dropped: 0 };
+      browser = scriptedOyaBrowser(BROWSER, KEY, () => ({ ok: true, data }));
+      const llm = stubLlm([toolReply([name, args]), textReply('DONE')]);
+      const checkpoint = mock.fn();
+      const result = await agentLoop(ctx({ checkpoint }), start());
+      assert.equal(result.failed, false);
+      assert.ok(llm.requests[0].tools.some((tool) => tool.function.name === name));
+      assert.deepEqual(
+        browser.calls.map(({ action, params }) => ({ action, params })),
+        [{ action: name, params: args }],
+      );
+      const reply = llm.requests[1].messages.find((message) => message.role === 'tool');
+      assert.deepEqual(JSON.parse(reply.content), data);
+      const mutates = ['key_chord', 'edit_text', 'scroll_at'].includes(name);
+      assert.deepEqual(recorder.lastRun(BROWSER).steps, mutates ? [{ action: name, ...args }] : []);
+      assert.equal(checkpoint.mock.callCount(), ['key_chord', 'edit_text'].includes(name) ? 1 : 0);
+    });
+  }
+
   it('returns the model’s text once it stops calling tools', async () => {
     const llm = stubLlm([textReply('  DONE: nothing to do  ')]);
     assert.deepEqual(await agentLoop(ctx(), start()), { text: 'DONE: nothing to do', toolCalls: [], failed: false });

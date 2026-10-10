@@ -29,6 +29,8 @@ const PAGE_CHANGING = new Set([
   'click',
   'double_click',
   'press_key',
+  'key_chord',
+  'edit_text',
   'select_option',
   'open_tab',
   'switch_tab',
