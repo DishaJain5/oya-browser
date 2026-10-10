@@ -18,8 +18,8 @@ jobs:
       DEPOT_TOOLS_WIN_TOOLCHAIN: '0'
       DEPOT_TOOLS_UPDATE: '0'
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      OYA_ENGINE_SOURCE_ROOT: D:\oya-native-source
-      OYA_ACCEPTANCE_OUTPUT: D:\oya-native-acceptance
+      OYA_ENGINE_SOURCE_ROOT: D:/oya-native-source
+      OYA_ACCEPTANCE_OUTPUT: D:/oya-native-source/acceptance
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -45,6 +45,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Pinned depot_tools download failed' }
           git -C "$env:OYA_ENGINE_SOURCE_ROOT/depot_tools" checkout --detach FETCH_HEAD
           if ($LASTEXITCODE) { throw 'Pinned depot_tools checkout failed' }
+          & "$env:OYA_ENGINE_SOURCE_ROOT/depot_tools/bootstrap/win_tools.bat"
+          if ($LASTEXITCODE) { throw 'Pinned Windows tool bootstrap failed' }
           "$env:OYA_ENGINE_SOURCE_ROOT/depot_tools" >> $env:GITHUB_PATH
           @"
           solutions = [{
