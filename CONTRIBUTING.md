@@ -123,6 +123,14 @@ The universal Mac runner must execute both arm64 and x64 engines (ARM64 with
 Rosetta). Linux cloud pins and an arm64-only testing build cannot satisfy this gate.
 Missing desktop artifacts block desktop releases; never substitute stock Electron.
 
+To regenerate the Windows archive, dispatch **Build native Windows engine**
+(`.github/workflows/build-native-windows.yaml`). It uses the revisions and source
+overlay in `browser/engine/desktop-source.json`, checks every patched baseline file,
+and compiles Electron's official release configuration. The native capability probe
+and complete acceptance matrix must pass before it uploads `native-windows-x64`.
+Publish that verified archive as a native-engine prerelease and set the repository
+URL and SHA-256 variables above. The source overlay is not a runnable distribution.
+
 ## Project layout
 
 | Path | What lives there |

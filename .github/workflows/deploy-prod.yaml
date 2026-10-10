@@ -359,6 +359,9 @@ jobs:
   deploy:
     name: Deploy to GKE (prod)
     needs: [build-image, build-browser, register-snapshot]
+    # Desktop failures are ancestors of build-image. Override GitHub's implicit
+    # success() check while still requiring both validated production images.
+    if: ${{ !cancelled() && needs['build-image'].result == 'success' && needs['build-browser'].result == 'success' }}
     runs-on: ubuntu-24.04
     # A GitHub environment, so a release can wait for a named approver before it
     # touches prod. The approvers are set in the repo's Settings > Environments.
