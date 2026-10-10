@@ -35,6 +35,8 @@ const PAGE_CHANGING = new Set([
   'double_click',
   'click_coordinates',
   'press_key',
+  'key_chord',
+  'edit_text',
   'switch_tab',
   'go_back',
   'go_forward',
@@ -356,6 +358,9 @@ function replayClickCoordinates(browserId, step) {
 const REPLAYERS: Record<string, Replayer> = {
   navigate: (browserId, step, values) =>
     command(browserId, 'navigate', { url: fill(step.url, values) }, NAVIGATE_TIMEOUT_MS),
+  key_chord: (browserId, step) => command(browserId, 'key_chord', { key: step.key }),
+  edit_text: (browserId, step) => command(browserId, 'edit_text', { operation: step.operation }),
+  scroll_at: (browserId, { x, y, delta_x, delta_y }) => command(browserId, 'scroll_at', { x, y, delta_x, delta_y }),
   press_key: (browserId, step) => command(browserId, 'press_key', { key: step.key }),
   scroll: (browserId, step) => command(browserId, 'scroll', { direction: step.direction, amount: step.amount }),
   wait: (browserId, step) => command(browserId, 'wait', { selector: step.selector, timeout: step.timeout }),

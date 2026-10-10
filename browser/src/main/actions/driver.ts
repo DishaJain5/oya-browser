@@ -4,7 +4,7 @@
  * dispatches server and dev panel commands through their command maps.
  */
 import type { WebContents } from 'electron';
-import type { PageView } from '../cdp/cdp.ts';
+import type { NativePage as PageView } from '../native/index.ts';
 import type { Keyboard } from '../input/keyboard.ts';
 import type { Mouse } from '../input/mouse.ts';
 import { sleep } from '../input/timing.ts';
@@ -19,7 +19,7 @@ import type { AnalysisData, CommandId, CommandParams, Located, ScriptResult } fr
 export interface TabView {
   /** The view that shows the tab. */
   view: PageView;
-  /** Settles once CDP setup and the first navigation finish. */
+  /** Settles once native setup and the first navigation finish. */
   ready?: Promise<unknown>;
 }
 

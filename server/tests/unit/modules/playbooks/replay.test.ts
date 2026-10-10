@@ -98,6 +98,22 @@ describe('play', () => {
     assert.equal(commands()[0].timeout, NAVIGATE_TIMEOUT_MS);
   });
 
+  for (const [action, args] of Object.entries({
+    key_chord: { key: 'Shift+Tab' },
+    edit_text: { operation: 'undo' },
+    scroll_at: { x: 20, y: 30, delta_x: 40, delta_y: 50 },
+  })) {
+    it(`replays ${action} through the browser command boundary`, async () => {
+      browser.disconnect();
+      browser = scriptedBrowser(BROWSER, KEY, page, 'oya');
+      await play(KEY, BROWSER, pb([{ action, ...args }]));
+      assert.deepEqual(
+        commands().map((c) => [c.action, c.params]),
+        [[action, args]],
+      );
+    });
+  }
+
   it('replays a hover on the recorded element and history moves as the browser’s own', async () => {
     const steps = [
       { action: 'hover', el: { text: 'Go', type: 'button' } },

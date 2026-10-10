@@ -4,6 +4,10 @@
 
 /** Console entries kept per browser. Enough to cover a page's own error burst. */
 export const CONSOLE_MAX = 500;
+/** Concurrent action traces retained per browser. */
+export const TRACE_MAX = 4;
+/** Each trace has a fixed memory budget, with dropped-event counts in reads. */
+export const TRACE_EVENTS_MAX = 1000;
 
 /** Network records kept per browser. A portal page can make hundreds of requests. */
 export const NETWORK_MAX = 1000;

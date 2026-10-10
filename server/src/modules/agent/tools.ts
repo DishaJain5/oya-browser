@@ -1,6 +1,7 @@
 /**
  * Browser tool definitions for the chat LLM, maps to MCP tools / sendCommand.
  */
+import { NATIVE_TOOLS } from './native-tools.ts';
 import { KEYBOARD_TOOLS } from './keyboard-tools.ts';
 import { NOTIFICATION_TOOLS, NOTIFICATION_TOOL_NAMES } from './notification-tools.ts';
 import { LIBRARY_TOOLS, LIBRARY_TOOL_NAMES } from './library-tools.ts';
@@ -445,6 +446,7 @@ The real <input type="file"> is normally hidden behind a styled "Choose file" / 
   ...LIBRARY_TOOLS,
   ...NOTIFICATION_TOOLS,
   ...KEYBOARD_TOOLS,
+  ...NATIVE_TOOLS,
 ];
 
 /**
@@ -453,6 +455,11 @@ The real <input type="file"> is normally hidden behind a styled "Choose file" / 
  * history moves. Offering a tool the browser refuses only costs the model a turn.
  */
 const NEEDS: Record<string, string> = {
+  analyze_page: 'analyze',
+  read_elements: 'analyze',
+  find: 'analyze',
+  select_option: 'select',
+  upload_file: 'type',
   ...Object.fromEntries(NOTIFICATION_TOOL_NAMES.map((name) => [name, name])),
   list_keyboard_shortcuts: 'list_keyboard_shortcuts',
   ...Object.fromEntries(LIBRARY_TOOL_NAMES.map((name) => [name, name])),
@@ -470,6 +477,4 @@ const NEEDS: Record<string, string> = {
 
 /** The browser tools a browser that does `actions` can run; all of them when its actions are not known. */
 export const toolsOn = (actions: readonly string[] | null) =>
-  actions
-    ? BROWSER_TOOLS.filter((t) => !Object.hasOwn(NEEDS, t.function.name) || actions.includes(NEEDS[t.function.name]))
-    : BROWSER_TOOLS;
+  actions ? BROWSER_TOOLS.filter((t) => actions.includes(NEEDS[t.function.name] ?? t.function.name)) : BROWSER_TOOLS;

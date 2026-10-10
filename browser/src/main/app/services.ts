@@ -12,7 +12,7 @@ import type * as Electron from 'electron';
 import type { Workspace } from '../workflow/workspace.ts';
 import type { PageDriver } from '../actions/driver.ts';
 import type { DesktopDialogs } from '../dialogs/index.ts';
-import type { World } from '../cdp/world.ts';
+import type { World } from '../native/index.ts';
 import type { CdpRelay } from '../connection/cdp-relay.ts';
 import type { CommandRunner } from '../connection/commands.ts';
 import type { ControlSocket } from '../connection/socket.ts';
@@ -104,7 +104,7 @@ export interface AppServices {
   deepLinks: DeepLinks;
   /** Scheduled routines (src/main/routines/routines.ts). */
   routines: Routines;
-  /** The analyzer's isolated world (src/main/cdp/world.ts). */
+  /** The analyzer's isolated world (src/main/native/world.ts). */
   world: World;
   /** Who drives: agent or person (src/main/control/control-state.ts). */
   control: DesktopControl;

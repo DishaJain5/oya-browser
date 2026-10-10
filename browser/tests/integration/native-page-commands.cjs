@@ -105,6 +105,46 @@ async function formAndEditor(win, run) {
   );
 }
 
+/** Agent editor tools reach native input and selection, including empty replacements. */
+async function extendedInput(win, run) {
+  const value = () => win.webContents.executeJavaScript('document.querySelector("#email").value');
+  await run('type', { selector: '#email', text: 'old@example.test' });
+  await run('type', { selector: '#email', text: '' });
+  assert.equal(await value(), '', 'explicit empty text clears the field');
+  await run('keyboard_type', { text: 'one@example.test' });
+  await run('key_chord', { key: 'ControlOrMeta+a' });
+  await run('keyboard_type', { text: 'two@example.test' });
+  assert.equal(await value(), 'two@example.test');
+  await run('edit_text', { operation: 'undo' });
+  assert.notEqual(await value(), 'two@example.test', 'native undo restores editor history');
+  await run('edit_text', { operation: 'redo' });
+  assert.equal(await value(), 'two@example.test');
+  await run('press_key', { key: 'Tab' });
+  await run('key_chord', { key: 'Shift+Tab' });
+  assert.equal(await win.webContents.executeJavaScript('document.activeElement.id'), 'email');
+}
+
+/** Wheel input is trusted and scrolls the pointed panel on both axes. */
+async function panelScroll(win, run) {
+  await win.webContents.executeJavaScript(`{
+    const panel = document.createElement('div'); panel.id='wheel-panel';
+    panel.style='position:fixed;left:10px;top:10px;width:150px;height:100px;overflow:scroll;z-index:999';
+    panel.innerHTML='<div style="width:1000px;height:1000px">Panel</div>';
+    panel.addEventListener('wheel', e => window.trustedWheel=e.isTrusted);
+    document.body.append(panel);
+  }`);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await run('scroll_at', { x: 50, y: 50, delta_x: 60, delta_y: 80 });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.deepEqual(
+    await win.webContents.executeJavaScript(
+      '[trustedWheel, document.querySelector("#wheel-panel").scrollLeft > 0, document.querySelector("#wheel-panel").scrollTop > 0]',
+    ),
+    [true, true, true],
+  );
+  await win.webContents.executeJavaScript('document.querySelector("#wheel-panel").remove()');
+}
+
 /** Local fixtures distinguish Oya command correctness from the public site's unavailable services. */
 module.exports = async function checkPageCommands(win, profile) {
   const fixture = path.join(profile, 'page-commands.html');
@@ -122,6 +162,8 @@ module.exports = async function checkPageCommands(win, profile) {
   const run = commandDriver(win);
   await coveredTargets(win, run);
   await coveredFrame(win, run);
+  await extendedInput(win, run);
+  await panelScroll(win, run);
   await formAndEditor(win, run);
   console.log(
     'PASS: production PageDriver refuses overlays, delivers trusted clicks/form submission and replaces iframe editor content without CDP',

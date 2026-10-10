@@ -33,6 +33,18 @@ describe('hasReplayableSteps', () => {
 describe('recorder', () => {
   afterEach(() => browser?.disconnect());
 
+  for (const [action, args] of Object.entries({
+    key_chord: { key: 'Shift+Tab' },
+    edit_text: { operation: 'undo' },
+    scroll_at: { x: 20, y: 30, delta_x: 40, delta_y: 50 },
+  })) {
+    it(`records ${action} without losing its native arguments`, async () => {
+      const run = await started('about:blank');
+      await recorder.recordStep(BROWSER, action, args, {});
+      assert.deepEqual(run.steps, [{ action, ...args }]);
+    });
+  }
+
   it('starts a run from the page the browser is on', async () => {
     const run = await started();
     assert.deepEqual(run.steps, [{ action: 'navigate', url: 'https://a.test/start', start: true }]);

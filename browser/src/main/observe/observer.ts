@@ -14,6 +14,7 @@
  * member ids and tokens there and this buffer is read back over the API.
  */
 import vm from 'node:vm';
+import { Traces } from './trace.ts';
 import {
   CONSOLE_MAX,
   NETWORK_MAX,
@@ -28,6 +29,8 @@ import {
 
 /** A console message as a renderer reports it. */
 export interface ConsoleInput {
+  /** Exact native page source, when known. */
+  webContentsId?: number;
   /** Electron's level: a name, or the number older events carried. */
   level: string | number;
   /** The text logged. */
@@ -40,6 +43,8 @@ export interface ConsoleInput {
 
 /** A finished or failed request as the session reports it. */
 export interface RequestInput {
+  /** Exact native page source, when known. */
+  webContentsId?: number;
   /** Where it went. */
   url: string;
   /** Its HTTP method. */
@@ -158,14 +163,18 @@ const failed = (e: NetworkEntry): boolean => Boolean(e.error) || (e.status !== n
 
 /** The console and network rings for one browser. */
 export class Observer {
+  /** Action-scoped traces capture the same sanitized native observations. */
+  readonly traces = new Traces();
   /** Console entries, oldest first. */
   readonly console: ConsoleEntry[] = [];
   /** Network records, oldest first. */
   readonly network: NetworkEntry[] = [];
 
   /** Records one console entry from a renderer. */
-  addConsole({ level, message, line, sourceId }: ConsoleInput): void {
-    push(this.console, consoleEntry({ level, message, line, sourceId }), CONSOLE_MAX);
+  addConsole(input: ConsoleInput): void {
+    const entry = consoleEntry(input);
+    push(this.console, entry, CONSOLE_MAX);
+    this.traces.add(input.webContentsId, 'console', entry);
   }
 
   /**

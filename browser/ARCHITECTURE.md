@@ -849,3 +849,23 @@ storage operations, not just the presence of function names.
 
 This is integrated in the default native lifecycle. Platform release readiness
 still requires the corresponding engine build and native acceptance report.
+
+### Native agent input and diagnostics
+
+The agent and MCP expose `key_chord`, `edit_text` (select-all, undo, redo),
+and `scroll_at` when the connected Oya browser advertises those commands.
+Input shares the native keyboard, editor and wheel paths with workflow playback;
+the recorder preserves these actions for replay.
+
+`start_trace`, `read_trace`, and `stop_trace` collect chronological console and
+network metadata through browser-owned console and session events. Each trace
+belongs to one native tab and its original control revision. Capture stops after
+revocation; closing the tab removes its traces. Four traces may retain up to
+1,000 events each, with cursor pagination and explicit overflow counts.
+Stopping releases the trace after its final page is read.
+
+Network records correlate redirects and completion/failure without replacing
+the governance request-blocking hook. URLs omit credentials, queries and fragments;
+headers, cookies and bodies are excluded. Elapsed time starts at request headers,
+not DNS or TLS. Console text remains untrusted page output. These hooks do not
+attach a debugger or inject tracing scripts; this is not an undetectability claim.

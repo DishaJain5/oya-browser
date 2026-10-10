@@ -10,6 +10,7 @@ import { elementOf, rememberHandle, setElements } from './recorder.ts';
 import { analysisText, elementList } from './element-index.ts';
 import { noteAnalysis } from './changes.ts';
 import { ELEMENT_GONE, byId, withControls } from './controls.ts';
+import { NATIVE_TOOL_HANDLERS } from './native-tool-handlers.ts';
 import { NOTIFICATION_TOOL_HANDLERS } from './notification-tool-handlers.ts';
 import { LIBRARY_TOOL_HANDLERS } from './library-tool-handlers.ts';
 import { PAGE_TOOL_HANDLERS } from './page-tool-handlers.ts';
@@ -263,6 +264,7 @@ export const TOOL_HANDLERS: Record<string, ToolHandler> = {
   handle_dialog: handleDialog,
   close_tab: closeTab,
   ...PAGE_TOOL_HANDLERS,
+  ...NATIVE_TOOL_HANDLERS,
   ...LIBRARY_TOOL_HANDLERS,
   ...NOTIFICATION_TOOL_HANDLERS,
   list_keyboard_shortcuts: listKeyboardShortcuts,

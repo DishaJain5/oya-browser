@@ -127,3 +127,6 @@ export const NOTIFICATION_PAGE_MAX = 50;
 export const NOTIFICATION_IDS_MAX = 100;
 /** Maximum length of one notification ID. */
 export const NOTIFICATION_ID_MAX = 128;
+
+/** Largest bounded native trace page accepted by Oya. */
+export const TRACE_READ_MAX = 1000;

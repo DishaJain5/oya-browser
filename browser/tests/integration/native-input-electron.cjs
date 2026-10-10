@@ -186,6 +186,7 @@ app
     assert.ok(replies.every((reply) => reply[1] === true));
     await require('./native-page-commands.cjs')(win, profile);
     await require('./native-shielded-input.cjs')(win, profile);
+    await require('./native-trace.cjs')(win);
     win.destroy();
     await assert.rejects(mouse.click(view, 1, 2), /destroyed/);
     console.log(

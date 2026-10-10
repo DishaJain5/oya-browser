@@ -29,6 +29,10 @@ export type CommandDeps = Pick<
 
 /** A command's arguments: a page command's, plus those of the commands answered here. */
 export interface RemoteParams extends CommandParams {
+  /** Opaque trace identity returned by start_trace. */
+  trace_id?: string;
+  /** Last trace sequence consumed by the agent. */
+  after?: number;
   /** List unread inbox entries without changing their state. */
   unread_only?: boolean;
   /** Explicit inbox entries to mark read. */

@@ -6,6 +6,8 @@
 import { z } from 'zod';
 import { track } from '../modules/telemetry/index.ts';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { toolsOn } from '../modules/agent/chat.ts';
+import { actionsOf } from '../modules/browsers/socket.ts';
 import { sendCommand } from '../modules/browsers/socket.ts';
 import { registry } from '../modules/browsers/registry.ts';
 import { analysis, type Page } from './analysis.ts';
@@ -268,11 +270,18 @@ export function registerBrowserTools(
   server: McpServer,
   { pick, tag = () => '', only = BROWSER_TOOL_NAMES, noBrowser = 'no browser is connected', oneBrowser }: Options,
 ) {
+  if (oneBrowser) only = availableTools(only, pick);
   registerAgentTools(server, only, { pick: () => pick(false), noBrowser, oneBrowser });
   for (const name of only.filter((n) => Object.hasOwn(TOOLS, n))) {
-    const tool = TOOLS[name];
-    server.tool(name, tool.description, tool.schema, (args) => runTool(name, tool, args, { pick, tag, noBrowser }));
+    registerDirectTool(server, name, { pick, tag, noBrowser });
   }
+}
+
+/** Direct MCP tools use the same capability filter as the model's tools. */
+function availableTools(names: string[], pick: Options['pick']): string[] {
+  const id = pick(false);
+  const offered = new Set(toolsOn(id ? actionsOf(id) : null).map((entry) => entry.function.name));
+  return names.filter((name) => !Object.hasOwn(TOOLS, name) || offered.has(name));
 }
 
 /** Where runTool sends a call and how it labels the reply. */
@@ -296,4 +305,10 @@ function reply(out: Reply, prefix: () => string) {
   const tag = prefix();
   const text = typeof out === 'object' ? (tag ? `${tag}\n` : '') + out.page : (tag ? `${tag} ` : '') + out;
   return { content: [{ type: 'text' as const, text }] };
+}
+
+/** Register one direct command without duplicating its routing or result encoder. */
+function registerDirectTool(server: McpServer, name: string, routing: Routing): void {
+  const tool = TOOLS[name];
+  server.tool(name, tool.description, tool.schema, (args) => runTool(name, tool, args, routing));
 }

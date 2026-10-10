@@ -9,6 +9,7 @@ import { actionNavigation } from './action-navigation.ts';
 import { sleep, jitter } from '../input/timing.ts';
 import * as s from './scripts.ts';
 import * as c from './constants.ts';
+import { INTERACTION_COMMANDS } from './interaction-commands.ts';
 import { POINTER_COMMANDS } from './pointer-commands.ts';
 import { HISTORY_COMMANDS } from './history-commands.ts';
 import * as queries from '../../page/queries.ts';
@@ -210,6 +211,7 @@ async function suggestionsVisible(driver: PageDriver, view: PageView): Promise<u
 /** The handler for each server command that has one. */
 export const PAGE_COMMANDS: Readonly<Record<string, PageHandler>> = {
   ...POINTER_COMMANDS,
+  ...INTERACTION_COMMANDS,
   ...HISTORY_COMMANDS,
 
   /**
@@ -253,7 +255,7 @@ export const PAGE_COMMANDS: Readonly<Record<string, PageHandler>> = {
     const info = await focusField(driver, id, view, selector);
     if (!info) return;
     const text = params?.text || '';
-    if (!text) return driver.deps.sendResult(id, true, { typed: true, ...withHandle(info) });
+    if (params?.text === undefined) return driver.deps.sendResult(id, true, { typed: true, ...withHandle(info) });
     if (await fillIfDate(driver, id, view, { selector, text })) return;
     await typeAndReport(driver, id, view, { selector, text, handle: info.data.handle });
   },

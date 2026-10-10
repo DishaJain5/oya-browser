@@ -21,6 +21,12 @@ export interface CommandParams {
   text?: string;
   /** The key to press. */
   key?: string;
+  /** Native focused text edit, without clipboard access. */
+  operation?: string;
+  /** Horizontal wheel distance; positive moves right. */
+  delta_x?: number;
+  /** Vertical wheel distance; positive moves down. */
+  delta_y?: number;
   /** The value to pick in a <select>. */
   value?: string;
   /** The agent's script for run_script. */

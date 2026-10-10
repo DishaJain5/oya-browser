@@ -189,6 +189,13 @@ describe('page commands', () => {
     assert.deepEqual(results(ctx), [['c1', true, { typed: true }]]);
   });
 
+  it('an explicit empty replacement clears the field with native Backspace', async () => {
+    const view = pageView();
+    const world = (expr) => (expr.includes('el.select()') ? 'select' : expr.includes('__acFindElement') ? FOUND : 'old');
+    await run(view, 'type', { selector: 'i', text: '' }, { world });
+    assert.ok(view.webContents.calls.some((call) => call[0] === 'input' && call[1].keyCode === 'Backspace'));
+  });
+
   it('type selects the field, deletes, types and reports suggestions', async () => {
     const view = pageView();
     const world = (expr) => (expr.includes('el.select()') ? 'select' : expr.includes('listbox') ? true : FOUND);
