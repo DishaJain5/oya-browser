@@ -18,8 +18,8 @@ jobs:
       DEPOT_TOOLS_WIN_TOOLCHAIN: '0'
       DEPOT_TOOLS_UPDATE: '0'
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      OYA_ENGINE_SOURCE_ROOT: C:\oya-native-source
-      OYA_ACCEPTANCE_OUTPUT: C:\oya-native-acceptance
+      OYA_ENGINE_SOURCE_ROOT: D:\oya-native-source
+      OYA_ACCEPTANCE_OUTPUT: D:\oya-native-acceptance
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -35,7 +35,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $lock = Get-Content browser/engine/desktop-source.json | ConvertFrom-Json
           Get-PSDrive -PSProvider FileSystem | Format-Table Name,Used,Free
-          if ((Get-PSDrive C).Free -lt 55GB) { throw 'Native compilation needs at least 55 GB free on C:' }
+          if ((Get-PSDrive D).Free -lt 55GB) { throw 'Native compilation needs at least 55 GB free on D:' }
           New-Item -ItemType Directory -Path $env:OYA_ENGINE_SOURCE_ROOT -Force | Out-Null
           git config --global core.longpaths true
           git config --global core.autocrlf false
@@ -123,7 +123,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: native-windows-x64
-          path: C:/oya-native-source/oya-native-win32-x64-44.5.1.tar.gz
+          path: ${{ env.OYA_ENGINE_SOURCE_ROOT }}/oya-native-win32-x64-44.5.1.tar.gz
           if-no-files-found: error
           retention-days: 14
 
@@ -133,7 +133,7 @@ jobs:
         with:
           name: native-windows-diagnostics
           path: |
-            C:/oya-native-source/*.log
-            C:/oya-native-acceptance/
+            ${{ env.OYA_ENGINE_SOURCE_ROOT }}/*.log
+            ${{ env.OYA_ACCEPTANCE_OUTPUT }}/
           if-no-files-found: ignore
           retention-days: 14
