@@ -1,4 +1,5 @@
 {
+  "engineVersion": "44.5.1",
   "electronRevision": "19c601167d4ae75989938416c18ed81eb21c6020",
   "chromiumRevision": "2c592105bbcd9490a9894df48d0fe59b2c512651",
   "depotToolsRevision": "071d5b9d91e06cb2a9c9ce926d6ee666df185b49",

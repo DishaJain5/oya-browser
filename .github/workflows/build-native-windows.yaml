@@ -87,21 +87,34 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          $lock = Get-Content browser/engine/desktop-source.json | ConvertFrom-Json
           Set-Location "$env:OYA_ENGINE_SOURCE_ROOT/src"
           New-Item -ItemType Directory -Path out/OyaRelease -Force | Out-Null
-          @'
+          @"
           import("//electron/build/args/release.gn")
+          override_electron_version = "$($lock.engineVersion)"
           target_cpu = "x64"
           symbol_level = 0
           use_thin_lto = false
           chrome_pgo_phase = 0
           generate_about_credits = true
-          '@ | Set-Content out/OyaRelease/args.gn -Encoding utf8
+          "@ | Set-Content out/OyaRelease/args.gn -Encoding utf8
           $env:PATH = "$env:OYA_ENGINE_SOURCE_ROOT/src/buildtools/win;$env:PATH"
-          & buildtools/win/gn.exe gen out/OyaRelease
+          & buildtools/win/gn.exe gen out/OyaRelease 2>&1 | Tee-Object "$env:OYA_ENGINE_SOURCE_ROOT/compile.log"
           if ($LASTEXITCODE) { throw 'Native release generation failed' }
-          & third_party/ninja/ninja.exe -C out/OyaRelease -j 4 electron:electron_dist_zip 2>&1 | Tee-Object "$env:OYA_ENGINE_SOURCE_ROOT/compile.log"
+          & third_party/ninja/ninja.exe -C out/OyaRelease -j 4 electron:electron_dist_zip 2>&1 | Tee-Object -Append "$env:OYA_ENGINE_SOURCE_ROOT/compile.log"
           if ($LASTEXITCODE) { throw 'Native release compilation failed' }
+
+      # Retain a compiled engine if later acceptance fails, so diagnostics can be
+      # reproduced on Windows. This artifact is never selected by release jobs.
+      - name: Preserve engine for acceptance diagnostics
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-windows-unvalidated
+          path: ${{ env.OYA_ENGINE_SOURCE_ROOT }}/src/out/OyaRelease/dist.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
 
       - name: Build Oya application and validate native runtime
         shell: pwsh
