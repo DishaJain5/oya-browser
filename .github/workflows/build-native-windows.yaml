@@ -1,0 +1,139 @@
+name: Build native Windows engine
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-windows-engine
+  cancel-in-progress: false
+
+jobs:
+  engine:
+    runs-on: windows-2025
+    timeout-minutes: 360
+    env:
+      DEPOT_TOOLS_WIN_TOOLCHAIN: '0'
+      DEPOT_TOOLS_UPDATE: '0'
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      OYA_ENGINE_SOURCE_ROOT: C:\oya-native-source
+      OYA_ACCEPTANCE_OUTPUT: C:\oya-native-acceptance
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Prepare pinned source tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lock = Get-Content browser/engine/desktop-source.json | ConvertFrom-Json
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name,Used,Free
+          if ((Get-PSDrive C).Free -lt 55GB) { throw 'Native compilation needs at least 55 GB free on C:' }
+          New-Item -ItemType Directory -Path $env:OYA_ENGINE_SOURCE_ROOT -Force | Out-Null
+          git config --global core.longpaths true
+          git config --global core.autocrlf false
+          git init "$env:OYA_ENGINE_SOURCE_ROOT/depot_tools"
+          git -C "$env:OYA_ENGINE_SOURCE_ROOT/depot_tools" remote add origin https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          git -C "$env:OYA_ENGINE_SOURCE_ROOT/depot_tools" fetch --depth 1 origin $lock.depotToolsRevision
+          if ($LASTEXITCODE) { throw 'Pinned depot_tools download failed' }
+          git -C "$env:OYA_ENGINE_SOURCE_ROOT/depot_tools" checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE) { throw 'Pinned depot_tools checkout failed' }
+          "$env:OYA_ENGINE_SOURCE_ROOT/depot_tools" >> $env:GITHUB_PATH
+          @"
+          solutions = [{
+            'name': 'src/electron',
+            'url': 'https://github.com/electron/electron',
+            'deps_file': 'DEPS',
+            'managed': False,
+            'custom_deps': {'src': 'https://github.com/chromium/chromium.git@$($lock.chromiumRevision)'},
+            'custom_vars': {},
+          }]
+          "@ | Set-Content "$env:OYA_ENGINE_SOURCE_ROOT/.gclient" -Encoding utf8
+
+      - name: Synchronize pinned Electron and Chromium dependencies
+        shell: pwsh
+        run: |
+          $lock = Get-Content browser/engine/desktop-source.json | ConvertFrom-Json
+          Set-Location $env:OYA_ENGINE_SOURCE_ROOT
+          gclient.bat sync --no-history --revision "src/electron@$($lock.electronRevision)" -j 4 2>&1 | Tee-Object source-sync.log
+          if ($LASTEXITCODE) { throw 'Pinned source synchronization failed' }
+
+      - name: Apply verified native Oya source overlay
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $lock = Get-Content browser/engine/desktop-source.json | ConvertFrom-Json
+          $archive = "$env:OYA_ENGINE_SOURCE_ROOT/native-source.tar.gz"
+          curl.exe --fail --location --proto '=https' --proto-redir '=https' --retry 3 --output $archive $lock.overlayUrl
+          if ($LASTEXITCODE) { throw 'Native source download failed' }
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $lock.overlaySha256) { throw 'Native source checksum mismatch' }
+          $overlay = "$env:OYA_ENGINE_SOURCE_ROOT/overlay"
+          New-Item -ItemType Directory -Path $overlay | Out-Null
+          tar.exe -xzf $archive -C $overlay
+          if ($LASTEXITCODE) { throw 'Native source extraction failed' }
+          node scripts/apply-native-source.mjs "$env:OYA_ENGINE_SOURCE_ROOT/src" $overlay
+          if ($LASTEXITCODE) { throw 'Native source baseline validation or application failed' }
+
+      - name: Compile official native x64 distribution
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-Location "$env:OYA_ENGINE_SOURCE_ROOT/src"
+          New-Item -ItemType Directory -Path out/OyaRelease -Force | Out-Null
+          @'
+          import("//electron/build/args/release.gn")
+          target_cpu = "x64"
+          symbol_level = 0
+          use_thin_lto = false
+          chrome_pgo_phase = 0
+          generate_about_credits = true
+          '@ | Set-Content out/OyaRelease/args.gn -Encoding utf8
+          $env:PATH = "$env:OYA_ENGINE_SOURCE_ROOT/src/buildtools/win;$env:PATH"
+          & buildtools/win/gn.exe gen out/OyaRelease
+          if ($LASTEXITCODE) { throw 'Native release generation failed' }
+          & third_party/ninja/ninja.exe -C out/OyaRelease -j 4 electron:electron_dist_zip 2>&1 | Tee-Object "$env:OYA_ENGINE_SOURCE_ROOT/compile.log"
+          if ($LASTEXITCODE) { throw 'Native release compilation failed' }
+
+      - name: Build Oya application and validate native runtime
+        shell: pwsh
+        run: |
+          npm ci --prefix browser
+          if ($LASTEXITCODE) { throw 'Browser dependency installation failed' }
+          npm run build --prefix browser
+          if ($LASTEXITCODE) { throw 'Browser application build failed' }
+          $distribution = "$env:OYA_ENGINE_SOURCE_ROOT/distribution"
+          Expand-Archive "$env:OYA_ENGINE_SOURCE_ROOT/src/out/OyaRelease/dist.zip" $distribution
+          $env:OYA_NATIVE_ENGINE = "$distribution/electron.exe"
+          node -e "require('./browser/build/native-distribution.cjs').verify('win32', 'x64', process.argv[1])" $distribution
+          if ($LASTEXITCODE) { throw 'Native packaging capability probe failed' }
+          node browser/build/native-acceptance.mjs
+          if ($LASTEXITCODE) { throw 'Native Windows release acceptance failed' }
+          tar.exe -czf "$env:OYA_ENGINE_SOURCE_ROOT/oya-native-win32-x64-44.5.1.tar.gz" -C $distribution .
+          if ($LASTEXITCODE) { throw 'Native runtime archive failed' }
+          Get-FileHash "$env:OYA_ENGINE_SOURCE_ROOT/oya-native-win32-x64-44.5.1.tar.gz" -Algorithm SHA256 | Format-List
+
+      - name: Upload validated runtime
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-windows-x64
+          path: C:/oya-native-source/oya-native-win32-x64-44.5.1.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Preserve native build and acceptance logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: native-windows-diagnostics
+          path: |
+            C:/oya-native-source/*.log
+            C:/oya-native-acceptance/
+          if-no-files-found: ignore
+          retention-days: 14
