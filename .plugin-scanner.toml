@@ -1,0 +1,32 @@
+# Policy for HOL plugin-scanner (https://github.com/hashgraph-online/ai-plugin-scanner),
+# which plugin catalogs such as awesome-ai-plugins run on this repository.
+#
+# Every path below was reviewed by hand (2026-10-11): the findings are false positives,
+# not secrets or unsafe code. Re-review a path before adding to this list; never ignore a
+# file to hide a real finding.
+[scanner]
+profile = "public-marketplace"
+ignore_paths = [
+  # Test fixtures: fake API keys, tokens and passwords, and eval in test harnesses.
+  "*/tests/*",
+  "tests/*",
+  "ui/tests/*",
+  # Example code for users; no credentials in it.
+  "examples/*",
+  # A template with placeholder values ("64-hex-chars").
+  "k8s/secrets.example.yaml",
+  # Secrets generated at deploy time (openssl rand / random_hex), never stored in the repo.
+  ".github/workflows/deploy-prod.yaml",
+  "deployments/gcloud/deploy.sh",
+  "deployments/k8s/deploy.sh",
+  # Names of environment variables and settings, not their values.
+  "packages/cli/src/failure.ts",
+  "server/src/modules/config/constants.ts",
+  "ui/src/components/dashboard/settings/constants.ts",
+  # The local-storage key a refresh token is kept under, not a token.
+  "ui/src/lib/auth/storage.ts",
+  # Documentation showing the RFC 6238 example TOTP secret (JBSWY3DPEHPK3PXP).
+  "ui/src/app/docs/_sections/identity.tsx",
+  # The tab preload runs Oya's own analyzer in an isolated world (Electron webFrame API), never page input.
+  "browser/src/preload/recording.ts",
+]
