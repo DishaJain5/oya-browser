@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.173](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.173) · 2026-10-11
+
 ### Added
 
 - Set up in under a minute: the desktop app's first run is a short checklist. Sign in with ChatGPT, bring in your logins from your usual browser, make Oya your default browser, and start. No API key and no account to create.
