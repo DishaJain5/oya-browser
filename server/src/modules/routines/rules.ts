@@ -64,8 +64,10 @@ export interface Routine {
   createdAt: number;
   /** Its name. */
   name: string;
-  /** What the agent is asked each run. */
+  /** What the agent is asked each run; '' when the routine plays a playbook instead. */
   prompt: string;
+  /** The saved playbook each run plays, by name, instead of asking a prompt. */
+  playbook?: string;
   /** When it runs. */
   schedule: Schedule;
   /** Off: kept, but never run on schedule. */
@@ -86,7 +88,7 @@ export interface Routine {
 export type Target = 'desktop' | 'cloud';
 
 /** The fields a client sets on a routine. */
-export type Definition = Pick<Routine, 'name' | 'prompt' | 'schedule' | 'enabled' | 'target' | 'tz'>;
+export type Definition = Pick<Routine, 'name' | 'prompt' | 'playbook' | 'schedule' | 'enabled' | 'target' | 'tz'>;
 
 /** A refusal. */
 const refuse = (message: string) => new HttpError(Status.BAD_REQUEST, message);
@@ -125,11 +127,30 @@ export function definitionFrom(input: any, current?: Definition): Definition {
   const has = (field: string) => input?.[field] !== undefined || !current;
   return {
     name: has('name') ? text(input?.name, ROUTINE_MAX_NAME, 'name') : current!.name,
-    prompt: has('prompt') ? text(input?.prompt, ROUTINE_MAX_PROMPT, 'prompt') : current!.prompt,
+    ...taskFrom(input, current),
     schedule: has('schedule') ? scheduleFrom(input?.schedule) : current!.schedule,
     enabled: input?.enabled === undefined ? (current?.enabled ?? true) : input.enabled === true,
     ...placeFrom(input, current),
   };
+}
+
+/**
+ * What each run does: plays a saved playbook, or asks the agent a prompt. A playbook
+ * wins; `playbook: null` switches back to the prompt. Each field `input` leaves out is
+ * taken from `current`.
+ */
+function taskFrom(input: any, current?: Definition): Pick<Definition, 'prompt' | 'playbook'> {
+  const playbook = input?.playbook === undefined ? current?.playbook : playbookFrom(input.playbook);
+  const given = input?.prompt === undefined ? current?.prompt : input.prompt;
+  if (playbook) return { playbook, prompt: given ? text(given, ROUTINE_MAX_PROMPT, 'prompt') : '' };
+  if (!given) throw refuse('A routine runs a prompt or a saved playbook: give one of them.');
+  // An explicit undefined: an edit's merge must drop a playbook the routine had.
+  return { prompt: text(given, ROUTINE_MAX_PROMPT, 'prompt'), playbook: undefined };
+}
+
+/** A playbook's name, or undefined for none (null or ''). */
+function playbookFrom(value: unknown): string | undefined {
+  return value === null || value === '' ? undefined : text(value, ROUTINE_MAX_NAME, 'playbook');
 }
 
 /** Where and in which time zone the routine runs, each left as `current` has it when `input` leaves it out. */

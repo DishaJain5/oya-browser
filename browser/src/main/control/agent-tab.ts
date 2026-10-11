@@ -1,0 +1,155 @@
+/**
+ * Which tabs agents drive. While the server's agents hold control, only their own
+ * tabs are fenced: each agent (a chat run, an MCP session, a playbook run; its
+ * "lane", carried on every command) drives one tab of its own, and the person can
+ * switch to, open and use every other tab at the same time. Every agent command
+ * keeps acting on its lane's tab whichever one the window shows.
+ *
+ * A connected desktop sits in agent mode even when nothing runs, so no tab is
+ * fenced until an agent starts on one (its first page command, or a chat sent from
+ * it); a run's end lets it go. Local automation (a CDP client, a workflow check) and
+ * another operator's hold still take the whole browser, as before.
+ */
+import { AsyncLocalStorage } from 'node:async_hooks';
+import type { AppServices } from '../app/services.ts';
+import type { TabView } from '../tabs/types.ts';
+import type { ControlSnapshot } from './control-state.ts';
+import { LANE_IDLE_MS } from './constants.ts';
+
+/** What the claims read: who drives, and the tabs. */
+type Deps = Pick<AppServices, 'control' | 'tabs'>;
+
+/** The lane of a command that names none: one agent, as before lanes. */
+export const DEFAULT_LANE = 'default';
+
+/** The lane the running command belongs to. */
+const lanes = new AsyncLocalStorage<string>();
+
+/** Runs `work` as lane `lane`'s, so every agent-tab read inside it means that lane's tab. */
+export function inLane<T>(lane: unknown, work: () => T): T {
+  return lanes.run(typeof lane === 'string' && lane ? lane : DEFAULT_LANE, work);
+}
+
+/** The running command's lane. */
+const currentLane = (): string => lanes.getStore() ?? DEFAULT_LANE;
+
+/** The agents' tabs while control is scoped to them. */
+export class AgentTab {
+  /** Each lane's tab. */
+  private readonly claims = new Map<string, number>();
+  /** Each lane's lapse: a lane quiet for LANE_IDLE_MS has finished. */
+  private readonly lapses = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Control and the tabs. */
+  private readonly deps: Deps;
+  /** Hears a claim move, so every window's shield, toolbar and strip follow it. */
+  private readonly changed: () => void;
+
+  /** `deps` is the main-process services; `changed` hears a claim move. */
+  constructor(deps: Deps, changed: () => void = () => {}) {
+    this.deps = deps;
+    this.changed = changed;
+  }
+
+  /** The running lane's tab, or null when it has none. */
+  get id(): number | null {
+    return this.claims.get(currentLane()) ?? null;
+  }
+
+  /** Every tab an agent drives. */
+  claimed(): number[] {
+    return [...this.claims.values()];
+  }
+
+  /** Whether control is scoped to agents' tabs: the server's agents drive, with no local automation attached. */
+  scoped(state: ControlSnapshot = this.deps.control.snapshot()): boolean {
+    return !!state.connected && state.mode === 'agent' && !state.localClients && !state.interactive;
+  }
+
+  /** On every control change: anything but the server's agents driving ends every claim. */
+  sync(state: ControlSnapshot): void {
+    if (!this.scoped(state) && this.claims.size) this.update(() => this.claims.clear());
+  }
+
+  /**
+   * An agent starts on a page with no tab of its own yet: alone, it takes the shown tab,
+   * as one agent always has; beside other agents, it gets a fresh background tab, so it
+   * never lands in another agent's tab or the one the person is using.
+   */
+  start(): void {
+    if (!this.scoped() || this.claims.has(currentLane())) return;
+    const { tabs } = this.deps;
+    this.claim(this.claims.size ? tabs.createTab('about:blank', false) : tabs.activeTabId);
+  }
+
+  /** The running lane's run ended: its tab is the person's again. */
+  release(): void {
+    if (this.claims.has(currentLane())) this.update(() => this.claims.delete(currentLane()));
+  }
+
+  /** The running lane now drives tab `id` (a tab it opened, one it switched to, the one a chat was sent from). */
+  claim(id: number | null | undefined): void {
+    if (!this.scoped() || id === null || id === undefined || this.claims.get(currentLane()) === id) return;
+    this.update(() => this.claims.set(currentLane(), id));
+    this.keepAlive(currentLane());
+  }
+
+  /** A tab the running lane opened becomes its tab; answers its id. */
+  opened(id: number): number {
+    this.claim(id);
+    return id;
+  }
+
+  /** The page a command acts on, taking a tab first when its lane has none yet; the lane is alive again. */
+  drive(): TabView | null {
+    this.start();
+    this.keepAlive(currentLane());
+    return this.view();
+  }
+
+  /** Restarts lane `lane`'s lapse. */
+  private keepAlive(lane: string): void {
+    clearTimeout(this.lapses.get(lane));
+    if (!this.claims.has(lane)) return void this.lapses.delete(lane);
+    const lapse = setTimeout(() => this.claims.has(lane) && this.update(() => this.claims.delete(lane)), LANE_IDLE_MS);
+    this.lapses.set(lane, (lapse.unref?.(), lapse));
+  }
+
+  /** The running lane's page: its own tab while scoped (null once that tab is gone, never another's), else the active one. */
+  view(): TabView | null {
+    const id = this.id;
+    if (!this.scoped() || id === null) return this.deps.tabs.getActiveView();
+    return (this.deps.tabs.find(id)?.view as TabView | undefined) ?? null;
+  }
+
+  /** The running lane's tab id, as list_tabs reports it active. */
+  tabId(): number | null {
+    return this.scoped() && this.id !== null ? this.id : (this.deps.tabs.activeTabId ?? null);
+  }
+
+  /** Whether the person may use tab `tabId` right now; null asks about something new, such as a new tab. */
+  humanMay(tabId: number | null | undefined): boolean {
+    const state = this.deps.control.snapshot();
+    return state.interactive || (this.scoped(state) && (tabId === null || !this.claimed().includes(tabId!)));
+  }
+
+  /** Whether another lane drives tab `tabId`. */
+  othersDrive(tabId: number | null | undefined): boolean {
+    return [...this.claims].some(([lane, id]) => id === tabId && lane !== currentLane());
+  }
+
+  /** Throws unless the person may use tab `tabId` (null: something new, such as a new tab). */
+  requireFor(tabId: number | null | undefined): void {
+    if (!this.humanMay(tabId)) throw new Error('Take control before interacting with this page');
+  }
+
+  /** Whether the window shows the running lane's tab, so what it opens is shown too. */
+  following(): boolean {
+    return !this.scoped() || this.id === null || this.deps.tabs.activeTabId === this.id;
+  }
+
+  /** Changes the claims, then tells the windows. */
+  private update(change: () => unknown): void {
+    change();
+    this.changed();
+  }
+}

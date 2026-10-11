@@ -196,9 +196,7 @@ describe('TabManager', () => {
   });
 
   it('refuses a reload while an agent has control', () => {
-    ctx.shield.requireHumanControl = () => {
-      throw new Error('Take control');
-    };
+    ctx.control.state = { interactive: false, mode: 'agent', mine: false };
     assert.throws(() => ctx.tabs.reloadActivePage(), /Take control/);
   });
 
@@ -252,6 +250,7 @@ describe('TabManager', () => {
         home: false,
         favicon: null,
         active: true,
+        agent: true,
         loading: true,
         loadError: null,
         canGoBack: false,

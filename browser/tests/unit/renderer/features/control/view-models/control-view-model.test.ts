@@ -128,7 +128,7 @@ describe('the control guard', () => {
   it('lets page actions through while you hold control', async () => {
     const { vm } = await bar({ getControlState: MINE });
     assert.deepEqual([vm.guard(false), vm.guard(true)], ['allow', 'allow']);
-    assert.deepEqual(blockedActions(vm.state), { pageBlocked: false, recordBlocked: false });
+    assert.deepEqual(blockedActions(vm.state), { pageBlocked: false, newTabBlocked: false, recordBlocked: false });
   });
 
   it('still refuses other page actions while watch-only, and marks them blocked', async () => {
@@ -136,6 +136,19 @@ describe('the control guard', () => {
     assert.equal(vm.guard(false), 'refuse');
     assert.equal(blockedActions(vm.state).pageBlocked, true);
     assert.equal(fake.called('changeControl').length, 0);
+  });
+
+  it("opens the address bar, reload and new tab on the person's own tab while the agent drives another", async () => {
+    const { vm } = await bar({ getControlState: { ...AGENT, pageInteractive: true } });
+    assert.equal(vm.guard(false), 'allow');
+    assert.equal(blockedActions(vm.state).pageBlocked, false);
+    assert.equal(vm.guard(true), 'take', 'recording still needs control of the whole browser');
+  });
+
+  it("opens a new tab while the person looks at the agent's own tab, where everything else stays refused", async () => {
+    const { vm } = await bar({ getControlState: { ...AGENT, pageInteractive: false, newTabInteractive: true } });
+    assert.deepEqual([vm.guard(false), vm.guard(false, true)], ['refuse', 'allow']);
+    assert.deepEqual(blockedActions(vm.state), { pageBlocked: true, newTabBlocked: false, recordBlocked: false });
   });
 
   it('takes control, then lets Start recording through, without looking disabled', async () => {

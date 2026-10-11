@@ -53,6 +53,31 @@ describe('site credentials', () => {
   });
   afterEach(() => mock.restoreAll());
 
+  it('imports a password export in one write, keeping the first account per site', async () => {
+    const counts = await credentials.importMany('p', [
+      { url: 'https://www.a.com/login', username: 'first', password: 'one' },
+      { url: 'https://a.com', username: 'second', password: 'two' },
+      { url: 'b.com', username: 'me', password: 'pw' },
+    ]);
+    assert.deepEqual(counts, { imported: 2, skipped: 1 });
+    assert.deepEqual(credentials.lookup('p', 'a.com'), { domain: 'a.com', username: 'first', password: 'one' });
+    credentials.reset();
+    await credentials.restore();
+    assert.equal(credentials.lookup('p', 'b.com')?.password, 'pw');
+  });
+
+  it('skips export rows that are not web logins: app links, no address, no username or password', async () => {
+    const counts = await credentials.importMany('p', [
+      { url: 'android://hash@com.example.app/', username: 'u', password: 'p' },
+      { url: '', username: 'u', password: 'p' },
+      { url: 'https://c.com', username: '', password: 'p' },
+      { url: 'https://d.com', username: 'u', password: 42 },
+      null,
+    ]);
+    assert.deepEqual(counts, { imported: 0, skipped: 5 });
+    assert.deepEqual(credentials.list('p'), []);
+  });
+
   it('refuses a domain that is not a host name, naming the field and what it needs', async () => {
     await assert.rejects(credentials.set('p', '../x y', { username: 'u', password: 'p' }), {
       status: 400,

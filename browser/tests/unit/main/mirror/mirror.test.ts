@@ -6,7 +6,8 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { Mirror } from '../../../../src/main/mirror/mirror.ts';
-import { MIRROR_ANSWER_TIMEOUT_MS } from '../../../../src/main/mirror/constants.ts';
+import { MIRROR_ANSWER_TIMEOUT_MS, FULL_DISK_ACCESS_PANE } from '../../../../src/main/mirror/constants.ts';
+import { FULL_DISK_ACCESS } from '../../../../src/main/mirror/safari.ts';
 import { flush } from '../../support/fakes.cjs';
 
 /** What a capture of Chrome with two profiles returns. */
@@ -29,7 +30,9 @@ function mirrorWith({ capture = async (): Promise<any> => CAPTURED, up = true }:
     reconnects: 0,
     config: { values: { apiKey: 'k' }, merge: (v: object) => Object.assign(ctx.config.values, v), save: () => {} },
     electron: {},
+    libraries: {},
   };
+  ctx.library = { importInto: (partition: string, data: object) => (ctx.libraries[partition] = data) };
   ctx.shell = { send: (_channel: string, status: object) => ctx.statuses.push(status) };
   ctx.socket = {
     ready: up,
@@ -39,7 +42,11 @@ function mirrorWith({ capture = async (): Promise<any> => CAPTURED, up = true }:
     connect: () => {},
   };
   const seeded: unknown[][] = [];
-  const mirror = new Mirror(ctx, { capture, seed: (...args) => void seeded.push(args) });
+  const readLibrary = (source: string, dir: string, profile: string) => ({
+    bookmarks: [{ url: `https://${source}.test/${profile}`, title: dir, time: 1 }],
+    history: [],
+  });
+  const mirror = new Mirror(ctx, { capture, seed: (...args) => void seeded.push(args), readLibrary });
   return { ctx, mirror, seeded };
 }
 
@@ -68,6 +75,23 @@ describe('Mirror', () => {
     assert.deepEqual(seeded[0].slice(1), ['p-1', '/chrome', 'Default']);
     assert.equal(ctx.config.values.persona, 'p-1');
     assert.equal(ctx.reconnects, 1);
+  });
+
+  it("brings the default profile's bookmarks and history into the default persona's own library", async () => {
+    const { ctx, mirror } = mirrorWith();
+    await mirror.reimport('chrome');
+    mirror.onOk({ personaIds: ['p-1', 'p-2'], defaultPersonaId: 'p-2' });
+    assert.deepEqual(Object.keys(ctx.libraries), ['persist:oya-p-2']);
+    assert.equal(ctx.libraries['persist:oya-p-2'].bookmarks[0].url, 'https://chrome.test/Profile 1');
+  });
+
+  it('opens the Full Disk Access setting when macOS keeps Safari private, and says what to do', async () => {
+    const { ctx, mirror } = mirrorWith({ capture: async () => Promise.reject(new Error(FULL_DISK_ACCESS)) });
+    const opened: string[] = [];
+    ctx.electron.shell = { openExternal: async (url: string) => void opened.push(url) };
+    await mirror.reimport('safari');
+    assert.deepEqual(opened, [FULL_DISK_ACCESS_PANE]);
+    assert.deepEqual(ctx.statuses.at(-1), { done: true, error: FULL_DISK_ACCESS });
   });
 
   it('remembers each finished import for the account page, the newest first, the last five only', async () => {

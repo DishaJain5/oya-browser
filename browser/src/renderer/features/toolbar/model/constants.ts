@@ -8,6 +8,18 @@ export const TEXT = {
   /** The toolbar's name. */
   toolbar: 'Browser navigation',
   library: 'Library',
+  /** The bookmarks bar's name. */
+  bookmarks: 'Bookmarks',
+  /** What the bar says before any bookmark. */
+  bookmarksEmpty: 'Bookmark a page to keep it here.',
+  /** The bar's way to every bookmark and the history. */
+  allBookmarks: 'All bookmarks',
+  /** The star's name when the page is not saved. */
+  bookmarkPage: 'Bookmark this page',
+  /** The star's name when it is. */
+  unbookmarkPage: 'Remove bookmark',
+  /** The bar's hide button. */
+  hideBookmarks: 'Hide bookmarks bar',
   libraryTitle: 'History and bookmarks (⌘/Ctrl Y)',
   back: 'Back',
   forward: 'Forward',

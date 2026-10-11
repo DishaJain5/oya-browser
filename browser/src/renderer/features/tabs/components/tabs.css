@@ -256,8 +256,8 @@ body.mode-browsing .tab-bar {
 .tab-list[data-size='tiny'] .tab-item.active .tab-icon {
   display: none;
 }
-/* ── The agent drives this tab: a small Oya light on its icon ── */
-:root[data-agent-active='true'] .tab-item.active .tab-icon::after {
+/* ── The agent drives this tab: a small Oya light on its icon, even while the person works in another ── */
+:root[data-agent-active='true'] .tab-item.agent .tab-icon::after {
   content: '';
   position: absolute;
   right: -3px;

@@ -16,13 +16,13 @@ import {
   ReconnectOverlay,
   ShellDialog,
   UpdatePill,
-  ConnectionPill,
+  ProfileButton,
   AppVersion,
 } from '../features/connection/index.ts';
 import { ControlBar, blockedActions } from '../features/control/index.ts';
 import { BrandMark, ThemeSelect, PageBackdrop, Launch, useChromeRoot } from '../features/chrome/index.ts';
 import { TabBar, TabCard } from '../features/tabs/index.ts';
-import { Toolbar } from '../features/toolbar/index.ts';
+import { BookmarksBar, Toolbar } from '../features/toolbar/index.ts';
 import { StartPage } from '../features/start/index.ts';
 import { PlaybooksPane } from '../features/playbooks/index.ts';
 import { AskPane } from '../features/ask/index.ts';
@@ -52,7 +52,17 @@ function CommandsButton({ vms }: ShellRootProps) {
   );
 }
 
-/** The tab bar and the toolbar under it. */
+/** The toolbar's end, as in Chrome: notifications, then the profile with its connection dot. */
+function ToolbarEnd({ vms }: ShellRootProps) {
+  return (
+    <>
+      <NotificationsButton vm={vms.notifications} />
+      <ProfileButton pill={vms.connection.pill} account={vms.connection.account} />
+    </>
+  );
+}
+
+/** The tab bar, the toolbar under it, and the bookmarks bar under that. */
 function BrowserChrome({ vms }: ShellRootProps) {
   const { tabs, chrome, connection: c } = vms;
   const brand = <BrandMark vm={chrome.activity} />;
@@ -66,24 +76,30 @@ function BrowserChrome({ vms }: ShellRootProps) {
         commands={<CommandsButton vms={vms} />}
       />
       <TabCard vm={tabs.card} />
-      <Toolbar vm={vms.toolbar} panel={vms.panel} shell={vms.shell}>
-        <NotificationsButton vm={vms.notifications} />
+      <Toolbar vm={vms.toolbar} panel={vms.panel} shell={vms.shell} trailing={<ToolbarEnd vms={vms} />}>
         <UpdatePill vm={c.updates} />
-        <ConnectionPill vm={c.pill} />
         <ControlBar vm={vms.control} />
       </Toolbar>
+      <BookmarksBar vm={vms.toolbar.bookmarks} />
     </>
   );
 }
 
 /** The workspace panel and its panes. */
 function Workspace({ vms }: ShellRootProps) {
-  const { orb } = useViewModel(vms.ask.run);
+  // The panel is the shown tab's agent: its own conversation, run and orb.
+  const { current: ask } = useViewModel(vms.ask);
+  const { orb } = useViewModel(ask.run);
   const { pane } = useViewModel(vms.panel);
   const recordBlocked = useRecordBlocked(vms);
   return (
     <PanelFrame panel={vms.panel} orb={orb}>
-      <AskPane ask={vms.ask} panel={vms.panel} onViewPlaybook={(name) => void vms.playbooks.open(name)} />
+      <AskPane
+        key={ask.tabId ?? 'none'}
+        ask={ask}
+        panel={vms.panel}
+        onViewPlaybook={(name) => void vms.playbooks.open(name)}
+      />
       <PlaybooksPane vm={vms.playbooks} panel={vms.panel} />
       <RoutinesPane routines={vms.routines} panel={vms.panel} />
       <ActionsPane actions={vms.inspect.actions} panel={vms.panel} />

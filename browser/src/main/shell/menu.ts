@@ -2,7 +2,8 @@
  * The application menu. On macOS the first menu is the app's own; the page
  * commands (new tab, close tab, reload) only act while a person has control.
  */
-import type { MenuItemConstructorOptions } from 'electron';
+import { bookmarksBarShown, setBookmarksBar } from './bookmarks-bar.ts';
+import type { MenuItem, MenuItemConstructorOptions } from 'electron';
 import type { AppServices } from '../app/services.ts';
 import { DefaultBrowser } from '../app/default-browser.ts';
 import { LibraryMenu } from '../library/index.ts';
@@ -10,28 +11,38 @@ import { HOME_URL } from '../tabs/constants.ts';
 import { ZOOM_STEP } from './constants.ts';
 
 /** The services the menu uses. */
-type Deps = Pick<AppServices, 'electron' | 'tabs' | 'control' | 'library' | 'persona' | 'shell' | 'windows'>;
+type Deps = Pick<
+  AppServices,
+  'electron' | 'tabs' | 'control' | 'library' | 'persona' | 'shell' | 'windows' | 'agentTab' | 'config'
+>;
 
 /** A menu item's id, label and keys. */
 type ItemName = Pick<MenuItemConstructorOptions, 'id' | 'label' | 'accelerator'>;
 
 /** Quit, named for the product. */
 const QUIT: MenuItemConstructorOptions = { role: 'quit', label: 'Quit Oya Browser' };
+/** macOS's app menu below About and Make Default, named for the product rather than Electron. */
+const MAC_APP_ITEMS: MenuItemConstructorOptions[] = [
+  { type: 'separator' },
+  { role: 'services' },
+  { type: 'separator' },
+  { role: 'hide', label: 'Hide Oya Browser' },
+  { role: 'hideOthers' },
+  { role: 'unhide' },
+  { type: 'separator' },
+  QUIT,
+];
+
 /** macOS's app menu, named for the product rather than Electron. */
-const MAC_APP_MENU: MenuItemConstructorOptions = {
-  label: 'Oya Browser',
-  submenu: [
-    { role: 'about', label: 'About Oya Browser' },
-    { type: 'separator' },
-    { role: 'services' },
-    { type: 'separator' },
-    { role: 'hide', label: 'Hide Oya Browser' },
-    { role: 'hideOthers' },
-    { role: 'unhide' },
-    { type: 'separator' },
-    QUIT,
-  ],
-};
+function macAppMenu(deps: Deps): MenuItemConstructorOptions {
+  const about: MenuItemConstructorOptions = { role: 'about', label: 'About Oya Browser' };
+  return { label: 'Oya Browser', submenu: [about, makeDefaultItem(deps), ...MAC_APP_ITEMS] };
+}
+
+/** Where people look for it first, as in Safari and Chrome; Help keeps a route on every platform. */
+function makeDefaultItem(deps: Deps): MenuItemConstructorOptions {
+  return { label: 'Make Oya Browser Default…', click: () => void new DefaultBrowser(deps).request() };
+}
 
 /**
  * A zoom item that zooms the page, never the shell. The built-in zoom roles act
@@ -53,12 +64,27 @@ function viewItems(deps: Deps): MenuItemConstructorOptions[] {
     zoomItem(deps, { id: 'zoom-reset', label: 'Actual Size', accelerator: 'CmdOrCtrl+0' }, () => 0),
     zoomItem(deps, { id: 'zoom-in', label: 'Zoom In', accelerator: 'CmdOrCtrl+=' }, (level) => level + ZOOM_STEP),
     zoomItem(deps, { id: 'zoom-out', label: 'Zoom Out', accelerator: 'CmdOrCtrl+-' }, (level) => level - ZOOM_STEP),
-    { type: 'separator' },
+    ...bookmarksBarItems(deps),
     { role: 'togglefullscreen' },
   ];
 }
 
-/** A page command: it does nothing unless a person has control. */
+/** Always Show Bookmarks Bar, as in Chrome: Cmd/Ctrl+Shift+B shows or hides it. */
+const BOOKMARKS_BAR_ITEM = {
+  id: 'bookmarks-bar',
+  label: 'Always Show Bookmarks Bar',
+  type: 'checkbox',
+  accelerator: 'CmdOrCtrl+Shift+B',
+} as const;
+
+/** The bookmarks bar's View item, between separators; its tick is whether the bar shows. */
+function bookmarksBarItems(deps: Deps): MenuItemConstructorOptions[] {
+  const checked = bookmarksBarShown(deps.config);
+  const click = (item: MenuItem) => setBookmarksBar(deps as AppServices, item.checked);
+  return [{ type: 'separator' }, { ...BOOKMARKS_BAR_ITEM, checked, click }, { type: 'separator' }];
+}
+
+/** A page command: it does nothing unless the person may use the tab shown (under the agent, any but its own). */
 function humanItem(
   deps: Deps,
   id: string,
@@ -66,7 +92,7 @@ function humanItem(
   accelerator: string,
   run: () => unknown,
 ): MenuItemConstructorOptions {
-  return { id, label, accelerator, click: () => deps.control.snapshot().interactive && run() };
+  return { id, label, accelerator, click: () => deps.agentTab.humanMay(deps.tabs.activeTabId) && run() };
 }
 
 /** File: tabs, plus Quit where the platform puts it there. */
@@ -103,7 +129,7 @@ export function installApplicationMenu(deps: Deps): void {
   const { app, Menu } = deps.electron;
   const mac = process.platform === 'darwin';
   app.setAboutPanelOptions({ applicationName: 'Oya Browser', applicationVersion: app.getVersion() });
-  const template = [...(mac ? [MAC_APP_MENU] : []), fileMenu(deps, mac), { role: 'editMenu' as const }];
+  const template = [...(mac ? [macAppMenu(deps)] : []), fileMenu(deps, mac), { role: 'editMenu' as const }];
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([...template, libraryMenu(deps), viewMenu(deps), { role: 'windowMenu' }, defaultMenu(deps)]),
   );
@@ -113,6 +139,6 @@ export function installApplicationMenu(deps: Deps): void {
 function defaultMenu(deps: Deps): MenuItemConstructorOptions {
   return {
     label: 'Help',
-    submenu: [{ label: 'Make Oya Browser Default…', click: () => void new DefaultBrowser(deps).request() }],
+    submenu: [makeDefaultItem(deps)],
   };
 }

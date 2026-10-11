@@ -13,7 +13,10 @@ import { resolveShortcut } from '../../shared/shortcuts.ts';
 import { LAST_TAB_DIGIT, ZOOM_STEP } from './constants.ts';
 
 /** The services the shortcuts use. */
-type Deps = Pick<AppServices, 'shell' | 'control' | 'tabs' | 'library' | 'electron' | 'persona' | 'windows'>;
+type Deps = Pick<
+  AppServices,
+  'shell' | 'control' | 'tabs' | 'library' | 'electron' | 'persona' | 'windows' | 'agentTab'
+>;
 
 /** A command the main process runs itself. */
 type LocalCommand = (deps: Deps) => unknown;
@@ -25,6 +28,8 @@ export type KeyInput = Pick<Input, 'type' | 'key' | 'code' | 'isAutoRepeat' | 's
 interface TabRef {
   /** The tab's id. */
   id: number;
+  /** Its page, when it has one. */
+  view?: { /** The page's contents. */ webContents: WebContents };
 }
 
 /** Shows the `n`th tab (1-based); 9 is always the last, as in Chrome. */
@@ -48,7 +53,7 @@ const DIGIT_COMMANDS: Record<string, LocalCommand> = Object.fromEntries(
 
 /** Zoom only the page: never distort the shell relative to its native view bounds. */
 function zoomPage(deps: Deps, offset: number | null): void {
-  if (!deps.control.snapshot().interactive) return;
+  if (!deps.agentTab.humanMay(deps.tabs.activeTabId)) return;
   const contents = deps.tabs.getActiveView()?.webContents;
   if (contents) contents.setZoomLevel(offset === null ? 0 : contents.getZoomLevel() + offset);
 }
@@ -64,15 +69,15 @@ const LOCAL_COMMANDS: Record<string, LocalCommand> = {
   library: (deps) => new LibraryMenu(deps).show(),
   bookmark: (deps) => new LibraryMenu(deps).toggle(),
   'new-tab': (deps) => {
-    if (!deps.control.snapshot().interactive) return;
+    if (!deps.agentTab.humanMay(null)) return;
     // The start page loads nothing, so a recording has no navigation to keep.
     deps.tabs.createTab(HOME_URL, true);
   },
-  reload: (deps) => deps.control.snapshot().interactive && deps.tabs.reloadActivePage(),
-  'close-tab': (deps) => deps.control.snapshot().interactive && deps.tabs.closeTab(deps.tabs.activeTabId!),
+  reload: (deps) => deps.agentTab.humanMay(deps.tabs.activeTabId) && deps.tabs.reloadActivePage(),
+  'close-tab': (deps) => deps.agentTab.humanMay(deps.tabs.activeTabId) && deps.tabs.closeTab(deps.tabs.activeTabId!),
   'next-tab': (deps) => deps.tabs.cycleTab(1),
   'previous-tab': (deps) => deps.tabs.cycleTab(deps.tabs.list.length - 1),
-  'reopen-tab': (deps) => deps.control.snapshot().interactive && reopenClosed(deps.tabs),
+  'reopen-tab': (deps) => deps.agentTab.humanMay(null) && reopenClosed(deps.tabs),
   'move-tab-left': (deps) => moveActive(deps, -1),
   'move-tab-right': (deps) => moveActive(deps, 1),
 };
@@ -99,12 +104,18 @@ export class Shortcuts {
     });
   }
 
+  /** Whether the person may type into `contents`: any tab but the agent's while it drives one; anything unknown only with control. */
+  private mayType(contents: WebContents): boolean {
+    const tab = this.deps.tabs.list.find((t: TabRef) => t.view?.webContents === contents);
+    return tab ? this.deps.agentTab.humanMay(tab.id) : this.deps.control.snapshot().interactive;
+  }
+
   /** Blocks page input while an agent drives, then runs any shortcut. */
   private onInput(contents: WebContents, event: ElectronEvent, input: KeyInput): void {
     const owner = this.deps.windows?.ownerOfContents(contents);
     if (owner && owner.shortcuts !== this) return owner.shortcuts.onInput(contents, event, input);
     const shell = this.deps.shell.window;
-    if (contents !== shell?.webContents && !this.deps.control.snapshot().interactive) event.preventDefault();
+    if (contents !== shell?.webContents && !this.mayType(contents)) event.preventDefault();
     const command = shortcutFor(input);
     if (!command) return;
     event.preventDefault();

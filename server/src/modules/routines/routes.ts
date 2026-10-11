@@ -16,7 +16,7 @@ router.get('/routines', authMiddleware, async (req, res) => {
   res.json({ routines: await routines.list(getKey(req)) });
 });
 
-/** POST /routines, add a routine: name, prompt, schedule, enabled. */
+/** POST /routines, add a routine: name, a prompt or a saved playbook (by name) to play, schedule, enabled. */
 router.post('/routines', authMiddleware, async (req, res) => {
   res.status(Status.CREATED).json(await routines.create(getKey(req), req.body));
 });
@@ -26,7 +26,7 @@ router.post('/routines/import', authMiddleware, async (req, res) => {
   res.json({ imported: await routines.importRoutines(getKey(req), req.body?.routines) });
 });
 
-/** PATCH /routines/:id, change any of name, prompt, schedule and enabled; the history is kept. */
+/** PATCH /routines/:id, change any of name, prompt, playbook (null to ask the prompt again), schedule and enabled; the history is kept. */
 router.patch('/routines/:id', authMiddleware, async (req, res) => {
   res.json(await routines.edit(getKey(req), req.params.id, req.body));
 });

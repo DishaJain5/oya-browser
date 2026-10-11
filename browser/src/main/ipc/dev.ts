@@ -10,7 +10,17 @@ import { renderPage, FORMATS, type Analysis } from '../../page/render.ts';
 /** The services the dev panel's handlers use. */
 type Deps = Pick<
   AppServices,
-  'config' | 'socket' | 'control' | 'shield' | 'chatAbort' | 'tabs' | 'protection' | 'world' | 'actions'
+  | 'config'
+  | 'socket'
+  | 'control'
+  | 'shield'
+  | 'chatAbort'
+  | 'chatRuns'
+  | 'tabs'
+  | 'protection'
+  | 'world'
+  | 'actions'
+  | 'agentTab'
 >;
 
 /** The channels this group answers. */
@@ -162,8 +172,8 @@ export class DevHandlers {
     'request-takeover': () => this.deps.shield.takeover.request(),
     'model-status': () => this.modelStatus(),
     'save-model-key': (_e, choice) => this.saveModelKey(choice),
-    'send-chat': (_e, messages, data) => this.chat.send(messages, data),
-    'stop-chat': () => this.chat.stop(),
+    'send-chat': (_e, messages, data, tabId) => this.chat.send(messages, data, tabId),
+    'stop-chat': (_e, tabId) => this.chat.stop(tabId),
     // The server keeps each browser's last run, so a body with only a name saves it as a playbook.
     'save-chat-playbook': (_e, name) => this.chat.ask('playbooks', { name }),
     // The html it reads is the page's outerHTML, a string.

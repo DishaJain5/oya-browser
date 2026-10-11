@@ -14,6 +14,9 @@ import { developmentExecutable } from '../../src/dev/launch.ts';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from '../../../ui/node_modules/playwright/index.mjs';
 import { shellLayout } from '../../src/main/shell/shell-layout.ts';
+import { BOOKMARKS_BAR_HEIGHT, CHROME_HEIGHT } from '../../src/main/shell/constants.ts';
+/** The chrome over the page: the strip, the toolbar and the bookmarks bar, which shows by default. */
+const TOP = CHROME_HEIGHT + BOOKMARKS_BAR_HEIGHT;
 
 const profile = await mkdtemp(join(tmpdir(), 'oya-shell-test-'));
 await writeFile(join(profile, 'config.json'), JSON.stringify({ ui: { importOffered: true } }));
@@ -270,7 +273,7 @@ try {
     await page.waitForFunction(() => window.motionFrames.at(-1)?.progress === 1);
     assert.deepEqual(
       await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getBrowserView().getBounds()),
-      shellLayout(width, 860, true).page,
+      shellLayout(width, 860, true, undefined, TOP).page,
     );
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.evaluate(() => {
@@ -530,12 +533,14 @@ try {
   await page.getByRole('tab', { name: 'Ask', exact: true }).click();
   await capture('ask-dark');
   // A reply whose run acted on the page offers to save it; only the latest run can be saved.
-  await page.evaluate(() => window.oyaShell.ask.reply('Searched.', [{ name: 'analyze_page' }, { name: 'type' }]));
+  await page.evaluate(() =>
+    window.oyaShell.ask.state.current.reply('Searched.', [{ name: 'analyze_page' }, { name: 'type' }]),
+  );
   await page.getByRole('button', { name: 'Save as playbook', exact: true }).click();
   assert.equal(await page.getByRole('textbox', { name: 'Playbook name' }).inputValue(), 'agent-run');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.locator('.chat-save-error', { hasText: 'Not connected to server' }).waitFor();
-  await page.evaluate(() => window.oyaShell.ask.reply('Nothing to replay.', [{ name: 'analyze_page' }]));
+  await page.evaluate(() => window.oyaShell.ask.state.current.reply('Nothing to replay.', [{ name: 'analyze_page' }]));
   const readOnly = page.getByRole('button', { name: 'Save as playbook', exact: true });
   assert.equal(await readOnly.isDisabled(), true, 'a read-only run shows the offer disabled');
   await page.locator('.chat-save-note', { hasText: 'only read pages' }).waitFor();
@@ -600,7 +605,7 @@ try {
   assert.notEqual(fresh.id, savedDraft, 'Start made a new draft');
   assert.equal(fresh.steps[0]?.start, true, 'a fresh recording starts where the person is');
   await page.getByRole('tab', { name: 'Ask', exact: true }).click();
-  await page.evaluate(() => window.oyaShell.ask.clear());
+  await page.evaluate(() => window.oyaShell.ask.state.current.clear());
   await page.locator('#chat-input').fill('First line');
   await page.locator('#chat-input').press('Shift+Enter');
   await page.locator('#chat-input').pressSequentially('Second line');
@@ -635,9 +640,9 @@ try {
     const bounds = await application.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()[0].getBrowserView().getBounds(),
     );
-    assert.deepEqual(bounds, shellLayout(width, height, true).page);
+    assert.deepEqual(bounds, shellLayout(width, height, true, undefined, TOP).page);
     const panel = await page.locator('#dev-panel').boundingBox();
-    assert.equal(Math.round(panel.y), width < 960 ? bounds.y + bounds.height : 88);
+    assert.equal(Math.round(panel.y), width < 960 ? bounds.y + bounds.height : TOP);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     await capture(`record-dark-${width}`);
   }

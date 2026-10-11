@@ -452,3 +452,53 @@ body.mode-browsing .toolbar {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* The address field's focus is the whole bar's ring (.address-wrap:focus-within); the
+   global input ring would draw a second, inset pill inside it. */
+.address-wrap .url-bar:focus,
+.address-wrap .url-bar:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* The address bar's star (address-bar.tsx): a bare star, a soft disc on hover, filled in the accent once the
+   page is saved. No box: a click leaves no ring inside the address field; only the keyboard gets a quiet one. */
+.bookmark-star {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-right: 2px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--secondary);
+  box-shadow: none;
+  outline: none;
+  transition:
+    color var(--t-fast) var(--ease),
+    background-color var(--t-fast) var(--ease),
+    transform 120ms var(--ease);
+}
+.bookmark-star:focus {
+  box-shadow: none;
+  outline: none;
+}
+.bookmark-star:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.bookmark-star .icon {
+  width: 16px;
+  height: 16px;
+}
+.bookmark-star:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.bookmark-star:active {
+  transform: scale(0.88);
+}
+.bookmark-star.saved {
+  color: var(--accent);
+}
+.bookmark-star.saved .icon path {
+  fill: currentColor;
+}

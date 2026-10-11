@@ -28,3 +28,20 @@ export const BOOKMARK_TITLE_LENGTH = 500;
 
 /** Keep the omnibox dropdown small enough for short windows. */
 export const ADDRESS_SUGGESTION_LIMIT = 8;
+/** How much each kind of address-bar match weighs; the order matters, not the numbers. */
+export const SUGGESTION_SCORES = {
+  /** The site's name starts with what was typed. */
+  site: 1000,
+  /** On top of that, it is the site's home page. */
+  home: 500,
+  /** The address starts with what was typed. */
+  address: 800,
+  /** A word of the title starts with it. */
+  word: 300,
+  /** The title or address contains it somewhere. */
+  contains: 100,
+  /** A bookmark edges out history of the same weight. */
+  bookmark: 50,
+} as const;
+/** Rows one site may take in the address bar's list, so other sites still show. */
+export const SUGGESTIONS_PER_SITE = 3;

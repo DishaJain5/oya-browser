@@ -1,4 +1,5 @@
 /** IPC: the address bar, back/forward/reload, and the tab strip (open, close, switch, move, its menu). */
+import { bookmarksBar, setBookmarksBar } from '../shell/bookmarks-bar.ts';
 import type { AppServices } from '../app/services.ts';
 import type { HandlersOf } from './handle.ts';
 import { LibraryMenu, addressSuggestions } from '../library/index.ts';
@@ -9,13 +10,26 @@ import { TabMenu } from '../tabs/tab-menu.ts';
 /** The services navigation uses. */
 type Deps = Pick<
   AppServices,
-  'externalApps' | 'shield' | 'shell' | 'tabs' | 'recorder' | 'control' | 'electron' | 'library' | 'persona' | 'windows'
+  | 'externalApps'
+  | 'shield'
+  | 'shell'
+  | 'tabs'
+  | 'recorder'
+  | 'control'
+  | 'electron'
+  | 'library'
+  | 'persona'
+  | 'windows'
+  | 'agentTab'
 >;
 
 /** The channels this group answers. */
 type Channel =
   | 'address-suggestions'
   | 'show-library'
+  | 'bookmarks-bar-state'
+  | 'set-bookmarks-bar'
+  | 'toggle-bookmark'
   | 'navigate'
   | 'go-back'
   | 'go-forward'
@@ -37,6 +51,9 @@ export class NavigationHandlers {
   readonly handlers: HandlersOf<Channel> = {
     'address-suggestions': (_e, query) => addressSuggestions(this.deps.library, query),
     'show-library': () => new LibraryMenu(this.deps).show(),
+    'bookmarks-bar-state': () => bookmarksBar(this.deps as AppServices),
+    'set-bookmarks-bar': (_e, shown) => setBookmarksBar(this.deps as AppServices, shown === true),
+    'toggle-bookmark': () => new LibraryMenu(this.deps).toggle(),
     navigate: (_e, url) => this.navigate(url),
     'go-back': () => this.goInHistory('go_back'),
     'go-forward': () => this.goInHistory('go_forward'),
@@ -48,7 +65,7 @@ export class NavigationHandlers {
     'begin-tab-drag': (_e, id) => this.deps.windows?.drag.begin(this.deps as AppServices, id),
     'end-tab-drag': () => this.deps.windows?.drag.stop(this.deps as AppServices),
     'close-tab': (_e, id) => {
-      this.requireHuman();
+      this.deps.agentTab.requireFor(id);
       this.deps.tabs.closeTab(id);
     },
     'activate-tab': (_e, id) => this.deps.tabs.activateTab(id),
@@ -83,9 +100,14 @@ export class NavigationHandlers {
     this.deps.shield.requireHumanControl();
   }
 
+  /** Throws unless the person may use the tab their window shows: under the agent, any tab but the agent's. */
+  private requireShownTab(): void {
+    this.deps.agentTab.requireFor(this.deps.tabs.activeTabId);
+  }
+
   /** Loads an address in the active tab, or leaves the start screen for it. */
   private async navigate(url: string): Promise<void> {
-    this.requireHuman();
+    this.requireShownTab();
     const contents = this.deps.tabs.getActiveView()?.webContents || this.deps.shell.window?.webContents;
     if (this.deps.externalApps.request(url, contents)) return;
     if (!this.deps.shell.browsingMode) return void this.deps.tabs.enterBrowsingMode(url);
@@ -94,7 +116,7 @@ export class NavigationHandlers {
 
   /** Back or forward in the active tab, recorded as a step when a recording is running. */
   private async goInHistory(action: 'go_back' | 'go_forward'): Promise<void> {
-    this.requireHuman();
+    this.requireShownTab();
     const contents = this.deps.tabs.getActiveView()?.webContents;
     const back = action === 'go_back';
     const history = contents?.navigationHistory;
@@ -106,7 +128,7 @@ export class NavigationHandlers {
 
   /** Opens a tab; the start page loads nothing, so a recording keeps only a real address. */
   private newTab(url: string | undefined): number {
-    this.requireHuman();
+    this.deps.agentTab.requireFor(null);
     const id = this.deps.tabs.createTab(url || HOME_URL, true);
     if (url) this.deps.recorder.recordNavigation(url);
     return id;

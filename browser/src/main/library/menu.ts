@@ -5,7 +5,7 @@ import { safeAddress, type LibraryEntry } from './library.ts';
 import { CLEAR_HISTORY_CONFIRMATION, CONFIRM_RESPONSE, MENU_PAGE_SIZE, MENU_TITLE_LENGTH } from './constants.ts';
 
 /** The native menu's collaborators. */
-type Deps = Pick<AppServices, 'library' | 'tabs' | 'electron' | 'shell' | 'control' | 'persona'>;
+type Deps = Pick<AppServices, 'library' | 'tabs' | 'electron' | 'shell' | 'control' | 'persona' | 'agentTab'>;
 /** Native history/bookmark navigation, shared by the toolbar and application menu. */
 export class LibraryMenu {
   /** Services supplied by the composition root. */
@@ -14,9 +14,13 @@ export class LibraryMenu {
   constructor(deps: Deps) {
     this.deps = deps;
   }
+  /** Whether the person may use the shown tab: with control, or beside an agent's tab. */
+  private mayUse(): boolean {
+    return this.deps.agentTab.humanMay(this.deps.tabs.activeTabId);
+  }
   /** Opens the library with fresh contents, even after a profile switch. */
   show(): void {
-    if (!this.deps.control.snapshot().interactive) return;
+    if (!this.mayUse()) return;
     this.deps.electron.Menu.buildFromTemplate(this.items()).popup({ window: this.deps.shell.window! });
   }
   /** The native list is built afresh for the current profile. */
@@ -32,7 +36,7 @@ export class LibraryMenu {
   }
   /** Bookmarking uses the active page, not user-editable address-bar text. */
   toggle(): void {
-    if (!this.deps.control.snapshot().interactive) return;
+    if (!this.mayUse()) return;
     const tab = this.deps.tabs.find(this.deps.tabs.activeTabId);
     if (tab && !tab.home) this.deps.library.toggle(tab.url, tab.title);
   }
@@ -61,8 +65,7 @@ export class LibraryMenu {
     return {
       label: `${entry.title.slice(0, MENU_TITLE_LENGTH)} — ${new URL(entry.url).host}`.replaceAll('&', '&&'),
       click: () => {
-        if (this.deps.control.snapshot().interactive && partition === this.deps.persona.partitionName())
-          this.deps.tabs.createTab(entry.url, true);
+        if (this.mayUse() && partition === this.deps.persona.partitionName()) this.deps.tabs.createTab(entry.url, true);
       },
     };
   }
@@ -70,11 +73,7 @@ export class LibraryMenu {
   private async clear(): Promise<void> {
     const partition = this.deps.persona.partitionName();
     const result = await this.deps.electron.dialog.showMessageBox(this.deps.shell.window!, CLEAR_HISTORY_CONFIRMATION);
-    if (
-      result.response === CONFIRM_RESPONSE &&
-      partition === this.deps.persona.partitionName() &&
-      this.deps.control.snapshot().interactive
-    )
+    if (result.response === CONFIRM_RESPONSE && partition === this.deps.persona.partitionName() && this.mayUse())
       this.deps.library.clearHistory();
   }
 }

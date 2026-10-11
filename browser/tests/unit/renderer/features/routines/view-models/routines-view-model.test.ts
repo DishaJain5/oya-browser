@@ -80,6 +80,7 @@ async function pane(state: unknown = snapshot([]), after: unknown = state, shown
   const fake = fakeBridge({
     listRoutines: state,
     stopRoutine: true,
+    playbooks: { playbooks: [{ name: 'check-prices' }, { name: 'inbox-zero' }] },
     ...Object.fromEntries(names.map((n) => [n, answer])),
   });
   const panel = new FakePanel({ pane: shown });
@@ -249,6 +250,18 @@ describe('RoutinesViewModel', () => {
 });
 
 describe('the routine editor', () => {
+  it('offers the saved playbooks, and saves a routine that plays one instead of asking a prompt', async () => {
+    const { fake, vm } = await pane(snapshot([]), snapshot([INBOX]));
+    vm.edit(null);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.deepEqual(vm.editor.state.playbooks, ['check-prices', 'inbox-zero']);
+    vm.editor.setField('name', 'Prices');
+    vm.editor.setField('playbook', 'check-prices');
+    await vm.editor.submit();
+    const [[saved]] = fake.called('saveRoutine');
+    assert.deepEqual([saved.playbook, saved.prompt], ['check-prices', '']);
+  });
+
   it('saves a new daily routine, on, and closes', async () => {
     const { fake, vm } = await pane(snapshot([]), snapshot([INBOX]));
     vm.edit(null);
@@ -262,6 +275,7 @@ describe('the routine editor', () => {
         {
           name: 'Standup',
           prompt: 'Summarize Slack',
+          playbook: null,
           enabled: true,
           schedule: { kind: 'daily', at: '08:30' },
           target: 'desktop',

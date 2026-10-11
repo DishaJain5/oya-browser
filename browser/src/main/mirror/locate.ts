@@ -10,6 +10,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { windowsExecutable } from './windows-executable.ts';
 import { firefoxSource, type FirefoxSource } from './firefox.ts';
+import { safariSource, type SafariSource } from './safari.ts';
 
 /** A profile a Chromium browser holds, as Local State lists it. */
 export interface SourceProfile {
@@ -38,7 +39,7 @@ export interface ChromiumSource {
 }
 
 /** A browser an import can read. */
-export type Source = ChromiumSource | FirefoxSource;
+export type Source = ChromiumSource | FirefoxSource | SafariSource;
 
 /** A browser on this machine, as the import picker lists it. */
 export interface ListedSource {
@@ -74,6 +75,8 @@ interface WinSpec {
 
 /** The macOS bundle id and Windows ProgId marker of Firefox, which is read differently (firefox.ts). */
 const FIREFOX_BUNDLE = 'org.mozilla.firefox';
+/** Safari's macOS bundle id. */
+const SAFARI_BUNDLE = 'com.apple.safari';
 
 /** A supported browser family: its display name, macOS bundle id, and app/data locations. */
 const MAC_BROWSERS: Record<string, MacSpec> = {
@@ -128,13 +131,22 @@ function macSources(): ListedSource[] {
   const chromium = Object.entries(MAC_BROWSERS)
     .filter(([, spec]) => fs.existsSync(path.join(macSupport(), spec.data)))
     .map(([bundleId, spec]) => ({ id: macId(spec), name: spec.name, isDefault: bundleId === bundle }));
+  return defaultFirst([...chromium, ...macReadSources(bundle)]);
+}
+
+/** Firefox and Safari, which are read from their files; Safari is the default when nothing else claims https. */
+function macReadSources(bundle: string | null): ListedSource[] {
   const firefox = firefoxSource() ? [{ id: 'firefox', name: 'Firefox', isDefault: bundle === FIREFOX_BUNDLE }] : [];
-  return defaultFirst([...chromium, ...firefox]);
+  const safari = safariSource()
+    ? [{ id: 'safari', name: 'Safari', isDefault: !bundle || bundle === SAFARI_BUNDLE }]
+    : [];
+  return [...firefox, ...safari];
 }
 
 /** The macOS browser named `id`, ready to capture; null when it is not installed. */
 function macSource(id: string): Source | null {
   if (id === 'firefox') return firefoxSource();
+  if (id === 'safari') return safariSource();
   const spec = Object.values(MAC_BROWSERS).find((b) => macId(b) === id);
   if (!spec || !fs.existsSync(path.join(macSupport(), spec.data))) return null;
   return describeSource(id, spec.name, macExe(spec.app), path.join(macSupport(), spec.data));
@@ -169,6 +181,7 @@ function winSources(): ListedSource[] {
 /** The Windows browser named `id`, ready to capture; null when it is not installed. */
 function winSource(id: string): Source | null {
   if (id === 'firefox') return firefoxSource();
+  if (id === 'safari') return safariSource();
   const local = process.env.LOCALAPPDATA || '';
   const spec = Object.values(WIN_BROWSERS).find((b) => winId(b) === id);
   if (!spec || !local || !fs.existsSync(path.join(local, spec.data))) return null;

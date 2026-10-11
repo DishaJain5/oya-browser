@@ -15,7 +15,7 @@ const { Proxy } = await import('../../../../src/modules/proxies/proxy.ts');
 const credentials = await import('../../../../src/modules/personas/credentials.ts');
 const mfa = await import('../../../../src/modules/challenges/mfa.ts');
 const { recent, fingerprint } = await import('../../../../src/platform/audit.ts');
-const { allowKey, callRoute } = await import('../../support/agent.ts');
+const { allowKey, callRoute, scriptedBrowser } = await import('../../support/agent.ts');
 const { personaService } = await import('../../support/personas.ts');
 
 const KEY = 'persona-routes-key';
@@ -206,6 +206,32 @@ describe('persona site routes', () => {
     // configured is the persona-wide default; a factor filed against one portal is a site.
     assert.deepEqual(res.body, { configured: false, sites: [{ domain: 'portal.example.net', type: 'totp' }] });
     assert.doesNotMatch(JSON.stringify(res.body), /JBSWY3DPEHPK3PXP/);
+  });
+
+  it("imports a password export into the calling browser's persona, answering counts only", async () => {
+    const browser = scriptedBrowser('b-import', KEY);
+    try {
+      const entries = [{ url: 'https://a.com', username: 'me', password: 'pw' }];
+      const res = await call('POST', '/browsers/b-import/credentials/import', { entries });
+      assert.deepEqual(res.body, { imported: 1, skipped: 0 });
+      assert.equal(credentials.lookup('p-1', 'a.com')?.username, 'me');
+      assert.deepEqual(lastAudit('credentials.import').meta, { imported: 1, skipped: 0 });
+      assert.doesNotMatch(JSON.stringify(recent({})), /"pw"/);
+    } finally {
+      browser.disconnect();
+    }
+  });
+
+  it("refuses a password import into another key's browser, or one that is not a list", async () => {
+    const browser = scriptedBrowser('b-import', KEY);
+    try {
+      const entries = [{ url: 'https://a.com', username: 'me', password: 'pw' }];
+      assert.equal((await call('POST', '/browsers/b-import/credentials/import', { entries }, OTHER)).status, 404);
+      assert.equal((await call('POST', '/browsers/b-import/credentials/import', { entries: 'x' })).status, 400);
+      assert.equal(credentials.lookup('p-1', 'a.com'), null);
+    } finally {
+      browser.disconnect();
+    }
   });
 
   it('lists site logins by username only', async () => {

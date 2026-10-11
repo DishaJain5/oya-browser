@@ -6,6 +6,7 @@ import type { ControlChange, PersonaList, ShellStatus } from '../../shared/ipc.t
 import type { HandlersOf } from './handle.ts';
 import { ServerApi } from '../connection/server-api.ts';
 import { pairingServer } from '../connection/pairing.ts';
+import { PasswordImport } from '../mirror/passwords.ts';
 
 /** The services the session handlers use. */
 type Deps = Pick<
@@ -24,6 +25,7 @@ type Channel =
   | 'save-profile'
   | 'import-sources'
   | 'reimport-browser'
+  | 'import-passwords'
   | 'sign-out'
   | 'get-fingerprint'
   | 'list-personas'
@@ -95,6 +97,7 @@ export class SessionHandlers {
     'import-sources': () => this.deps.mirror.sources(),
     // The id comes from the shell page: only a listed browser is ever opened.
     'reimport-browser': (_e, sourceId) => this.deps.mirror.reimport(this.listedSource(sourceId)),
+    'import-passwords': () => new PasswordImport(this.deps).run(),
     'sign-out': () => this.signOut(),
     'get-fingerprint': () => this.deps.persona.summary(),
     'list-personas': () => this.listPersonas(),

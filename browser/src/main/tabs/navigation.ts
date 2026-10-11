@@ -9,7 +9,7 @@ import { loadInTab, isUnprotected, showUnprotected } from './load.ts';
 import type { Tab } from './types.ts';
 
 /** The services the address bar uses. */
-type Deps = Pick<AppServices, 'tabs' | 'control' | 'recorder' | 'cookies'>;
+type Deps = Pick<AppServices, 'tabs' | 'control' | 'recorder' | 'cookies' | 'agentTab'>;
 
 /** A host, with an optional port and path: has a dot, or is localhost, and no spaces. */
 const HOST = /^(localhost|[^\s/:]+\.[^\s/:]+)(:\d+)?(\/\S*)?$/i;
@@ -78,7 +78,7 @@ export class AddressBar {
     const { tabs } = this.deps;
     if (tab.view.webContents.isDestroyed() || tab.navigationRequest !== request) return;
     tab.navigationPending = false;
-    if (this.deps.control.snapshot().interactive)
+    if (this.deps.agentTab.humanMay(tab.id))
       loadInTab(tab, url).catch((e) => isUnprotected(e) && showUnprotected(tabs, tab));
     tabs.sendTabList();
   }

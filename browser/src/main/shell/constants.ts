@@ -6,6 +6,10 @@
 
 /** Height of the shell's toolbar above the page. */
 export const CHROME_HEIGHT = 88;
+/** The bookmarks bar's height under the toolbar, when it shows. */
+export const BOOKMARKS_BAR_HEIGHT = 30;
+/** Most bookmarks the bar carries; the rest are under All bookmarks. */
+export const BOOKMARKS_BAR_ITEMS = 40;
 
 /** Below this window width the dev panel docks at the bottom instead of the side. */
 export const COMPACT_WIDTH = 960;

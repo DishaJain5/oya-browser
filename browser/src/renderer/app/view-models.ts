@@ -5,12 +5,13 @@
  * record button, the studio's record button goes through the control bar).
  * Views receive these instances; nothing else constructs a ViewModel.
  */
+import { RendererConstants as C } from '../core/constants.ts';
 import { NotificationsViewModel } from '../features/notifications/index.ts';
 import type { OyaBrowser } from '../core/bridge.ts';
 import { ShellViewModel } from './shell-view-model.ts';
 import { PanelViewModel, type FrameClock } from './panel/panel-view-model.ts';
 import { PlaybooksViewModel } from '../features/playbooks/index.ts';
-import { AskViewModel } from '../features/ask/index.ts';
+import { AskSessions } from '../features/ask/index.ts';
 import {
   ThemeViewModel,
   AgentActivityViewModel,
@@ -62,7 +63,8 @@ function recordingGate(control: ControlViewModel): RecordingGate {
 /** Tabs move only while a person holds control; a refused drag focuses Take control, as a refused button does. */
 function tabDragGate(control: ControlViewModel, frames: FrameClock): TabDragGate {
   return {
-    movable: () => !control.state.control || control.guard(false) === 'allow',
+    // Moving tabs between windows stays the person's only with control, even beside the agent's tab.
+    movable: () => !control.state.control || !!control.state.control.interactive,
     refuse: focusById(frames, CONTROL_ACTION_ID),
   };
 }
@@ -84,7 +86,7 @@ export class ShellViewModels {
   /** Who drives the browser. */
   declare readonly control: ControlViewModel;
   /** The Ask pane. */
-  declare readonly ask: AskViewModel;
+  declare readonly ask: AskSessions;
   /** The workflow studio. */
   declare readonly studio: StudioViewModel;
   /** Theme, activity, backdrop and launch. */
@@ -139,8 +141,8 @@ type FeatureKeys = 'ask' | 'studio' | 'chrome' | 'tabs' | 'toolbar' | 'start' | 
 function toolModels(root: ShellViewModels): Pick<ShellViewModels, 'ask' | 'studio' | 'start' | 'routines'> {
   const { env, shell, panel, control } = root;
   const { bridge, clipboard } = env;
-  const ask = new AskViewModel({ bridge, panel });
-  const asker = { ask: (text: string) => ask.ask(text), busy: () => ask.state.sending };
+  const ask = new AskSessions({ bridge, panel });
+  const asker = { ask: (text: string) => ask.ask(text), busy: () => ask.busy() };
   const studio = new StudioViewModel({ bridge, shell, panel, gate: recordingGate(control), clipboard });
   const routines = new RoutinesViewModel({ bridge, panel });
   return { ask, studio, routines, start: new StartViewModel({ bridge, shell, asker }) };
@@ -239,7 +241,7 @@ export interface ConnectionModels {
 }
 
 /** The account page's parts, then the dialog over them. */
-function accountModels({ bridge, clipboard }: PageEnvironment) {
+function accountModels({ bridge, clipboard }: PageEnvironment, busy: () => boolean) {
   const parts = {
     account: new AccountViewModel(bridge),
     sync: new SyncViewModel(bridge),
@@ -247,15 +249,23 @@ function accountModels({ bridge, clipboard }: PageEnvironment) {
     profile: new ProfileViewModel(bridge),
   };
   const dialog = new ShellDialogViewModel({ bridge, clipboard, ...parts });
-  return connectImportOffer(parts, dialog);
+  return connectImportOffer(parts, dialog, busy);
+}
+
+/** Opens the first-run offer once no agent is working, so it never lands on a person's first task. */
+function offerWhenIdle(busy: () => boolean, open: () => void): void {
+  if (!busy()) return open();
+  setTimeout(() => offerWhenIdle(busy, open), C.IMPORT_OFFER_RETRY_MS);
 }
 
 /** Wire the first-login offer after both collaborators exist. */
 function connectImportOffer<T extends { /** Login import invitation. */ imports: ImportViewModel }>(
   parts: T,
   dialog: ShellDialogViewModel,
+  busy: () => boolean,
 ) {
-  parts.imports.onOffer = () => void dialog.open(true);
+  parts.imports.onOffer = () => offerWhenIdle(busy, () => void dialog.open(true));
+  parts.imports.onDecline = () => dialog.close();
   return { ...parts, dialog };
 }
 
@@ -264,7 +274,7 @@ function paletteHost(root: ShellViewModels) {
   return {
     focusAddress: () => root.toolbar.focusAddress(),
     openNotifications: () => root.notifications.open(),
-    openModels: () => void root.panel.open('chat').then(() => root.ask.model.openCard()),
+    openModels: () => void root.panel.open('chat').then(() => root.ask.state.current.model.openCard()),
     focusChat: focusById(root.env.frames, 'chat-input'),
     recordButton: () => void root.studio.actions.recordShortcut(),
   };
@@ -274,7 +284,7 @@ function paletteHost(root: ShellViewModels) {
 function connectionModels(env: PageEnvironment, root: ShellViewModels): ConnectionModels {
   const { bridge, platform } = env;
   const { shell, panel } = root;
-  const { dialog, ...parts } = accountModels(env);
+  const { dialog, ...parts } = accountModels(env, () => root.ask.anyBusy());
   const setup = new SetupViewModel({ bridge, shell });
   const [reconnect, updates] = [new ReconnectViewModel({ bridge, shell, dialog, setup }), new UpdatesViewModel(bridge)];
   const palette = new PaletteViewModel({ bridge, panel, shell, dialog, updates, host: paletteHost(root), platform });

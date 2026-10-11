@@ -19,6 +19,7 @@ import { HOME_URL } from '../tabs/constants.ts';
 /** The services start-up uses. */
 type Deps = Pick<
   AppServices,
+  | 'agentTab'
   | 'electron'
   | 'library'
   | 'config'

@@ -10,14 +10,31 @@ function setup() {
   const ctx = mainCtx();
   return { ctx, library: new BrowsingLibrary(ctx) };
 }
-it('matches URL prefixes and page titles, with prefix matches first', () => {
+it('puts the site whose name starts with the query first, its home page before its deep links, then title matches', () => {
   const { library } = setup();
   library.visit('https://example.test/', 'Gmail guide');
   library.visit('https://gmail.test/inbox', 'Inbox');
   assert.deepEqual(
     addressSuggestions(library, 'GMAIL').map((item) => item.url),
-    ['https://gmail.test/inbox', 'https://example.test/'],
+    ['https://gmail.test/', 'https://gmail.test/inbox', 'https://example.test/'],
   );
+});
+it('ranks a word starting in a title above the query buried inside another', () => {
+  const { library } = setup();
+  library.visit('https://a.test/', 'Cardiology notes');
+  library.visit('https://b.test/', 'Your card statement');
+  assert.deepEqual(
+    addressSuggestions(library, 'card').map((item) => item.url),
+    ['https://b.test/', 'https://a.test/'],
+  );
+});
+it('lets no one site fill the list, so other sites that match still show', () => {
+  const { library } = setup();
+  for (let i = 0; i < ADDRESS_SUGGESTION_LIMIT; i++) library.visit(`https://docs.test/page${i}`, 'Docs');
+  library.visit('https://other.test/docs', 'Other docs');
+  const hosts = addressSuggestions(library, 'docs').map((item) => new URL(item.url).host);
+  assert.equal(hosts.filter((h) => h === 'docs.test').length, 3);
+  assert.ok(hosts.includes('other.test'));
 });
 it('deduplicates bookmarks and history while preserving saved titles', () => {
   const { library } = setup();
@@ -35,10 +52,10 @@ it('returns nothing for blank, invalid or oversized input', () => {
 });
 it('caps the result count and preserves recent history order', () => {
   const { library } = setup();
-  for (let i = 0; i < ADDRESS_SUGGESTION_LIMIT + 1; i++) library.visit(`https://example.test/${i}`, 'Example');
+  for (let i = 0; i < ADDRESS_SUGGESTION_LIMIT + 1; i++) library.visit(`https://site${i}.test/`, 'Example');
   const results = addressSuggestions(library, 'example');
   assert.equal(results.length, ADDRESS_SUGGESTION_LIMIT);
-  assert.equal(results[0].url, `https://example.test/${ADDRESS_SUGGESTION_LIMIT}`);
+  assert.equal(results[0].url, `https://site${ADDRESS_SUGGESTION_LIMIT}.test/`);
 });
 it('does not expose another profile or unsafe addresses', () => {
   const { ctx, library } = setup();

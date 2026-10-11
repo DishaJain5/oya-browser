@@ -133,6 +133,35 @@ describe('Routines', () => {
     assert.deepEqual(ending[2], { status: 'done', result: 'Cheapest is $4', steps: ['navigate'] });
   });
 
+  it('plays the saved playbook of a routine that names one, through the runs route, and records how it ended', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const server = fakeServer([held({ prompt: '', playbook: 'check-prices' })], {
+      'POST browsers/b1/runs': () => ({ id: 'run_1', status: 'running' }),
+      'GET runs/run_1': () => ({ id: 'run_1', status: 'succeeded', result: { steps: 2, total: 2, fellBack: false } }),
+    });
+    const run = mock.fn(async () => ({ text: 'never asked' }));
+    const ticking = new Routines(ctx, run).tick(EIGHT_AM + HOUR);
+    for (let i = 0; i < 20 && !server.called('GET', 'runs/run_1').length; i++) {
+      await new Promise((resolve) => setImmediate(resolve));
+      mock.timers.tick(1000);
+    }
+    await ticking;
+    mock.timers.reset();
+    assert.equal(run.mock.callCount(), 0, 'a playbook routine never asks the agent');
+    assert.deepEqual(server.called('POST', 'browsers/b1/runs')[0][2], { playbook: 'check-prices' });
+    const [ending] = server.calls.filter(([m, p]) => m === 'PATCH' && p.startsWith('routines/r1/runs/'));
+    assert.deepEqual(ending[2], { status: 'done', result: 'Played 2 of 2 steps.', steps: [] });
+  });
+
+  it('saves which playbook a routine plays, and clears it to go back to the prompt', async () => {
+    const server = fakeServer([]);
+    const routines = new Routines(ctx);
+    await routines.save({ name: 'Prices', prompt: '', playbook: 'check-prices', schedule: held().schedule });
+    await routines.save({ id: 'r1', name: 'Prices', prompt: 'Check prices', schedule: held().schedule });
+    assert.equal(server.called('POST', 'routines')[0][2].playbook, 'check-prices');
+    assert.equal(server.called('PATCH', 'routines/r1')[0][2].playbook, null);
+  });
+
   it('lets another desktop have a run it claimed first, without running the agent', async () => {
     fakeServer([held()], { 'POST routines/r1/claim': 409 });
     const run = mock.fn(async () => ({ text: 'x' }));
@@ -178,13 +207,15 @@ describe('Routines', () => {
   it('stops only its own run of the routine it was asked to stop', async () => {
     fakeServer([held()]);
     const routines = new Routines(ctx, () => new Promise(() => {}));
+    ctx.tabs.activeTabId = 4;
     await routines.refresh();
     await routines.runNow('r1');
-    ctx.chatAbort = new AbortController();
+    const [own, person] = [new AbortController(), new AbortController()];
+    ctx.chatRuns.set(4, own).set(5, person);
     assert.equal(routines.stop('other'), false);
-    assert.equal(ctx.chatAbort.signal.aborted, false);
+    assert.equal(own.signal.aborted, false);
     assert.equal(routines.stop('r1'), true);
-    assert.equal(ctx.chatAbort.signal.aborted, true);
+    assert.deepEqual([own.signal.aborted, person.signal.aborted], [true, false], "another tab's chat keeps going");
   });
 
   it('marks its own runs a quit cut short as interrupted, and leaves another browser’s alone', async () => {

@@ -3,7 +3,7 @@ import type { CommandDeps, RemoteParams } from './commands.ts';
 import type { TabHandler } from './tab-commands.ts';
 /** The active page must still belong to this browser's tab manager. */
 function traceTarget(deps: CommandDeps) {
-  const view = deps.tabs.getActiveView();
+  const view = deps.agentTab.view();
   if (!view || view.webContents.isDestroyed()) throw Error('No active tab');
   if (!deps.observer) throw Error('Native tracing is unavailable');
   return view.webContents;

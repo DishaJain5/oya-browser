@@ -63,6 +63,12 @@ test('a popup with an unowned partition is closed', () => {
   });
   assert.equal(closed, true);
 });
+test('a sign-in popup offers the person control, since only they can answer a passkey or a code', () => {
+  const { ctx, view, session } = fixture();
+  ctx.protection.configureSession(session);
+  ctx.protection.protectPopup({ webContents: view.webContents, destroy: () => assert.fail('closed') });
+  assert.deepEqual(ctx.shield.takeover.asked, ['This sign-in needs you']);
+});
 test('analyzer is deferred until requested and runs through the isolated world', async () => {
   const { ctx, view } = fixture();
   let calls = 0;

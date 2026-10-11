@@ -77,7 +77,7 @@ export interface ShellDialogDeps extends AccountParts {
 export function pageLabels(page: DialogPage): PageLabels {
   if (page === 'shortcuts') return { title: 'Keyboard shortcuts', label: 'Keyboard shortcuts' };
   return page === 'profile'
-    ? { title: 'Account', label: 'Account and connection' }
+    ? { title: 'Settings', label: 'Settings' }
     : { title: 'Commands', label: 'Commands and settings' };
 }
 

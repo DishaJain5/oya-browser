@@ -7,6 +7,7 @@ import { useViewModel } from '../../../hooks/index.ts';
 import type { UpdatesViewModel } from '../view-models/updates-view-model.ts';
 import type { ConnectionPillViewModel } from '../view-models/connection-pill-view-model.ts';
 import type { ViewProps } from '../model/models.ts';
+import { accountCard, type AccountViewModel } from '../view-models/account-view-model.ts';
 import './toolbar-pills.css';
 
 /** The update pill: shown while there is something to say; checks, or restarts into a staged update. */
@@ -31,19 +32,37 @@ export function AppVersion({ vm }: ViewProps<UpdatesViewModel>) {
   return <span id="app-version">{useViewModel(vm).version}</span>;
 }
 
-/** The connection pill: connected, connecting or offline; opens the account page. */
-export function ConnectionPill({ vm }: ViewProps<ConnectionPillViewModel>) {
-  const s = useViewModel(vm);
+/** What the profile button is given. */
+export interface ProfileButtonProps {
+  /** The connection: connected, connecting or offline. */
+  pill: ConnectionPillViewModel;
+  /** Who is signed in, for the avatar's initial. */
+  account: AccountViewModel;
+}
+
+/**
+ * The profile button at the toolbar's end, as in Chrome: the account's initial, with
+ * a dot that says whether this browser is online (green), connecting (amber) or
+ * offline (grey). It opens Settings. The words stay for assistive tech and tooltips.
+ */
+export function ProfileButton({ pill, account }: ProfileButtonProps) {
+  const s = useViewModel(pill);
+  const { initial } = accountCard(useViewModel(account));
   return (
     <button
-      className={s.className}
+      className={`${s.className} profile-button`}
       id="conn-pill"
       title={s.title}
-      aria-label="Account and connection"
-      onClick={() => vm.click()}
+      aria-label={`Settings, ${s.label}`}
+      onClick={() => pill.click()}
     >
-      <span className="dot"></span>
-      <span id="conn-label">{s.label}</span>
+      <span className="profile-avatar" aria-hidden="true">
+        {initial}
+      </span>
+      <span className="dot" aria-hidden="true"></span>
+      <span id="conn-label" className="sr-only">
+        {s.label}
+      </span>
     </button>
   );
 }

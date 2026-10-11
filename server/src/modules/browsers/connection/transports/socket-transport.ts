@@ -31,7 +31,7 @@ export class SocketTransport implements CommandTransport {
   /** Writes the `cmd` message; returns the write error, if any. */
   private post(id: string, call: Call, type: 'cmd' | 'profile_capture'): Error | null {
     try {
-      this.ws.send(JSON.stringify({ type, id, action: call.action, params: call.params }));
+      this.ws.send(JSON.stringify({ type, id, action: call.action, params: call.params, lane: call.lane }));
       return null;
     } catch (err) {
       return err;

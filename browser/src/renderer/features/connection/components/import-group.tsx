@@ -1,6 +1,8 @@
 /**
- * "Imported logins" on the account page: the latest import (or what one is
- * for), the ones before it, the choice of browser, Import, and how it went.
+ * Imports: on the account page, the rows of the Logins section (the latest import
+ * or what one is for, the ones before it, the choice of browser and Import; saved
+ * passwords; how it went) and This browser's Make default; on first login, the
+ * offer that asks once.
  */
 import { useViewModel } from '../../../hooks/index.ts';
 import {
@@ -15,6 +17,7 @@ import {
 } from '../view-models/import-view-model.ts';
 import type { ImportRecord, ViewProps } from '../model/models.ts';
 import { Button, StatusLine, TimeAgo } from '../../../ui/index.ts';
+import { SettingsRow } from './settings-list.tsx';
 
 /** The latest import, in two lines; or, before any, what an import is for. */
 function Latest({ vm }: ViewProps<ImportViewModel>) {
@@ -66,56 +69,118 @@ function ImportOffer({ vm }: ViewProps<ImportViewModel>) {
   return (
     <section className="import-offer" aria-label="Import your browser logins">
       <h3>Bring your logins from {source}</h3>
-      <p>
-        Import site sessions and available site storage. Saved passwords, bookmarks, and history are not imported. Oya
-        switches to the imported profile when finished.
+      <p>Your sites stay signed in here, with your bookmarks and history. It takes a few seconds.</p>
+      <p className="import-offer-default">
+        <Button variant="primary" id="import-make-default" onClick={() => void vm.makeDefault()}>
+          Make Oya your default browser
+        </Button>
+        <span className="quiet">Links you open from other apps come here.</span>
       </p>
-      <Button onClick={() => void vm.dismissOffer()}>Not now</Button>
     </section>
   );
 }
 
-/** The import group. */
-export function ImportGroup({ vm }: ViewProps<ImportViewModel>) {
+/** The browser to import from, and Import (Import again once there is one); Not now while offering. */
+function ImportControls({ vm }: ViewProps<ImportViewModel>) {
   const s = useViewModel(vm);
-  const status = importStatus(s);
   return (
-    <div className="profile-group" role="group" aria-labelledby="import-label">
-      <ImportOffer vm={vm} />
-      <h4 className="profile-label" id="import-label" hidden={s.offer}>
-        Imported logins
-      </h4>
-      <div className="profile-row" hidden={s.offer}>
-        <div className="row-text">
-          <Latest vm={vm} />
-          <Earlier vm={vm} />
-        </div>
-      </div>
-      <div className="import-controls" id="import-controls" hidden={noSources(s)}>
-        <select
-          id="import-source"
-          aria-label="Browser to import from"
-          value={s.chosen}
-          onChange={(e) => vm.choose(e.target.value)}
-        >
-          {(s.sources ?? []).map((source) => (
-            <option key={source.id} value={source.id}>
-              {sourceLabel(source)}
-            </option>
-          ))}
-        </select>
-        <Button
-          variant={s.offer ? 'primary' : 'secondary'}
-          id="import-logins"
-          disabled={s.running || !!importBlocked(s)}
-          onClick={() => void vm.start()}
-        >
-          {s.history.length ? 'Import again' : 'Import'}
+    <div className="import-controls" id="import-controls" hidden={noSources(s)}>
+      <select
+        id="import-source"
+        aria-label="Browser to import from"
+        value={s.chosen}
+        onChange={(e) => vm.choose(e.target.value)}
+      >
+        {(s.sources ?? []).map((source) => (
+          <option key={source.id} value={source.id}>
+            {sourceLabel(source)}
+          </option>
+        ))}
+      </select>
+      <Button
+        variant={s.offer ? 'primary' : 'secondary'}
+        id="import-logins"
+        disabled={s.running || !!importBlocked(s)}
+        onClick={() => void vm.start()}
+      >
+        {s.history.length ? 'Import again' : 'Import'}
+      </Button>
+      {s.offer && (
+        <Button id="import-not-now" onClick={() => void vm.notNow()}>
+          Not now
         </Button>
-      </div>
-      <StatusLine className="quiet profile-note" id="import-status" data-kind={status.kind}>
-        {status.text}
-      </StatusLine>
+      )}
+    </div>
+  );
+}
+
+/** How the last import, or what stands in its way, went. */
+function ImportStatus({ vm }: ViewProps<ImportViewModel>) {
+  const status = importStatus(useViewModel(vm));
+  return (
+    <StatusLine className="quiet profile-note" id="import-status" data-kind={status.kind}>
+      {status.text}
+    </StatusLine>
+  );
+}
+
+/** The Logins section's import rows: from a browser, then saved passwords, with how it went. */
+export function ImportRows({ vm }: ViewProps<ImportViewModel>) {
+  return (
+    <>
+      <SettingsRow wide control={<ImportControls vm={vm} />}>
+        <Latest vm={vm} />
+        <Earlier vm={vm} />
+        <ImportStatus vm={vm} />
+      </SettingsRow>
+      <PasswordsRow vm={vm} />
+    </>
+  );
+}
+
+/** Make Oya the default browser, the first thing to do so links from other apps come here. */
+export function DefaultBrowserRow({ vm }: ViewProps<ImportViewModel>) {
+  const button = (
+    <Button variant="primary" id="make-default" onClick={() => void vm.makeDefault()}>
+      Make default
+    </Button>
+  );
+  return (
+    <SettingsRow control={button}>
+      <p className="row-title">Default browser</p>
+      <p className="quiet">Open links from other apps in Oya.</p>
+    </SettingsRow>
+  );
+}
+
+/** Saved passwords, from an export: the agent signs in with them where a session has expired. */
+function PasswordsRow({ vm }: ViewProps<ImportViewModel>) {
+  const s = useViewModel(vm);
+  const button = (
+    <Button
+      variant="secondary"
+      id="import-passwords"
+      disabled={s.running || !s.connected}
+      onClick={() => void vm.importPasswords()}
+    >
+      Import passwords…
+    </Button>
+  );
+  return (
+    <SettingsRow control={button}>
+      <p className="row-title">Saved passwords</p>
+      <p className="quiet">From the Passwords app, Safari, Chrome or a password manager, exported as CSV.</p>
+    </SettingsRow>
+  );
+}
+
+/** The first-login offer: one decision, which browser to bring logins from, and how it went. */
+export function ImportGroup({ vm }: ViewProps<ImportViewModel>) {
+  return (
+    <div className="profile-group" role="group" aria-label="Import your logins">
+      <ImportOffer vm={vm} />
+      <ImportControls vm={vm} />
+      <ImportStatus vm={vm} />
     </div>
   );
 }

@@ -294,6 +294,12 @@ MCP config for one browser:
       }
     }
 
+Several agents on one desktop browser: give each a name with the `X-Oya-Agent`
+header (or `?agent=NAME` on the URL). On the Oya desktop app each named agent
+drives a tab of its own, marked in the tab strip, while the person keeps using
+every other tab. Letters, digits, `.`, `_` and `-`, up to 64 characters. Agents
+without a name share one tab, as before.
+
 ## MCP Tools
 
 ### start_browser (pool endpoint)
@@ -406,6 +412,10 @@ Parameters: level / failed_only, pattern, limit (all optional)
 Clear a CAPTCHA with the configured solver, sign in with the persona's stored credentials for the site, or enter a one-time code from the persona's factors. Credentials and codes never reach the caller.
 Parameters: none
 
+### list_saved_logins
+The sites the persona has a saved login for (imported from a password export or set through the API), with the username only. Tells the caller whether sign_in can fill a form, and as which account.
+Parameters: none
+
 ### list_playbooks / run_playbook
 The playbooks saved on this key, and replaying one with its variables (a broken step is finished by the agent).
 Parameters: run_playbook takes name (string, required), variables (object, optional)
@@ -450,10 +460,10 @@ Set FLEET_TOKEN env var on the server. All browsers use that token as their API 
     POST /mcp/pool
     Authorization: Bearer FLEET_TOKEN
 
-Thirty-one tools: analyze_page, navigate, click, type, screenshot, press_key, handle_dialog,
+Thirty-two tools: analyze_page, navigate, click, type, screenshot, press_key, handle_dialog,
 scroll, wait, click_coordinates, mouse_move, double_click, keyboard_type, drag,
 select_option, run_script, wait_for, find, hover, go_back, go_forward, reload,
-solve_captcha, sign_in, complete_mfa, list_playbooks, run_playbook, run_task, plus
+solve_captcha, sign_in, complete_mfa, list_saved_logins, list_playbooks, run_playbook, run_task, plus
 start_browser, stop_browser and pool_status.
 
 The tab tools (list_tabs, open_tab, switch_tab, close_tab), read_elements and the console and

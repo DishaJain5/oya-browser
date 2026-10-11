@@ -53,14 +53,6 @@ describe('AskViewModel', () => {
     assert.deepEqual(fake.called('sendChat').at(-1)?.[0], [{ role: 'user', content: 'hello' }]);
   });
 
-  it('is what Clear does while the panel shows Ask', async () => {
-    const { panel, ask, send, answer } = await chatting();
-    await send('hi');
-    await answer({ text: 'hello' });
-    panel.clear();
-    assert.deepEqual(ask.state.items, []);
-  });
-
   it('sends the whole conversation, errors included, with each question', async () => {
     const { fake, send, answer } = await chatting();
     await send('one');

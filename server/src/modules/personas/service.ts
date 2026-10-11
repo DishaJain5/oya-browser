@@ -80,6 +80,26 @@ type ClonePersona = {
   name?: string;
 };
 
+/**
+ * A captured device whose languages agree with its locale: the locale and its base
+ * language, which is what every Oya engine sends as Accept-Language. A Mac set up in
+ * several languages reported them all, the page and the header disagreed, and every
+ * session on the imported persona was refused. Deterministic, so the device never moves.
+ */
+function coherentDevice(device: any) {
+  const locale = device?.locale || device?.navigator?.languages?.[0];
+  if (typeof locale !== 'string' || !device.navigator) return device;
+  const primary = locale.split('-')[0];
+  const languages = locale === primary ? [locale] : [locale, primary];
+  return { ...device, navigator: { ...device.navigator, languages } };
+}
+
+/** A mirroring persona's fingerprint: its captured device, made coherent, with the persona's own id and proxy. */
+function mirroredFingerprint(persona: Pick<Persona, 'id' | 'proxy' | 'device'>) {
+  const device = persona.device as any;
+  return { ...coherentDevice(device), id: persona.id, proxy: persona.proxy || device.proxy || null };
+}
+
 /** One real browser profile to mirror into a persona. */
 export type MirrorProfile = {
   /** The source browser, e.g. "chrome"; part of the persona's stable id. */
@@ -328,8 +348,7 @@ export class PersonaService {
    * machine still carries this persona's id and proxy.
    */
   fingerprintFor(persona: Pick<Persona, 'id' | 'seed' | 'prefs' | 'proxy' | 'device'>) {
-    if (persona.device)
-      return { ...persona.device, id: persona.id, proxy: persona.proxy || persona.device.proxy || null };
+    if (persona.device) return mirroredFingerprint(persona);
     return getFingerprintForPersona({ id: persona.id, seed: persona.seed, prefs: persona.prefs, proxy: persona.proxy });
   }
 

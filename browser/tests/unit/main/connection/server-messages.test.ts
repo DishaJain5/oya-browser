@@ -157,6 +157,10 @@ describe('server messages', () => {
   it('forwards the agent’s live events to the shell, so the panel can show the run as it goes', () => {
     const event = { kind: 'step', tool: 'navigate', line: 'Opening amazon.com' };
     handleServerMessage(ctx, { type: 'agent-event', runId: 'r1', event });
-    assert.deepEqual(ctx.shell.sentOn('agent-event'), [{ runId: 'r1', event }]);
+    handleServerMessage(ctx, { type: 'agent-event', runId: 'r2', lane: 'tab-7', event });
+    assert.deepEqual(ctx.shell.sentOn('agent-event'), [
+      { runId: 'r1', event, tabId: null },
+      { runId: 'r2', event, tabId: 7 },
+    ]);
   });
 });

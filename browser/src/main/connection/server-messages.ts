@@ -2,6 +2,7 @@
  * Message type → handler: everything the server can say to this browser. The
  * socket looks the type up here; an unknown type is ignored.
  */
+import { tabOfLane } from './chat.ts';
 import { captureProfile } from './profile-capture.ts';
 import { HOME_URL } from '../tabs/constants.ts';
 import type { AppServices } from '../app/services.ts';
@@ -61,6 +62,8 @@ export interface ServerMessage {
   sites?: unknown[];
   /** agent-event: the chat run it belongs to. */
   runId?: string;
+  /** agent-event: the agent it comes from; a tab's chat is lane tab-<id>. */
+  lane?: string;
   /** agent-event: what the agent did. */
   event?: unknown;
   /** mirror_ok: one persona id per captured profile. */
@@ -108,7 +111,9 @@ const SERVER_MESSAGES: Record<string, Handler> = {
   // The project's settings changed elsewhere (the console, the CLI): the model card re-reads them.
   settings_changed: ({ deps }, msg) => deps.shell.send('settings-changed', msg),
   // What the agent is doing in a chat this browser started (its plan, each step, how it ended), for the panel to show live.
-  'agent-event': ({ deps }, msg) => deps.shell.send('agent-event', { runId: msg.runId, event: msg.event }),
+  // A tab's chat runs in lane tab-<id>: its events go to that tab's panel.
+  'agent-event': ({ deps }, msg) =>
+    deps.shell.send('agent-event', { runId: msg.runId, event: msg.event, tabId: tabOfLane(msg.lane) }),
   // The project's routines changed (another desktop, a run starting or ending): re-read them.
   routines_changed: ({ deps }) => void deps.routines.refresh(),
   cookie_sync: async ({ deps }, msg) => {

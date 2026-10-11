@@ -52,6 +52,44 @@ describe('ControlShield', () => {
     assert.ok(!ctx.shell.window.views.includes(ctx.shield.view));
   });
 
+  it("covers only the agent's tab, and keeps it rendering beneath the person's tab with its bounds", () => {
+    const agentPage = new FakeBrowserView();
+    const tabs = [
+      { id: 1, view: agentPage },
+      { id: 2, view: page },
+    ];
+    let shown = 2;
+    ctx.tabs = {
+      list: tabs,
+      get activeTabId() {
+        return shown;
+      },
+      find: (id) => tabs.find((t) => t.id === id),
+      getActiveView: () => tabs.find((t) => t.id === shown)!.view,
+      getShownView: () => tabs.find((t) => t.id === shown)!.view,
+    };
+    ctx.control.state = { mode: 'agent', mine: false, interactive: false, connected: true, localClients: 0 };
+    ctx.agentTab.claim(1);
+    ctx.shield.sync();
+    assert.ok(!ctx.shell.window.views.includes(ctx.shield.view), "no shield over the person's tab");
+    assert.deepEqual(ctx.shell.window.views, [agentPage, page], "the agent's page sits beneath, still painting");
+    assert.deepEqual(agentPage.bounds, page.bounds);
+    shown = 1;
+    ctx.shell.window.setBrowserView(agentPage);
+    ctx.shield.sync();
+    assert.equal(ctx.shell.window.views.at(-1), ctx.shield.view, "the shield is back over the agent's tab");
+  });
+
+  it("leaves the person's own sign-in popup usable while the agent drives another tab", () => {
+    const popup = Object.assign(new EventEmitter(), { setEnabled: mock.fn(), isDestroyed: () => false });
+    ctx.shield.adoptPopup(popup, true);
+    ctx.shield.controlChanged({ mode: 'agent', mine: false, interactive: false });
+    assert.deepEqual(
+      popup.setEnabled.mock.calls.map((c) => c.arguments[0]),
+      [true, true],
+    );
+  });
+
   it('refuses page actions unless a person has control', () => {
     ctx.shield.requireHumanControl();
     ctx.control.state.interactive = false;
@@ -71,11 +109,14 @@ describe('ControlShield', () => {
     ctx.electron.Menu.items.set('browser-reload', item);
     const lost = mock.method(ctx.recorder, 'controlLost', () => {});
     const agent = { interactive: false, mode: 'agent', mine: false };
+    ctx.control.state = agent;
     ctx.shield.controlChanged(agent);
     assert.equal(popup.enabled, false);
     assert.equal(item.enabled, false);
     assert.equal(lost.mock.callCount(), 1);
-    assert.deepEqual(ctx.shell.sentOn('control-state'), [agent]);
+    assert.deepEqual(ctx.shell.sentOn('control-state'), [
+      { ...agent, pageInteractive: false, newTabInteractive: false },
+    ]);
   });
 
   it('leaves a sign-in popup usable when the hold lapses or the socket drops: nobody else is driving', () => {

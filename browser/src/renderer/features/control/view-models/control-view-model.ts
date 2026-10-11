@@ -18,6 +18,10 @@ export interface ControlSnapshot {
   mine?: boolean;
   /** A person may use the page right now. */
   interactive?: boolean;
+  /** The person may use the tab this window shows (any but the agent's while it drives one). */
+  pageInteractive?: boolean;
+  /** The person may open a new tab (beside agents' tabs, always). */
+  newTabInteractive?: boolean;
   /** A handoff is under way. */
   busy?: boolean;
   /** Which handoff ('return' while handing back). */
@@ -79,8 +83,10 @@ export interface ActionLook extends ButtonLook {
 
 /** Which page actions are marked blocked. */
 export interface Blocked {
-  /** Back, Forward, Reload, New tab, a tab's close, and the address bar. */
+  /** Back, Forward, Reload, a tab's close, and the address bar. */
   pageBlocked: boolean;
+  /** New tab. */
+  newTabBlocked: boolean;
   /** Start recording. */
   recordBlocked: boolean;
 }
@@ -139,8 +145,16 @@ export function takeable(state: ControlState): boolean {
 /** Whether each page action is marked blocked: all of them while watch-only, except a record button that can take control. */
 export function blockedActions(state: ControlState): Blocked {
   const interactive = !!state.control?.interactive;
-  return { pageBlocked: !interactive, recordBlocked: !interactive && !takeable(state) };
+  const recordBlocked = !interactive && !takeable(state);
+  return { pageBlocked: !pageOpen(state), newTabBlocked: !newTabOpen(state), recordBlocked };
 }
+
+/** Whether a new tab may be opened: beside an agent's tab, even while the person looks at it. */
+const newTabOpen = (state: ControlState): boolean =>
+  !!(state.control?.newTabInteractive ?? state.control?.pageInteractive ?? state.control?.interactive);
+
+/** Whether the tab this window shows is the person's: with control, or beside the agent's own tab. */
+const pageOpen = (state: ControlState): boolean => !!(state.control?.pageInteractive ?? state.control?.interactive);
 
 /** The control bar. */
 export class ControlViewModel extends ViewModel<ControlState> {
@@ -185,8 +199,9 @@ export class ControlViewModel extends ViewModel<ControlState> {
   }
 
   /** A click on a page action: allowed, refused, or (Start recording) allowed once control is taken. */
-  guard(record: boolean): Verdict {
-    if (this.state.control?.interactive) return 'allow';
+  guard(record: boolean, newTab = false): Verdict {
+    const open = newTab ? newTabOpen(this.state) : pageOpen(this.state);
+    if (this.state.control?.interactive || (!record && open)) return 'allow';
     return record && takeable(this.state) ? 'take' : 'refuse';
   }
 

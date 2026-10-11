@@ -4,6 +4,7 @@
  * page, or did nothing at all, and a click that did nothing is the most common
  * way a run goes wrong without noticing.
  */
+import { LaneMap } from '../browsers/connection/lane.ts';
 
 /** What is remembered of a page: its facts, and the fields showing an error. */
 type Seen = {
@@ -14,7 +15,7 @@ type Seen = {
 };
 
 /** browserId → what the last analysis showed. */
-const seen = new Map<string, Seen>();
+const seen = new LaneMap<Seen>();
 
 /** The fields showing an error, by label. */
 const errorsOf = (elements: any[] = []) =>

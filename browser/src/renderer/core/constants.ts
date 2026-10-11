@@ -12,6 +12,8 @@ export const RendererConstants = {
   PROFILE_SAVE_TIMEOUT_MS: 15000,
   /** How long "Copied!" shows on a chat message. */
   COPIED_MS: 1500,
+  /** How often the first-run import offer checks whether an agent run has ended, so it never lands on one. */
+  IMPORT_OFFER_RETRY_MS: 2000,
   /** The tallest the Ask box grows before it scrolls. */
   CHAT_INPUT_MAX_PX: 160,
   /** The most attached file data a chat may carry, in base64 characters: the server's cap, 10 MiB of file. */

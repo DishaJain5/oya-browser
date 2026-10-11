@@ -23,7 +23,10 @@ export { normalizeAddress } from './navigation.ts';
 
 /** The services the tabs use, their listeners' included. */
 type Deps = TabEventsDeps &
-  Pick<AppServices, 'electron' | 'layout' | 'overlays' | 'cookies' | 'windows' | 'nativeBrowsing' | 'appDir'>;
+  Pick<
+    AppServices,
+    'electron' | 'layout' | 'overlays' | 'cookies' | 'windows' | 'nativeBrowsing' | 'appDir' | 'agentTab'
+  >;
 
 /** Optional native session is application-owned, never chosen by page-supplied partition strings. */
 type CreateTabArguments = [url: string, activate?: boolean, loadOptions?: LoadURLOptions, session?: Session];
@@ -48,6 +51,8 @@ export interface TabSummary {
   favicon: string | null;
   /** Whether it is the one on screen. */
   active: boolean;
+  /** Whether the agent drives it. */
+  agent: boolean;
   /** Whether it is loading. */
   loading: boolean;
   /** Why its page failed, or null. */
@@ -59,11 +64,12 @@ export interface TabSummary {
 }
 
 /** What the tab strip shows for one tab. */
-function tabSummary(t: Tab, activeTabId: number | null): TabSummary {
+function tabSummary(t: Tab, activeTabId: number | null, agentTabs: Array<number | null>): TabSummary {
   return {
     id: t.id,
     ...placeSummary(t),
     active: t.id === activeTabId,
+    agent: agentTabs.includes(t.id),
     ...loadSummary(t),
     ...historySummary(t.view.webContents.navigationHistory),
   };
@@ -173,10 +179,15 @@ function createPageView(deps: Deps, session?: Session): BrowserView {
   return view;
 }
 
+/** The tabs agents claimed; none while an agent drives whichever tab is shown. */
+const claimedTabs = ({ agentTab }: Pick<AppServices, 'agentTab'>): number[] =>
+  agentTab.scoped() ? agentTab.claimed() : [];
+
 /** Hidden transfer shells render metadata without owning a second copy of the page. */
-function windowTabSummaries(tabs: TabManager, staged?: Tab) {
+function windowTabSummaries(tabs: TabManager, agentTabs: number[], staged?: Tab) {
   const visible = tabs.list.length ? tabs.list : staged ? [staged] : [];
-  return visible.map((tab) => tabSummary(tab, tabs.activeTabId ?? staged?.id ?? null));
+  const active = tabs.activeTabId ?? staged?.id ?? null;
+  return visible.map((tab) => tabSummary(tab, active, agentTabs.length ? agentTabs : [active]));
 }
 /** The open tabs and which one is showing. */
 export class TabManager {
@@ -318,7 +329,7 @@ export class TabManager {
 
   /** Sends the tab strip to the shell. */
   sendTabList(): void {
-    this.deps.shell.send('tabs-updated', windowTabSummaries(this, this.deps.shell.stagedTab));
+    this.deps.shell.send('tabs-updated', windowTabSummaries(this, claimedTabs(this.deps), this.deps.shell.stagedTab));
     this.deps.windows?.tabEvents?.changed();
   }
 
@@ -367,7 +378,7 @@ export class TabManager {
 
   /** Reload, or stop a load in progress. */
   reloadActivePage(): void {
-    this.deps.shield.requireHumanControl();
+    this.deps.agentTab.requireFor(this.activeTabId);
     const tab = this.find(this.activeTabId);
     if (!tab) return;
     reloadOrStop(this, tab);

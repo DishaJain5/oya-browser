@@ -2,6 +2,7 @@
  * Commands from the server (`cmd` messages): run each one, answer it once, and
  * race it against a JavaScript dialog that would otherwise block it forever.
  */
+import { inLane } from '../control/agent-tab.ts';
 import { DIALOG_SAFE_ACTIONS, DIALOG_HELD, describeDialog } from '../dialogs/index.ts';
 import type { AppServices } from '../app/services.ts';
 import type { CommandId, CommandParams } from '../actions/types.ts';
@@ -14,6 +15,7 @@ import { RESULT_CODES } from './constants.ts';
 export type CommandDeps = Pick<
   AppServices,
   | 'control'
+  | 'agentTab'
   | 'windows'
   | 'shell'
   | 'tabs'
@@ -73,6 +75,8 @@ export interface CommandMessage {
   action?: unknown;
   /** The action's arguments. */
   params?: RemoteParams;
+  /** The agent it comes from (a chat run, an MCP session), which drives a tab of its own. */
+  lane?: unknown;
 }
 
 /** The code to send with a failed result: one of ours, or none. */
@@ -83,6 +87,13 @@ const codeOf = (err: unknown): string | undefined => {
 
 /** A thrown value as the error text a result carries. */
 const messageOf = (err: unknown): string => (err as Error | null | undefined)?.message || String(err);
+
+/** Why no page answered: the agent's own tab is gone (it must pick another), or there is no tab at all. */
+function noPage(deps: Pick<CommandDeps, 'agentTab'>): string {
+  return deps.agentTab.id !== null
+    ? "The agent's tab was closed. Use list_tabs and switch_tab, or open_tab."
+    : 'No active tab';
+}
 
 /** Runs server commands and sends their results. */
 export class CommandRunner {
@@ -110,7 +121,8 @@ export class CommandRunner {
    */
   async handleCommand(msg: CommandMessage): Promise<void> {
     const { held, release } = this.deps.dialogs.held();
-    const ran = this.runSafely(msg);
+    // Each agent (chat run, MCP session, playbook run) is a lane with a tab of its own.
+    const ran = inLane(msg.lane, () => this.runSafely(msg));
     const outcome = await Promise.race([ran, held]);
     release();
     if (outcome !== DIALOG_HELD) return;
@@ -170,9 +182,9 @@ export class CommandRunner {
         screenshot: await captureSpecifiedTab(this.deps, params.tab_id, params.format),
       });
     if (Object.hasOwn(TAB_COMMANDS, action)) return TAB_COMMANDS[action](this, id, params);
-    // All remaining actions need an active tab
-    const view = this.deps.tabs.getActiveView();
-    if (!view || view.webContents.isDestroyed()) return this.sendResult(id, false, null, 'No active tab');
+    // All remaining actions need the agent's page
+    const view = this.deps.agentTab.drive();
+    if (!view || view.webContents.isDestroyed()) return this.sendResult(id, false, null, noPage(this.deps));
     await this.deps.actions.runPageAction(id!, action, params, view);
   }
 

@@ -11,6 +11,7 @@
  * each main-process service once into `ctx` (src/main/app/services.ts), and
  * wires Electron's events to them. See ARCHITECTURE.md.
  */
+import { announceBookmarks } from './shell/bookmarks-bar.ts';
 import electron, { type BrowserView } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -39,6 +40,7 @@ import { DesktopDialogs, dialogPresenter } from './dialogs/index.ts';
 import { World, useFramePages, useStockWorld } from './native/index.ts';
 import { Observer } from './observe/observer.ts';
 import { DesktopControl } from './control/control-state.ts';
+import { AgentTab } from './control/agent-tab.ts';
 import { CookieSync, cookieSyncMark } from './sync/cookie-sync.ts';
 import { Routines } from './routines/routines.ts';
 import { PageDriver } from './actions/driver.ts';
@@ -131,6 +133,7 @@ const ctx = {
   governance,
   workspace: null,
   chatAbort: null,
+  chatRuns: new Map(),
   validationTabs: undefined,
 } as AppServices;
 ctx.config = new ConfigStore({ dir: () => app.getPath('userData'), safe: electron.safeStorage });
@@ -157,15 +160,23 @@ ctx.workers = new WorkerCoverage(ctx, () => app.getPath('userData'));
 ctx.persona = new Persona(ctx);
 app.once('will-quit', () => ctx.persona.disposeStorage());
 ctx.library = new BrowsingLibrary(ctx);
+ctx.library.changed = () => announceBookmarks(ctx);
 ctx.recorder = new Recorder(ctx);
 ctx.socket = new ControlSocket(ctx);
 ctx.commands = new CommandRunner(ctx);
 ctx.deepLinks = new DeepLinks(ctx);
 ctx.routines = new Routines(ctx);
 ctx.world = new World({ analyzerScript, worldName: ISOLATED_WORLD });
+ctx.agentTab = new AgentTab(ctx, () =>
+  ctx.windows?.each((scope) => {
+    scope.shield.sync();
+    scope.tabs.sendTabList();
+  }),
+);
 ctx.control = new DesktopControl({
   send: (message) => ctx.socket.send(message),
   changed: (state) => {
+    ctx.agentTab.sync(state);
     ctx.dialogs.controlChanged();
     ctx.shield.controlChanged(state);
   },
@@ -194,12 +205,13 @@ ctx.stream = new LiveStream(ctx);
 ctx.actions = new PageDriver({
   config: ctx.config,
   navigate: (url) => ctx.tabs.navigateActive(url),
-  getActiveView: () => ctx.tabs.getActiveView(),
+  // The agent's own tab while control is scoped to it; the active one otherwise.
+  getActiveView: () => ctx.agentTab.view(),
   pullCookiesFor: (url) => ctx.cookies.pullCookiesFor(url),
   injectScripts: (view) => ctx.protection.injectScripts(view),
   worldEval: <T>(view: Parameters<World['evaluate']>[0], expression: string) => ctx.world.evaluate<T>(view, expression),
   sendResult: (id, ok, data, error, code) => ctx.commands.sendResult(id, ok, data, error, code),
-  createTab: (url, activate) => ctx.tabs.createTab(url, activate),
+  createTab: (url, activate) => ctx.agentTab.opened(ctx.tabs.createTab(url, activate && ctx.agentTab.following())),
   closeTab: (id) => ctx.tabs.closeTab(id),
   requireHumanControl: () => ctx.shield.requireHumanControl(),
   // The page a command drives is a tab's BrowserView.
@@ -208,7 +220,7 @@ ctx.actions = new PageDriver({
   narrate: (view, action, params) =>
     ctx.shield.acting(view as BrowserView, action, params as ActionParams | undefined).catch(() => {}),
   tabs: () => ctx.tabs.list,
-  activeTabId: () => ctx.tabs.activeTabId,
+  activeTabId: () => ctx.agentTab.tabId(),
   keyboard: new Keyboard(process.platform),
   mouse: new Mouse(),
 });

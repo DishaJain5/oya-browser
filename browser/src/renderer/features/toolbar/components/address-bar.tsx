@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { useViewModel } from '../../../hooks/index.ts';
-import { Icon } from '../../../ui/index.ts';
+import { Icon, IconButton } from '../../../ui/index.ts';
 import { navLook, windowTitle, type ToolbarViewModel } from '../view-models/toolbar-view-model.ts';
 import { AddressSuggestions } from './address-suggestions.tsx';
 import { TEXT } from '../model/constants.ts';
@@ -36,11 +36,19 @@ function addressKey(event: KeyboardEvent<HTMLInputElement>, vm: ToolbarViewModel
   if (event.key === 'Tab') vm.completion.dismiss();
 }
 
+/** Whether an edit added text (typing, pasting), which may complete inline; a deletion never does. */
+const typed = (event: Event): boolean => String((event as InputEvent).inputType ?? '').startsWith('insert');
+
 /** The editable combobox owns focus and keyboard interaction, not the option rows. */
 function AddressInput({ vm }: AddressBarProps) {
   const { url, nav, focusRequest } = useViewModel(vm);
-  const { selected, open } = useViewModel(vm.completion);
+  const { selected, open, inline } = useViewModel(vm.completion);
   const input = useRef<HTMLInputElement>(null);
+  // The completed rest stays selected, so the next key types over it and Enter accepts it.
+  useEffect(() => {
+    // Only with a completion: an edit in the middle of the address keeps its caret.
+    if (inline) input.current?.setSelectionRange(url.length, url.length + inline.length);
+  }, [url, inline]);
   useEffect(() => {
     if (focusRequest) {
       input.current?.focus();
@@ -63,11 +71,29 @@ function AddressInput({ vm }: AddressBarProps) {
       placeholder={TEXT.address}
       spellCheck={false}
       autoComplete="off"
-      value={url}
+      value={url + inline}
       onFocus={() => void vm.completion.search(vm.state.url)}
       onBlur={() => vm.completion.dismiss()}
-      onChange={(event) => vm.edit(event.target.value)}
+      onChange={(event) => vm.edit(event.target.value, typed(event.nativeEvent))}
       onKeyDown={(event) => addressKey(event, vm)}
+    />
+  );
+}
+
+/** The star at the address bar's end, as in Chrome: filled when the page is bookmarked; a click saves or removes it. */
+function BookmarkStar({ vm }: AddressBarProps) {
+  const { url } = useViewModel(vm);
+  const { saved } = useViewModel(vm.bookmarks);
+  if (!/^https?:\/\//i.test(url)) return null;
+  const on = saved.includes(url);
+  return (
+    <IconButton
+      className={on ? 'bookmark-star saved' : 'bookmark-star'}
+      id="btn-bookmark"
+      label={on ? TEXT.unbookmarkPage : TEXT.bookmarkPage}
+      aria-pressed={on}
+      icon="star"
+      onClick={(event) => (vm.bookmarks.toggleCurrent(), event.currentTarget.blur())}
     />
   );
 }
@@ -92,6 +118,7 @@ export function AddressBar({ vm }: AddressBarProps) {
       >
         {look.status}
       </span>
+      <BookmarkStar vm={vm} />
       <AddressSuggestions vm={vm} />
     </div>
   );

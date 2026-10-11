@@ -26,6 +26,7 @@ import {
   ROUTINE_CLOUD_POLL_MS,
   ROUTINE_CLOUD_READY_MS,
   ROUTINE_CLOUD_TICK_MS,
+  ROUTINE_PLAY_MS,
   ROUTINE_RESULT_CHARS,
   ROUTINE_SELF_URL,
   ROUTINE_STEPS_KEPT,
@@ -118,7 +119,7 @@ async function stop(key: string, browser: Started) {
 async function runOnCloud(key: string, routine: Routine, browser: Started) {
   browser.id = await steps.launch(key, routine.name);
   await steps.connected(key, browser.id);
-  return steps.ask(key, browser.id, routine.prompt);
+  return routine.playbook ? steps.play(key, browser.id, routine.playbook) : steps.ask(key, browser.id, routine.prompt);
 }
 
 /** Starts one cloud browser, held to the same gates as starting one through the API. */
@@ -156,8 +157,79 @@ async function ask(key: string, browserId: string, prompt: string): Promise<Chat
   return answer;
 }
 
-/** The run's three steps, as one object so tests can stand in for the cloud. */
-export const steps = { launch, connected, ask };
+/** A background playbook run, as the runs route reports it. */
+interface PlaybookRun {
+  /** Its id. */
+  id: string;
+  /** running, needs_attention, succeeded or failed. */
+  status: string;
+  /** What the playbook answered, once it succeeded. */
+  result?: unknown;
+  /** Why it failed, or the API's refusal. */
+  error?: string;
+}
+
+/** Calls this server's API as the routine's project. */
+async function api<T>(key: string, path: string, body?: object): Promise<T> {
+  const init = {
+    method: body ? 'POST' : 'GET',
+    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+  };
+  return (await fetch(`${ROUTINE_SELF_URL}/api/${path}`, body ? { ...init, body: JSON.stringify(body) } : init)).json();
+}
+
+/**
+ * Plays the saved playbook on the browser through the runs route and waits for its end.
+ * A run that stops to ask a person failed: nobody is at a cloud run to answer.
+ */
+async function play(key: string, browserId: string, playbook: string): Promise<ChatAnswer> {
+  let run = await api<PlaybookRun>(key, `browsers/${encodeURIComponent(browserId)}/runs`, { playbook });
+  if (!run.id) throw new Error(run.error || 'The playbook could not start.');
+  for (const deadline = Date.now() + ROUTINE_PLAY_MS; run.status === 'running' && Date.now() < deadline;) {
+    await pause(ROUTINE_CLOUD_POLL_MS);
+    run = await api<PlaybookRun>(key, `runs/${encodeURIComponent(run.id)}`);
+  }
+  return playedAnswer(run);
+}
+
+/** What a playbook's run did, in words: how many steps played, and who finished a broken one. */
+function playedText(result: unknown): string {
+  if (typeof result === 'string') return result;
+  const r = (result ?? {}) as PlayedResult;
+  if (r.total === undefined) return result === undefined ? 'Done' : JSON.stringify(result);
+  const played = `Played ${r.steps} of ${r.total} steps`;
+  if (!r.fellBack) return `${played}.`;
+  return `${played}; ${r.healed ? 'the agent' : 'a person'} finished the rest${r.text ? `: ${r.text}` : '.'}`;
+}
+
+/** What a playbook's replay answers. */
+interface PlayedResult {
+  /** Steps played as recorded. */
+  steps?: number;
+  /** Steps it has. */
+  total?: number;
+  /** Whether a broken step was handed on. */
+  fellBack?: boolean;
+  /** Whether the agent (rather than a person) finished it. */
+  healed?: boolean;
+  /** What whoever finished it said. */
+  text?: string;
+}
+
+/** A finished playbook run as the routine records it. */
+function playedAnswer(run: PlaybookRun): ChatAnswer {
+  if (run.status !== 'succeeded') return { text: `The playbook did not finish: ${whyUnfinished(run)}.`, failed: true };
+  return { text: playedText(run.result) };
+}
+
+/** Why a playbook run did not succeed. */
+function whyUnfinished(run: PlaybookRun): string {
+  if (run.status === 'needs_attention') return 'it stopped for a person';
+  return run.status === 'running' ? 'it ran too long' : run.error || 'it failed';
+}
+
+/** The run's steps, as one object so tests can stand in for the cloud. */
+export const steps = { launch, connected, ask, play };
 
 /**
  * The run's record from the agent's answer: done or failed, its reply and the

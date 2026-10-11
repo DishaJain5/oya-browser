@@ -16,6 +16,7 @@ import type { Tab, TabView } from './types.ts';
 /** The services a tab's windows and menu use. */
 export type TabWindowsDeps = Pick<
   AppServices,
+  | 'agentTab'
   | 'appDir'
   | 'externalApps'
   | 'tabs'

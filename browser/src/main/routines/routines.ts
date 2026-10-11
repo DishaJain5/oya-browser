@@ -16,10 +16,14 @@ import { randomUUID } from 'node:crypto';
 import type { AppServices } from '../app/services.ts';
 import { Chat, STOPPED } from '../connection/chat.ts';
 import { ServerApi } from '../connection/server-api.ts';
+import { playOnServer } from './play.ts';
 import { ROUTINE_TICK_MS, ROUTINE_UNIT_MS, ROUTINE_RESULT_CHARS, ROUTINE_STEPS_KEPT } from './constants.ts';
 
 /** The services routines use. */
-type Deps = Pick<AppServices, 'socket' | 'shell' | 'config' | 'recorder' | 'chatAbort' | 'control' | 'shield'>;
+type Deps = Pick<
+  AppServices,
+  'socket' | 'shell' | 'config' | 'recorder' | 'chatAbort' | 'chatRuns' | 'control' | 'shield' | 'agentTab' | 'tabs'
+>;
 
 /** When a routine runs: "every N units" (`n`, `unit`) or "daily at HH:MM" (`at`), as the server holds it. */
 export interface Schedule {
@@ -49,8 +53,10 @@ export interface Routine {
   id: string;
   /** Its name in the pane. */
   name?: string;
-  /** What the agent is asked. */
+  /** What the agent is asked; '' when the routine plays a playbook instead. */
   prompt: string;
+  /** The saved playbook each run plays, by name, instead of asking the prompt. */
+  playbook?: string;
   /** Whether its schedule is on. */
   enabled: boolean;
   /** When it was made, in epoch milliseconds. */
@@ -126,6 +132,10 @@ interface CurrentRun {
   routineId: string;
   /** The claimed run. */
   runId: string;
+  /** The person stopped it: a playbook's run is no longer waited on. */
+  stopped?: boolean;
+  /** The tab it runs in, whose chat Stop ends. */
+  tab?: number;
 }
 
 /** What the Routines pane shows. */
@@ -225,14 +235,17 @@ export class Routines {
   private readonly ctx: Deps;
   /** Asks the agent. */
   private readonly run: RunChat;
+  /** Plays a saved playbook. */
+  private readonly play: (playbook: string) => Promise<ChatAnswer>;
   /** The server's API, as this browser. */
   private readonly api: ServerApi;
 
   /** `ctx` is the main-process services (see src/main/main.ts); `run` asks the agent (an Ask through Chat, faked in tests). */
-  constructor(ctx: Deps, run?: RunChat) {
+  constructor(ctx: Deps, run?: RunChat, play?: (playbook: string) => Promise<ChatAnswer>) {
     this.ctx = ctx;
     this.api = new ServerApi(ctx);
-    this.run = run ?? ((messages) => new Chat(ctx).send(messages));
+    this.run = run ?? ((messages) => new Chat(ctx).send(messages, undefined, this.current?.tab));
+    this.play = play ?? ((playbook) => playOnServer(this.api, playbook, () => !!this.current?.stopped));
   }
 
   /** The list with each routine's next run, and what this app is doing, as the Routines pane shows it. */
@@ -303,10 +316,10 @@ export class Routines {
 
   /** Adds a routine, or changes the one with its id (its history is kept). */
   save(input: Partial<Routine> | null | undefined): Promise<RoutinesSnapshot | Refusal> {
-    const { id, name, prompt, schedule, enabled, target } = input || {};
+    const { id, name, prompt, playbook, schedule, enabled, target } = input || {};
     // This desktop's time zone, so a daily time means the same hour when the server runs it in the cloud.
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const body = { name, prompt, schedule, enabled, target, tz };
+    const body = { name, prompt, playbook: playbook || null, schedule, enabled, target, tz };
     return id ? this.change('PATCH', routineRoute(id), body) : this.change('POST', 'routines', body);
   }
 
@@ -328,7 +341,8 @@ export class Routines {
   /** Stops this app's run of routine `id`, and only that; answers whether one was stopped. */
   stop(id: string): boolean {
     if (this.current?.routineId !== id) return false;
-    this.ctx.chatAbort?.abort();
+    this.current.stopped = true;
+    this.ctx.chatRuns.get(this.current.tab ?? -1)?.abort();
     return true;
   }
 
@@ -360,13 +374,13 @@ export class Routines {
     return runId;
   }
 
-  /** Asks the agent the routine's prompt as the claimed run `runId`, then records how it ended. */
+  /** Asks the agent the routine's prompt, or plays its playbook, as the claimed run `runId`, then records how it ended. */
   private async perform(routine: Routine, runId: string | null): Promise<unknown> {
     if (!runId) return this.refresh();
-    this.current = { routineId: routine.id, runId };
+    this.current = { routineId: routine.id, runId, tab: this.ctx.tabs.activeTabId ?? undefined };
     await this.refresh();
-    const ask = [{ role: 'user', content: routine.prompt }];
-    const answer = await this.run(ask).catch((e: Error) => ({ error: e.message }));
+    const work = routine.playbook ? this.play(routine.playbook) : this.run([{ role: 'user', content: routine.prompt }]);
+    const answer = await work.catch((e: Error) => ({ error: e.message }));
     this.current = null;
     await this.end(routine.id, runId, endingOf(answer));
     await this.refresh();

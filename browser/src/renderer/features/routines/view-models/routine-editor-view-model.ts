@@ -1,6 +1,7 @@
 /**
  * The Routines pane's editor: a card at the top of the pane for a new routine
- * or the one being edited, with its name, prompt and schedule ("every N minutes
+ * or the one being edited, with its name, what it does (asks the agent a prompt,
+ * or plays a saved playbook), and its schedule ("every N minutes
  * or hours", or "daily at HH:MM"). Saving goes to the project on the server; a
  * refusal (a name too long, a time not written HH:MM) shows in the card, which
  * keeps what was typed.
@@ -26,6 +27,10 @@ export interface RoutineEditorState {
   name: string;
   /** The prompt field. */
   prompt: string;
+  /** The saved playbook it plays, or '' to ask the prompt. */
+  playbook: string;
+  /** The project's saved playbooks, by name, to choose from. */
+  playbooks: string[];
   /** Every or Daily at. */
   kind: ScheduleKind;
   /** How often, for Every (as typed). */
@@ -41,16 +46,25 @@ export interface RoutineEditorState {
 }
 
 /** The editor's text fields. */
-export type EditorField = 'name' | 'prompt' | 'n' | 'unit' | 'at';
+export type EditorField = 'name' | 'prompt' | 'playbook' | 'n' | 'unit' | 'at';
+
+/** The editor's settings fields, without its open state and the playbooks it offers. */
+type EditorFields = Omit<RoutineEditorState, 'open' | 'opened' | 'editing' | 'error' | 'playbooks'>;
 
 /** The fields for `routine`'s settings, or a new routine's. */
-function fieldsOf(routine: Routine | null): Omit<RoutineEditorState, 'open' | 'opened' | 'editing' | 'error'> {
+function fieldsOf(routine: Routine | null): EditorFields {
   const s: Schedule = routine?.schedule ?? DEFAULT_SCHEDULE;
   const kind: ScheduleKind = s.kind === 'daily' ? 'daily' : 'every';
   const n = String(s.n ?? DEFAULT_SCHEDULE.n);
   const [unit, at] = [s.unit ?? DEFAULT_SCHEDULE.unit, s.at ?? DEFAULT_SCHEDULE.at];
-  const cloud = routine?.target === 'cloud';
-  return { name: routine?.name ?? '', prompt: routine?.prompt ?? '', kind, n, unit, at, cloud };
+  const task = { prompt: routine?.prompt ?? '', playbook: routine?.playbook ?? '' };
+  return { name: routine?.name ?? '', ...task, kind, n, unit, at, cloud: routine?.target === 'cloud' };
+}
+
+/** A saved playbook as the list names it. */
+interface NamedPlaybook {
+  /** Its name. */
+  name?: unknown;
 }
 
 /** A refusal's words, without what Electron puts before an error from the main process. */
@@ -59,13 +73,13 @@ export const refusalText = (message: unknown): string => String(message).replace
 /** The routine editor. */
 export class RoutineEditorViewModel extends ViewModel<RoutineEditorState> {
   /** The main process. */
-  private readonly bridge: Pick<OyaBrowser, 'saveRoutine'>;
+  private readonly bridge: Pick<OyaBrowser, 'saveRoutine' | 'playbooks'>;
   /** Called with the main process's answer once a save went through. */
   private readonly saved: (result: Payload) => void;
 
   /** Closed; `saved` takes the new list after a save. */
-  constructor(bridge: Pick<OyaBrowser, 'saveRoutine'>, saved: (result: Payload) => void) {
-    super({ open: false, opened: 0, editing: null, error: '', ...fieldsOf(null) });
+  constructor(bridge: Pick<OyaBrowser, 'saveRoutine' | 'playbooks'>, saved: (result: Payload) => void) {
+    super({ open: false, opened: 0, editing: null, error: '', playbooks: [], ...fieldsOf(null) });
     this.bridge = bridge;
     this.saved = saved;
   }
@@ -73,6 +87,14 @@ export class RoutineEditorViewModel extends ViewModel<RoutineEditorState> {
   /** Opens the editor on `routine`, or empty for a new one. */
   open(routine: Routine | null): void {
     this.set({ open: true, opened: this.state.opened + 1, editing: routine, error: '', ...fieldsOf(routine) });
+    void this.loadPlaybooks();
+  }
+
+  /** The project's saved playbooks, to choose one to play; none when they cannot be read. */
+  async loadPlaybooks(): Promise<void> {
+    const answer = await this.bridge.playbooks({ action: 'list' }).catch(() => null);
+    const list = Array.isArray(answer?.playbooks) ? (answer.playbooks as NamedPlaybook[]) : [];
+    this.set({ playbooks: list.map((p) => String(p?.name ?? '')).filter(Boolean) });
   }
 
   /** A field was typed in. */
@@ -98,9 +120,10 @@ export class RoutineEditorViewModel extends ViewModel<RoutineEditorState> {
 
   /** What the fields hold, as a routine to save; an edit keeps its id and whether it is on. */
   routine(): Payload {
-    const { editing, name, prompt, cloud } = this.state;
+    const { editing, name, prompt, playbook, cloud } = this.state;
     const target = cloud ? 'cloud' : 'desktop';
-    const base = { name, prompt, enabled: editing?.enabled ?? true, schedule: this.schedule(), target };
+    const task = { prompt, playbook: playbook || null };
+    const base = { name, ...task, enabled: editing?.enabled ?? true, schedule: this.schedule(), target };
     return editing ? { ...base, id: editing.id } : base;
   }
 

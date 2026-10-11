@@ -76,3 +76,6 @@ export const SERVER_RUN = new Set([CLOUD_PROVIDER, 'oya-selfhosted']);
 
 /** Native capture includes bounded storage reads; stopping must await its correlated answer. */
 export const PROFILE_CAPTURE_TIMEOUT_MS = 30_000;
+
+/** A lane's name: letters, digits, dots, dashes and underscores, short enough to log. */
+export const LANE_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;

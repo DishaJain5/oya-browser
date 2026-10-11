@@ -10,6 +10,8 @@ import { Status } from '../../../platform/http-status.ts';
 import { HttpError, answerFor, sendError } from '../../../platform/errors.ts';
 import * as flow from '../../playbooks/flow-recorder.ts';
 import { getKey, longJson, validData } from '../../../app/http.ts';
+import { randomUUID } from 'node:crypto';
+import { inLane } from '../connection/lane.ts';
 import { noTimeouts, refuseAction } from './helpers.ts';
 import { CHAT_DRAIN_MS, MAX_SCHEMA_CHARS } from '../constants.ts';
 import { challengesFor, quietCheckpointFor } from '../../playbooks/checkpoint.ts';
@@ -92,7 +94,9 @@ export async function chat(req, res) {
   if (!withLlm(req, res)) return;
   const { messages, data = {}, secrets = {}, schema } = req.body;
   const signal = abortOnHangUp(res);
-  await inFlight(longJson(res, () => converse(req, messages, { data, secrets, schema, signal })));
+  // The run's lane: an Oya desktop gives it a tab of its own, beside other agents and the person.
+  const lane = req.body.lane ?? randomUUID();
+  await inFlight(longJson(res, () => inLane(lane, () => converse(req, messages, { data, secrets, schema, signal }))));
 }
 
 /** Chats this replica is answering, so a shutdown lets them finish instead of cutting them off mid-run. */

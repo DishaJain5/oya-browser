@@ -43,6 +43,8 @@ export interface Routine {
   name?: string;
   /** What the agent is asked. */
   prompt?: string;
+  /** The saved playbook it plays instead of asking the prompt. */
+  playbook?: string;
   /** Whether its schedule is on. */
   enabled: boolean;
   /** When it runs. */

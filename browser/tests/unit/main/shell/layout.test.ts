@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { PanelLayout } from '../../../../src/main/shell/layout.ts';
 import { mainCtx, FakeBrowserView } from '../../support/main-ctx.cjs';
 import { shellLayout } from '../../../../src/main/shell/shell-layout.ts';
+import { BOOKMARKS_BAR_HEIGHT, CHROME_HEIGHT } from '../../../../src/main/shell/constants.ts';
 
 describe('PanelLayout', () => {
   let ctx: any, view: any;
@@ -18,10 +19,18 @@ describe('PanelLayout', () => {
   });
   afterEach(() => mock.timers.reset());
 
-  it('places the page below the toolbar, beside the closed panel', () => {
+  it('places the page below the toolbar and the bookmarks bar, beside the closed panel', () => {
+    const top = CHROME_HEIGHT + BOOKMARKS_BAR_HEIGHT;
     ctx.layout.layoutActiveTab();
-    assert.deepEqual(view.bounds, shellLayout(1280, 800, 0, 360).page);
-    assert.deepEqual(ctx.shell.sentOn('shell-layout')[0], { ...shellLayout(1280, 800, 0, 360), panelOpen: false });
+    assert.deepEqual(view.bounds, shellLayout(1280, 800, 0, 360, top).page);
+    assert.deepEqual(ctx.shell.sentOn('shell-layout')[0], { ...shellLayout(1280, 800, 0, 360, top), panelOpen: false });
+  });
+
+  it("gives the bookmarks bar's rows back to the page when the person hides it", () => {
+    ctx.config.values.ui = { bookmarksBar: false };
+    ctx.layout.layoutActiveTab();
+    assert.equal(view.bounds.y, CHROME_HEIGHT);
+    assert.equal(ctx.shell.sentOn('shell-layout')[0].chromeHeight, CHROME_HEIGHT);
   });
 
   it('replays the open interaction state with geometry after shell load or resize', () => {

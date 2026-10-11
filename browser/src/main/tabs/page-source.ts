@@ -8,7 +8,7 @@ import { renderedAnalysis } from '../actions/page-format.ts';
 import { agentDriving, AGENT_HOLDS_PAGE } from '../shell/control-shield.ts';
 
 /** The services the source pane reads through. */
-type Deps = Pick<AppServices, 'tabs' | 'control' | 'protection' | 'world' | 'config'>;
+type Deps = Pick<AppServices, 'tabs' | 'control' | 'protection' | 'world' | 'config' | 'agentTab'>;
 
 /** The page as the analyzer reads it: rendered, the analysis behind it, and why it is empty when it is. */
 export interface PageRead {
@@ -54,7 +54,7 @@ export class PageSource {
    * the element ids the agent's next click relies on.
    */
   async pageRead(view: PageView): Promise<PageRead> {
-    if (agentDriving(this.deps)) return { markdown: '', analysis: null, notice: AGENT_HOLDS_PAGE };
+    if (agentDriving(this.deps, view)) return { markdown: '', analysis: null, notice: AGENT_HOLDS_PAGE };
     try {
       const data = await this.analyze(view);
       if (data) return { markdown: data.page || data.markdown || '', analysis: data };

@@ -1,6 +1,6 @@
 /**
  * "Imported logins" on the account page: bring the sessions of a browser on
- * this computer (Chrome, Firefox, Arc, Brave, Edge) into Oya, so nobody has to
+ * this computer (Chrome, Safari, Firefox, Arc, Brave, Edge) into Oya, so nobody has to
  * sign in to every site again. The main process does the import and keeps the
  * last few (config `imports`); this holds the latest, the ones before it, the
  * choice of browser, and how it went.
@@ -8,7 +8,7 @@
 import { ViewModel } from '../../../core/view-model.ts';
 import { RendererConstants as C } from '../../../core/constants.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
-import type { ConnectionStatus } from '../../../../shared/ipc.ts';
+import type { ConnectionStatus, PasswordImportResult } from '../../../../shared/ipc.ts';
 import { DEFAULT_IMPORT_BROWSERS, TEXT } from '../model/constants.ts';
 import { messageOf, shape, type ImportRecord, type ImportSource, type MirrorStatus } from '../model/models.ts';
 
@@ -41,7 +41,14 @@ export interface ImportState {
 /** The parts of the bridge imports use. */
 export type ImportBridge = Pick<
   OyaBrowser,
-  'importSources' | 'reimportBrowser' | 'onMirrorStatus' | 'onWsStatus' | 'getUiPreferences' | 'saveUiPreferences'
+  | 'importSources'
+  | 'reimportBrowser'
+  | 'makeDefaultBrowser'
+  | 'importPasswords'
+  | 'onMirrorStatus'
+  | 'onWsStatus'
+  | 'getUiPreferences'
+  | 'saveUiPreferences'
 >;
 
 /** How much one import brought: sites when it counted them, else cookies. */
@@ -69,10 +76,15 @@ export function importBlocked(state: ImportState): string {
   return state.connected ? '' : TEXT.importOffline;
 }
 
-/** The status line: what stands in the way or, when nothing does, the last note. */
+/**
+ * The status line: being offline first, then the last note, then what stands in the way.
+ * A Mac with only Safari has no browser to import from, but its passwords import still
+ * has to say how it went.
+ */
 export function importStatus(state: ImportState): ImportNote {
   const blocked = importBlocked(state);
-  return blocked ? { text: blocked, kind: '' } : state.note;
+  const shown = blocked === TEXT.importOffline || (blocked && !state.note.text);
+  return shown ? { text: blocked, kind: '' } : state.note;
 }
 
 /** Imports earlier than the latest that the page lists. */
@@ -91,12 +103,20 @@ function importResult(status: MirrorStatus): string {
   return status.cookies ? TEXT.importDone : 'No logins were found. You may need to sign in to your sites in Oya.';
 }
 
+/** What a passwords import says: how many it kept, and a reminder that the export file is plain text. */
+export function passwordsResult({ imported, skipped }: PasswordImportResult): string {
+  const kept = `Imported ${imported} password${imported === 1 ? '' : 's'}`;
+  return `${kept}${skipped ? `, skipped ${skipped}` : ''}. Delete the exported file: it holds them unencrypted.`;
+}
+
 /** Importing logins from another browser. */
 export class ImportViewModel extends ViewModel<ImportState> {
   /** The main process. */
   private readonly bridge: ImportBridge;
   /** Opens account settings when the first-login invitation is ready. */
   onOffer?: () => void;
+  /** Closes the first-run offer's dialog when the person says Not now. */
+  onDecline?: () => void;
   /** A loaded preference prevents reconnects from offering import again. */
   private offered = true;
 
@@ -143,6 +163,20 @@ export class ImportViewModel extends ViewModel<ImportState> {
     await this.bridge.reimportBrowser(this.state.chosen).catch((e: unknown) => this.finish(messageOf(e), 'error'));
   }
 
+  /** Asks the system to make Oya the default browser (the first-run offer's second step). */
+  async makeDefault(): Promise<void> {
+    await this.bridge.makeDefaultBrowser().catch(() => {});
+  }
+
+  /** Imports a passwords export the person chooses, and says how it went. */
+  async importPasswords(): Promise<void> {
+    if (this.state.running) return;
+    this.set({ running: true });
+    const done = await this.bridge.importPasswords().catch((e: unknown) => this.finish(messageOf(e), 'error'));
+    if (done) this.finish(passwordsResult(done));
+    else this.set({ running: false });
+  }
+
   /** Progress from the main process: started, or done with a result, an error, or nothing to bring. */
   private onMirror(status: MirrorStatus): void {
     if (status.started) return this.set({ running: true });
@@ -166,6 +200,12 @@ export class ImportViewModel extends ViewModel<ImportState> {
     this.offered = true;
     this.set({ offer: true });
     this.onOffer?.();
+  }
+
+  /** Not now: the offer is remembered as made, and its dialog closes, back to the browser. */
+  async notNow(): Promise<void> {
+    this.onDecline?.();
+    await this.dismissOffer();
   }
 
   /** Remember the person's choice without reconnecting or changing account settings. */

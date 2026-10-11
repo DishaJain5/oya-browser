@@ -42,7 +42,7 @@ describe('the shell dialog', () => {
   });
 
   it('names itself after the page in view', () => {
-    assert.deepEqual(pageLabels('profile'), { title: 'Account', label: 'Account and connection' });
+    assert.deepEqual(pageLabels('profile'), { title: 'Settings', label: 'Settings' });
     assert.deepEqual(pageLabels('commands'), { title: 'Commands', label: 'Commands and settings' });
   });
 

@@ -13,7 +13,7 @@ export interface LibraryEntry {
   time: number;
 }
 /** The library of a single persona partition. */
-interface LibraryData {
+export interface LibraryData {
   /** Recently visited pages, newest first, deduplicated by address. */
   history: LibraryEntry[];
   /** Explicitly saved pages, newest first. */
@@ -57,24 +57,44 @@ function data(value: unknown): LibraryData {
   const saved = value as Partial<LibraryData> | null;
   return { history: entries(saved?.history).slice(0, HISTORY_LIMIT), bookmarks: entries(saved?.bookmarks) };
 }
+/** `imported` added to `current`: the bookmarks it lacked after its own, and every visit by address, newest first. */
+function merged(current: LibraryData, imported: LibraryData): LibraryData {
+  const saved = new Set(current.bookmarks.map((entry) => entry.url));
+  const bookmarks = [...current.bookmarks, ...entries(imported.bookmarks).filter((entry) => !saved.has(entry.url))];
+  const history = newestByAddress([...current.history, ...entries(imported.history)]).slice(0, HISTORY_LIMIT);
+  return { bookmarks, history };
+}
+/** One entry per address, the latest visit, newest first. */
+function newestByAddress(list: LibraryEntry[]): LibraryEntry[] {
+  const latest = new Map<string, LibraryEntry>();
+  for (const entry of list) if ((latest.get(entry.url)?.time ?? -Infinity) < entry.time) latest.set(entry.url, entry);
+  return [...latest.values()].sort((a, b) => b.time - a.time);
+}
 /** A library resolves its partition on every operation, including after a persona switch. */
 export class BrowsingLibrary {
   /** Persistence and the current persona. */
   private readonly deps: Deps;
+  /** Hears every change, so the bookmarks bar follows it. */
+  changed: () => void = () => {};
   /** Uses the same repository as desktop settings. */
   constructor(deps: Deps) {
     this.deps = deps;
   }
-  /** Returns only the current persona's data. */
-  snapshot(): LibraryData {
+  /** Returns only the current persona's data, or the persona whose partition is `partition`. */
+  snapshot(partition = this.deps.persona.partitionName()): LibraryData {
     const all = this.deps.config.values.browsingLibrary as Record<string, unknown> | undefined;
-    return data(all?.[this.deps.persona.partitionName()]);
+    return data(all?.[partition]);
   }
-  /** Writes only this persona while retaining other personas' libraries. */
-  private save(value: LibraryData): void {
+  /** Writes only this persona (or the one at `partition`) while retaining other personas' libraries. */
+  private save(value: LibraryData, partition = this.deps.persona.partitionName()): void {
     const all = this.deps.config.values.browsingLibrary as Record<string, unknown> | undefined;
-    this.deps.config.merge({ browsingLibrary: { ...all, [this.deps.persona.partitionName()]: value } });
+    this.deps.config.merge({ browsingLibrary: { ...all, [partition]: value } });
     this.deps.config.save();
+    this.changed();
+  }
+  /** Adds another browser's bookmarks and history to the persona at `partition`, keeping what it has. */
+  importInto(partition: string, imported: LibraryData): void {
+    this.save(merged(this.snapshot(partition), imported), partition);
   }
   /** Records a committed main-frame page; repeat visits move it to the front. */
   visit(url: string, title: string): void {

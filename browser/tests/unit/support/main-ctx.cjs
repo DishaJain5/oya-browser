@@ -9,6 +9,7 @@ const { EventEmitter } = require('node:events');
 const { FakeWebContents } = require('./fakes.cjs');
 const { DesktopDialogs } = require('../../../src/main/dialogs/index.ts');
 const { Governance } = require('../../../src/main/identity/governance.ts');
+const { AgentTab } = require('../../../src/main/control/agent-tab.ts');
 
 /** A tab's webContents: loads, history and handlers a BrowserView's page has. */
 class FakePageContents extends FakeWebContents {
@@ -385,6 +386,13 @@ function mainCtx(real = {}) {
       requireHumanControl() {},
       keepFocusOnShell() {},
       adoptPopup() {},
+      takeover: {
+        asked: [],
+        /** Records the handoff it was asked to offer. */
+        async request(options) {
+          this.asked.push(options?.message);
+        },
+      },
       controlChanged() {},
       runEnded() {
         this.ended = (this.ended || 0) + 1;
@@ -444,7 +452,13 @@ function mainCtx(real = {}) {
     cookies: { pullCookiesFor: async () => {}, flushCookieChanges() {} },
     routines: { start() {}, refresh() {} },
     mirror: { maybeRun() {}, onOk() {}, onFailed() {}, reimport() {} },
+    // Each tab's chat in flight.
+    chatRuns: new Map(),
+    // No tabs until a test gives some.
+    tabs: { list: [], activeTabId: null, getActiveView: () => null, getShownView: () => null, find: () => undefined },
   };
+  // The real claim: it reads the faked control and tabs, so control fakes keep their old meaning.
+  ctx.agentTab = new AgentTab(ctx);
   for (const [name, Service] of Object.entries(real)) ctx[name] = new Service(ctx);
   return ctx;
 }

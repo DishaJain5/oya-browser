@@ -255,6 +255,19 @@ describe('agentLoop', () => {
     assert.match(llm.requests[1].messages.find((m) => m.role === 'tool').content, /Solved the CAPTCHA \(solver\)/);
   });
 
+  it('lists the saved logins by site and username, so the agent knows what sign_in can fill', async () => {
+    const challenges = {
+      captcha: async () => null,
+      signIn: async () => null,
+      mfa: async () => null,
+      logins: () => [{ domain: 'a.com', username: 'ada@a.com' }],
+      liveViewUrl: '/x',
+    };
+    const llm = stubLlm([toolReply(['list_saved_logins', {}]), textReply('DONE')]);
+    await agentLoop(ctx({ challenges }), start());
+    assert.match(llm.requests[1].messages.find((m) => m.role === 'tool').content, /a\.com: ada@a\.com/);
+  });
+
   it('fills task values into placeholders before the browser sees them', async () => {
     stubLlm([toolReply(['type', { element_id: 1, text: '{{email|upper}}' }]), textReply('DONE')]);
     await agentLoop(ctx({ values: { email: 'ada@x.test' } }), start());

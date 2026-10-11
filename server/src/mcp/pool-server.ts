@@ -41,6 +41,7 @@ const POOL_TOOLS = [
   'solve_captcha',
   'sign_in',
   'complete_mfa',
+  'list_saved_logins',
   'list_playbooks',
   'run_playbook',
   'run_task',

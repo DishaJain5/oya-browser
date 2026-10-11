@@ -20,15 +20,15 @@ interface WorldRun {
   code: string;
 }
 /** Runs in the page's own process, so a document still loading a slow resource does not hold the read. */
-function runInWorld({ id, world, code }: WorldRun): void {
-  ipcRenderer.send(STOCK_PERSONA.ACK, id);
+async function runInWorld({ id, world, code }: WorldRun): Promise<void> {
+  if (!(await ipcRenderer.invoke(STOCK_PERSONA.ACK, id))) return;
   webFrame.executeJavaScriptInIsolatedWorld(world, [{ code }]).then(
     (value) => ipcRenderer.send(STOCK_PERSONA.RESULT, { id, value }),
     (error) => ipcRenderer.send(STOCK_PERSONA.RESULT, { id, error: String(error?.message ?? error) }),
   );
 }
 if (process.argv.includes(STOCK_PERSONA.ARGUMENT))
-  ipcRenderer.on(STOCK_PERSONA.RUN, (_event, request: WorldRun) => runInWorld(request));
+  ipcRenderer.on(STOCK_PERSONA.RUN, (_event, request: WorldRun) => void runInWorld(request));
 /** The sandbox owns this identity; website scripts cannot choose or read it. */
 const documentId = Array.from(crypto.getRandomValues(new Uint32Array(NATIVE_RECORDING.DOCUMENT_TOKEN_WORDS))).join('-');
 contextBridge.exposeInIsolatedWorld(NATIVE_RECORDING.WORLD_ID, NATIVE_RECORDING.BINDING, {

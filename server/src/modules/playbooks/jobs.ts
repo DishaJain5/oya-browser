@@ -2,6 +2,8 @@
  * The work a background run does: replay a playbook, or hand a prompt to the
  * agent, with the checkpoint between page-changing steps.
  */
+import { randomUUID } from 'node:crypto';
+import { inLane } from '../browsers/connection/lane.ts';
 import { runChat } from '../agent/chat.ts';
 import { play } from './service.ts';
 import { checkpointFor, challengesFor } from './checkpoint.ts';
@@ -26,9 +28,11 @@ export interface Job {
 
 /** Runs the job, parking on a person through `requestHuman` when it needs one. */
 export async function runJob(job: Job, requestHuman) {
-  const checkpoint = checkpointFor(job.key, job.browserId, requestHuman);
-  if (job.pb) return replayJob(job, checkpoint, requestHuman);
-  return runPrompt(job, checkpoint, requestHuman);
+  // Each run is its own lane: on an Oya desktop it drives a tab of its own, beside other agents.
+  return inLane(randomUUID(), () => {
+    const checkpoint = checkpointFor(job.key, job.browserId, requestHuman);
+    return job.pb ? replayJob(job, checkpoint, requestHuman) : runPrompt(job, checkpoint, requestHuman);
+  });
 }
 
 /** Replays the job's playbook with its data and secrets as the variables. */

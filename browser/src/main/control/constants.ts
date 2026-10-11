@@ -17,3 +17,9 @@ export const CONTROL_TICK_MS = 1000;
 
 /** Human control is renewed once it has less than this left. */
 export const CONTROL_RENEW_BEFORE_MS = 240_000;
+
+/**
+ * An agent that sent no command for this long has finished (an API or MCP agent
+ * never says so): its tab is the person's again. Longer than a model's slowest turn.
+ */
+export const LANE_IDLE_MS = 120_000;

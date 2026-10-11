@@ -115,4 +115,39 @@ describe('cloud routines', () => {
     fetch.mock.mockImplementation(async () => Response.json({ error: 'Browser not connected', status: 404 }));
     await assert.rejects(cloud.steps.ask(KEY, 'b-1', 'go'), /Browser not connected/);
   });
+
+  it('plays a routine that names a playbook instead of asking its prompt', async () => {
+    const made = await routines.create(KEY, { ...CLOUD, prompt: '', playbook: 'check-prices' });
+    mock.method(cloud.steps, 'launch', async () => 'b-cloud');
+    mock.method(cloud.steps, 'connected', async () => {});
+    const ask = mock.method(cloud.steps, 'ask', async () => ({ text: 'never' }));
+    const play = mock.method(cloud.steps, 'play', async () => ({ text: '{"price":5}' }));
+    const run = await runAndWait(made.id);
+    assert.deepEqual([run.status, run.result], ['done', '{"price":5}']);
+    assert.deepEqual(play.mock.calls[0].arguments, [KEY, 'b-cloud', 'check-prices']);
+    assert.equal(ask.mock.callCount(), 0);
+  });
+
+  it('plays through the runs route and waits for the run to end; one stopped for a person failed', async () => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const answers = [
+      { id: 'run_1', status: 'running' },
+      { id: 'run_1', status: 'succeeded', result: { price: 5 } },
+    ];
+    const fetch = mock.method(globalThis, 'fetch', async () => Response.json(answers.shift()));
+    const playing = cloud.steps.play(KEY, 'b 1', 'check-prices');
+    await new Promise((resolve) => setImmediate(resolve));
+    mock.timers.tick(3_000);
+    assert.deepEqual(await playing, { text: '{"price":5}' });
+    const [url, init] = fetch.mock.calls[0].arguments;
+    assert.match(String(url), /\/api\/browsers\/b%201\/runs$/);
+    assert.deepEqual(JSON.parse(init.body), { playbook: 'check-prices' });
+    assert.match(String(fetch.mock.calls[1].arguments[0]), /\/api\/runs\/run_1$/);
+    fetch.mock.mockImplementation(async () => Response.json({ id: 'run_2', status: 'needs_attention' }));
+    assert.deepEqual(await cloud.steps.play(KEY, 'b-1', 'x'), {
+      text: 'The playbook did not finish: it stopped for a person.',
+      failed: true,
+    });
+    mock.timers.reset();
+  });
 });

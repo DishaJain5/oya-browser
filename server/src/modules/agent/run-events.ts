@@ -6,6 +6,7 @@
  * redacted against the task's secrets. Sending is fire and forget; a browser that
  * cannot hear (gone, on another replica, an old app) never slows or breaks the run.
  */
+import { currentLane } from '../browsers/connection/lane.ts';
 import { randomUUID } from 'node:crypto';
 import { registry } from '../browsers/registry.ts';
 import { elementOf } from './recorder.ts';
@@ -64,6 +65,7 @@ const LINES: Record<string, (args: any, name: string) => string> = {
   request_human: () => 'Asking you',
   solve_captcha: () => 'Solving a CAPTCHA',
   sign_in: () => 'Signing in',
+  list_saved_logins: () => 'Checking saved logins',
   complete_mfa: () => 'Entering the sign-in code',
 };
 
@@ -95,6 +97,8 @@ export class LiveRun {
   secrets: Record<string, any>;
   /** Names this run's events, so the panel never mixes two runs. */
   runId = randomUUID();
+  /** The agent it is (a desktop tab's chat, say), so a desktop shows its events in that tab's panel. */
+  lane = currentLane();
 
   constructor(browserId: string, secrets: Record<string, any> = {}) {
     this.browserId = browserId;
@@ -138,7 +142,7 @@ export class LiveRun {
   /** Sends one event; never throws. */
   send(event: Record<string, any>) {
     try {
-      registry.send(this.browserId, { type: 'agent-event', runId: this.runId, event });
+      registry.send(this.browserId, { type: 'agent-event', runId: this.runId, lane: this.lane, event });
     } catch {}
   }
 }

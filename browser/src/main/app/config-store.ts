@@ -18,6 +18,8 @@ export interface UiPreferences {
   pageFormat?: string;
   /** The workspace panel's width. */
   panelWidth?: number;
+  /** Whether the bookmarks bar shows under the toolbar (shown unless turned off). */
+  bookmarksBar?: boolean;
   /** Anything else an older shell saved. */
   [key: string]: unknown;
 }

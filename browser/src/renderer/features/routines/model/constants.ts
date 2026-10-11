@@ -7,7 +7,8 @@
 /** The words the pane shows. */
 export const ROUTINES_TEXT = {
   empty: 'No routines yet',
-  emptyHint: 'Run a prompt every hour, or every day at a set time. Routines belong to this project.',
+  emptyHint:
+    'Run a prompt or a saved playbook every hour, or every day at a set time. Routines belong to this project.',
   offline: 'Offline. Connect to Oya to see and run this project’s routines.',
   loadError: (why: string) => `Could not reach this project’s routines: ${why}`,
   off: 'Off',
@@ -58,6 +59,9 @@ export const RUNS_TEXT = {
 
 /** The words the editor shows. */
 export const EDITOR_TEXT = {
+  task: 'Does',
+  askPrompt: 'Ask the agent a prompt',
+  playGroup: 'Play a saved playbook',
   cloud: 'Run in the cloud',
   cloudHint: 'Oya runs it on a cloud browser, even when this app is closed.',
   newTitle: 'New routine',

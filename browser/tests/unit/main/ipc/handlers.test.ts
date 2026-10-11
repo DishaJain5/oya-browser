@@ -96,6 +96,7 @@ describe('IPC handlers', () => {
   });
 
   it('refuses page actions while an agent has control', async () => {
+    ctx.control.state = { interactive: false, mode: 'agent', mine: false };
     ctx.shield.requireHumanControl = () => {
       throw new Error('Take control');
     };

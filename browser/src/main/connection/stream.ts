@@ -6,7 +6,7 @@ import type { SocketLike } from './socket.ts';
 import { STREAM_MIN_FRAME_MS, MS_PER_SECOND, STREAM_MAX_BUFFERED, STREAM_JPEG_QUALITY } from './constants.ts';
 
 /** The tab to show, and the socket the frames go over. */
-type Deps = Pick<AppServices, 'tabs' | 'socket'>;
+type Deps = Pick<AppServices, 'agentTab' | 'socket'>;
 
 /** The view a frame is taken of: its size, and its page to capture. */
 export interface StreamView {
@@ -70,7 +70,8 @@ export class LiveStream {
 
   /** Captures and sends one frame, if the socket can take it. */
   private async tick(): Promise<void> {
-    const view = this.deps.tabs.getActiveView() as StreamView | null; // a tab shown in the window is a BrowserView; popups have windows of their own
+    // The agent's tab, never one the person is using beside it; a BrowserView, as popups have windows of their own.
+    const view = this.deps.agentTab.view() as StreamView | null;
     if (!view || !this.canCapture(view, this.deps.socket.ws)) return;
     this.capturing = true;
     await this.sendFrame(view).catch(() => {});

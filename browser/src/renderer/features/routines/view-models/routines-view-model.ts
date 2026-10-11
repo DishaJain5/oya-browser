@@ -35,6 +35,7 @@ export type RoutinesBridge = Pick<
   OyaBrowser,
   | 'listRoutines'
   | 'saveRoutine'
+  | 'playbooks'
   | 'deleteRoutine'
   | 'runRoutineNow'
   | 'setRoutineEnabled'

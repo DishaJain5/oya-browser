@@ -55,6 +55,12 @@ export const MAX_ORIGIN_STORAGE_CHARS = 2_097_152;
 
 /** Labels in a registrable domain (`example.com`), the parent a credential lookup falls back to. */
 export const REGISTRABLE_LABELS = 2;
+/** Characters of an imported cookie's mark: enough that a changed cookie never matches by chance. */
+export const IMPORT_MARK_CHARS = 16;
+/** Most logins one password import may carry: a large password manager export, not a dump of everything. */
+export const MAX_IMPORTED_LOGINS = 10000;
+/** Longest username or password an import keeps; longer is not a login. */
+export const MAX_LOGIN_CHARS = 1024;
 
 // ── Fingerprint seeds ──
 

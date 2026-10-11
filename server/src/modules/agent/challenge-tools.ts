@@ -8,6 +8,14 @@
  */
 import { bare } from './tools.ts';
 
+/** A site the persona can sign in to, and as whom; never the password. */
+export interface SavedLogin {
+  /** The site it is filed under. */
+  domain: string;
+  /** The account name. */
+  username: string;
+}
+
 /** The challenges a run can clear (challengesFor), or none when the run was not given them. */
 export type Challenges = {
   /** Solve a CAPTCHA on the page. */
@@ -16,11 +24,13 @@ export type Challenges = {
   signIn: () => Promise<any>;
   /** Answer an MFA prompt from the persona's factors. */
   mfa: (login?: any) => Promise<any>;
+  /** The sites the persona has a saved login for, with usernames only, never a password. */
+  logins: () => SavedLogin[];
   /** Where a person can finish a challenge by hand. */
   liveViewUrl: string;
 };
 
-/** The three tools, as the model is offered them. */
+/** The challenge tools, as the model is offered them. */
 export const CHALLENGE_TOOLS = [
   bare(
     'solve_captcha',
@@ -29,6 +39,10 @@ export const CHALLENGE_TOOLS = [
   bare(
     'sign_in',
     "Sign in on the current page with the credentials stored for this site in the browser's persona. You never see them. Call it on a login form you were not given values for.",
+  ),
+  bare(
+    'list_saved_logins',
+    "List the sites this browser's persona has a saved login for, with the username, never the password. Call it before a sign-in to know whether sign_in can fill the form and which account it will use.",
   ),
   bare(
     'complete_mfa',
@@ -62,9 +76,16 @@ function mfaSaid(m: any) {
   return `Could not complete the code prompt: ${m.error || 'no factor configured for this site'}. Use request_human, or report FAILED.`;
 }
 
+/** What the saved-logins lookup says: one site per line, or that there are none. */
+function loginsSaid(logins: SavedLogin[]) {
+  if (!logins.length) return 'No saved logins. Ask a person to import passwords, or use request_human at a sign-in.';
+  return `Saved logins (sign_in fills these):\n${logins.map((l) => `${l.domain}: ${l.username}`).join('\n')}`;
+}
+
 /** Tool name → how it runs, given the run's challenges. */
 export const CHALLENGE_HANDLERS: Record<string, (c: Challenges) => Promise<string>> = {
   solve_captcha: async (c) => captchaSaid(await c.captcha()),
   sign_in: async (c) => signInSaid(await c.signIn()),
   complete_mfa: async (c) => mfaSaid(await c.mfa()),
+  list_saved_logins: async (c) => loginsSaid(c.logins()),
 };

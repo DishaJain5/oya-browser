@@ -1,6 +1,7 @@
 /** Import browser profiles through offline readers; never launch another browser or attach a debugger. */
 import { sourceBrowser, type Source } from './locate.ts';
 import { captureDevice, type DeviceElectron } from './device.ts';
+import { captureChromium } from './chromium.ts';
 import type { SlimCookie } from './read.ts';
 
 /** One captured profile: its identity and its cookies. */
@@ -39,9 +40,9 @@ export interface CaptureDeps {
   electron: DeviceElectron;
 }
 
-/** Native import cannot decrypt another Chromium browser's platform-bound cookies. */
-export function requireOfflineSource(source: Source): void {
-  if (source.kind === 'chromium')
+/** Chromium's cookies are opened with its Keychain key on macOS; on Windows they are bound to the browser itself. */
+export function requireOfflineSource(source: Source, platform = process.platform): void {
+  if (source.kind === 'chromium' && platform !== 'darwin')
     throw new Error(
       `Import from ${source.name} is unavailable: native cookie decryption is unsupported. Sign in directly in Oya Browser.`,
     );
@@ -52,9 +53,8 @@ export async function captureAll(ctx: CaptureDeps, sourceId?: string): Promise<C
   const source = sourceBrowser(sourceId);
   if (!source) return null;
   requireOfflineSource(source);
-  if (source.kind !== 'firefox') throw new Error('Unsupported native profile source');
+  const profiles = source.kind === 'chromium' ? await captureChromium(source) : source.capture();
   const device = await captureDevice(ctx.electron);
-  const profiles = source.capture();
   if (!profiles.length) return null;
   return { source: source.id, name: source.name, userDataDir: source.userDataDir, device, profiles, warnings: [] };
 }

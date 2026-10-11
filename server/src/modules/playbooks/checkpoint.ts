@@ -79,6 +79,7 @@ export function challengesFor(apiKey, browserId) {
     captcha: () => tryCaptcha(run, pageOf(run)),
     signIn: () => trySignIn(run, pageOf(run)),
     mfa: (login?) => tryMfa(run, pageOf(run), login),
+    logins: () => credentials.list(pageOf(run).personaId),
     liveViewUrl: run.liveViewUrl,
   };
 }

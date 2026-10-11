@@ -1,8 +1,9 @@
 /**
  * The navigation toolbar (index.html's nav.toolbar): Back, Forward, Reload,
  * the address bar and its status, then the other features' toolbar parts
- * (update pill, connection pill, control status) as children, the Ask button
- * and the navigation progress line. Its ids stay: the control guard finds
+ * (update pill, control status) as children, the Ask button, and at its end
+ * notifications and the profile, as in Chrome; and the navigation progress line.
+ * History and bookmarks are on the bookmarks bar under it (All bookmarks). Its ids stay: the control guard finds
  * #btn-back, #btn-forward, #btn-reload and #url-bar by id and marks them
  * blocked or read-only while an agent drives.
  */
@@ -22,24 +23,12 @@ export interface ToolbarProps extends Pick<RendererServices, 'panel' | 'shell'> 
   vm: ToolbarViewModel;
   /** The other features' toolbar parts, between the address bar and the Ask button. */
   children?: ReactNode;
-}
-
-/** A text button keeps the library discoverable without introducing an ambiguous icon. */
-function LibraryButton({ vm }: Pick<ToolbarProps, 'vm'>) {
-  return (
-    <button
-      className="library-button"
-      title={TEXT.libraryTitle}
-      aria-label={TEXT.libraryTitle}
-      onClick={() => vm.showLibrary()}
-    >
-      {TEXT.library}
-    </button>
-  );
+  /** What sits after the Ask button, at the toolbar's end: notifications and the profile, as in Chrome. */
+  trailing?: ReactNode;
 }
 
 /** The navigation toolbar. */
-export function Toolbar({ vm, panel, shell, children }: ToolbarProps) {
+export function Toolbar({ vm, panel, shell, children, trailing }: ToolbarProps) {
   const { nav } = useViewModel(vm);
   const look = navLook(nav);
   return (
@@ -71,9 +60,9 @@ export function Toolbar({ vm, panel, shell, children }: ToolbarProps) {
         icon={look.reloadIcon}
       />
       <AddressBar vm={vm} />
-      <LibraryButton vm={vm} />
       {children}
       <AskButton panel={panel} shell={shell} />
+      {trailing}
       <div id="navigation-progress" hidden={!nav.loading} aria-hidden="true"></div>
     </nav>
   );

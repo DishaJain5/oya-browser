@@ -36,6 +36,7 @@ import type { DeepLinks } from './deep-links.ts';
 import type { Persona } from './persona.ts';
 import type { Updater } from './updater.ts';
 import type { Governance } from '../identity/governance.ts';
+import type { AgentTab } from '../control/agent-tab.ts';
 
 /** The main process's services and the values they share. */
 export interface AppServices {
@@ -108,6 +109,8 @@ export interface AppServices {
   world: World;
   /** Who drives: agent or person (src/main/control/control-state.ts). */
   control: DesktopControl;
+  /** The one tab the agent drives while the rest stay the person's (src/main/control/agent-tab.ts). */
+  agentTab: AgentTab;
   /** The cookie pool sync (src/main/sync/cookie-sync.ts). */
   cookies: CookieSync;
   /** CDP relayed over the control socket (src/main/connection/cdp-relay.ts). */
@@ -122,6 +125,8 @@ export interface AppServices {
   updater: Updater;
   /** Stops the running chat, while one runs (src/main/connection/chat.ts). */
   chatAbort: AbortController | null;
+  /** Each tab's chat in flight, by tab id (src/main/connection/chat.ts). */
+  chatRuns: Map<number, AbortController>;
   /** Tabs a validation run left open to show where it ended. */
   validationTabs: Set<number> | undefined;
 }

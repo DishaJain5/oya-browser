@@ -13,7 +13,7 @@ import { PageSource } from './page-source.ts';
 /** The services the menu uses. */
 type Deps = Pick<
   AppServices,
-  'tabs' | 'recorder' | 'electron' | 'shell' | 'layout' | 'protection' | 'world' | 'control' | 'config'
+  'tabs' | 'recorder' | 'electron' | 'shell' | 'layout' | 'protection' | 'world' | 'control' | 'config' | 'agentTab'
 >;
 
 /** The clicked point, as the inspector needs it. */
@@ -143,7 +143,8 @@ export class ContextMenu {
   /** The analyzer's view of the clicked element's section, shown in the dev panel; refused while an agent drives. */
   private async inspectElement(view: PageView, params: Point): Promise<void> {
     this.deps.layout.reveal();
-    if (agentDriving(this.deps)) return this.deps.shell.send('inspect-result', { ok: false, error: AGENT_HOLDS_PAGE });
+    if (agentDriving(this.deps, view))
+      return this.deps.shell.send('inspect-result', { ok: false, error: AGENT_HOLDS_PAGE });
     this.deps.shell.send('inspect-result', await this.inspectRead(view, params));
   }
 

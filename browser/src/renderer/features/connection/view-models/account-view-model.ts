@@ -88,11 +88,17 @@ function signOutLabel(email: string | null | undefined): SignOutLabel {
   return { text: `Log out of ${email}`, title: `Forget this browser's key and sign out of ${email}` };
 }
 
+/** The project line: its name, with "Project" in front unless it already starts so ("Project 1b9258"). */
+function projectLabel(name: string | undefined, connected: boolean): string {
+  if (!name) return connected ? '' : 'Connect to see your project';
+  return /^project\b/i.test(name) ? name : `Project ${name}`;
+}
+
 /** The card for `state`. */
 export function accountCard(state: AccountState): AccountCard {
   const { account } = state;
   const name = account?.project?.name;
-  const project = name ? `Project ${name}` : state.connected ? '' : 'Connect to see your project';
+  const project = projectLabel(name, state.connected);
   const base = { ...who(account), project, plan: account?.plan ? `${account.plan} plan` : '' };
   const initial = base.initial.toUpperCase();
   return { ...base, initial, ...connection(state), signOut: signOutLabel(account?.email) };

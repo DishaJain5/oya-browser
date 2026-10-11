@@ -3,6 +3,7 @@
  * with each analysis, so steps keep the analyzer's stable metadata instead.
  * ponytail: in memory, oldest evicted past 1000 browsers; a run is lost on restart unless saved as a playbook.
  */
+import { LaneMap } from '../browsers/connection/lane.ts';
 import * as workflow from '../../../../browser/src/workflow/index.ts';
 
 import { sendCommand } from '../browsers/socket.ts';
@@ -88,8 +89,8 @@ const STABLE_KEYS = [
   'repeats',
 ];
 
-/** browserId -> { prompt, steps, elements } */
-const runs = new Map();
+/** Each agent's current run on a browser, per lane: { prompt, steps, elements }. */
+const runs = new LaneMap<any>(MAX_RECORDED_RUNS);
 
 /** Only the fields the browser actually reported. */
 const defined = (handle = {}) => Object.fromEntries(Object.entries(handle || {}).filter(([, v]) => v !== undefined));
@@ -219,9 +220,7 @@ export async function startRun(browserId, run, values = {}) {
   if (/^https?:/.test(startUrl || ''))
     run.steps.push({ action: 'navigate', url: startPlaceholder(startUrl, values), start: true });
   run.mark = run.steps.length;
-  runs.delete(browserId);
   runs.set(browserId, run);
-  if (runs.size > MAX_RECORDED_RUNS) runs.delete(runs.keys().next().value);
 }
 
 /** Reuse an explicitly supplied whole URL, so a replay can start in a new environment without guessing at hosts. */

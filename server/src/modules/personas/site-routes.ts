@@ -9,6 +9,9 @@ import * as mfa from '../challenges/mfa.ts';
 import * as credentials from './credentials.ts';
 import { Status } from '../../platform/http-status.ts';
 import { auditPersona, ownedPersona } from './route-support.ts';
+import { registry } from '../browsers/registry.ts';
+import { getKey, requireBrowser } from '../../app/http.ts';
+import { MAX_IMPORTED_LOGINS } from './constants.ts';
 
 /** A persona's second factors. */
 export function mountMfa(router: Router, personas: PersonaService) {
@@ -43,6 +46,11 @@ export function mountCredentials(router: Router, personas: PersonaService) {
   router.put('/personas/:id/credentials', authMiddleware, setCredentials(personas));
   /** DELETE /personas/:id/credentials?domain=, forget the persona's login for one site. */
   router.delete('/personas/:id/credentials', authMiddleware, clearCredentials(personas));
+  /**
+   * Import a password manager's export into the persona this browser runs as. The
+   * desktop parses the file; passwords are sealed here and never read back.
+   */
+  router.post('/browsers/:browserId/credentials/import', authMiddleware, requireBrowser, importCredentials(personas));
 }
 
 /** Stores a second factor, persona-wide or for one site. */
@@ -103,3 +111,22 @@ const clearCredentials = (personas: PersonaService) => async (req: Request, res:
   auditPersona(req, 'credentials.clear', p.id, { meta: { domain: site }, outcome: removed ? 'ok' : 'error' });
   res.json({ ok: removed });
 };
+
+/** Seals a password export's logins for the calling browser's persona: counts only, never a login. */
+const importCredentials = (personas: PersonaService) => async (req: Request, res: Response) => {
+  const entries = req.body?.entries;
+  if (!Array.isArray(entries) || entries.length > MAX_IMPORTED_LOGINS) return refuseImport(res);
+  const personaId = browserPersona(personas, req);
+  const counts = await credentials.importMany(personaId, entries);
+  auditPersona(req, 'credentials.import', personaId, { meta: counts });
+  res.json(counts);
+};
+
+/** Answers 400 for an import body that is not a bounded list of logins. */
+const refuseImport = (res: Response) =>
+  res.status(Status.BAD_REQUEST).json({ error: `entries must be a list of at most ${MAX_IMPORTED_LOGINS} logins` });
+
+/** The persona the `:browserId` browser runs as, or the key's default when it has none. */
+function browserPersona(personas: PersonaService, req: Request): string {
+  return registry.get(req.params.browserId as string)?.persona?.id || personas.defaultFor(getKey(req)).id;
+}

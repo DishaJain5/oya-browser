@@ -3,6 +3,7 @@
  * window is narrow, above) the dev panel. The panel slides open and shut, and
  * its width is remembered.
  */
+import { chromeHeight } from './bookmarks-bar.ts';
 import type { BrowserView } from 'electron';
 import type { AppServices } from '../app/services.ts';
 import { shellLayout } from './shell-layout.ts';
@@ -53,7 +54,7 @@ export class PanelLayout {
   /** Tells the shell the layout, moves the page, and keeps the shield over it. */
   private apply(view: BrowserView | null, progress: number): void {
     const bounds = this.deps.shell.window!.getContentBounds(); // layoutActiveTab checked it
-    const layout = shellLayout(bounds.width, bounds.height, progress, this.width);
+    const layout = shellLayout(bounds.width, bounds.height, progress, this.width, chromeHeight(this.deps.config));
     this.deps.shell.send('shell-layout', { ...layout, panelOpen: this.open });
     if (view && this.deps.shell.browsingMode) view.setBounds(layout.page);
     this.deps.shield.sync();

@@ -149,3 +149,63 @@
   background: var(--logo-green);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--logo-green) 20%, transparent);
 }
+
+/* ── The profile button: the account's initial, with the connection as a dot on it (Chrome's place, the toolbar's end) ── */
+.conn-pill.profile-button {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  justify-content: center;
+}
+.profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 600 13px/1 var(--font);
+  transition: box-shadow var(--t-fast) var(--ease);
+}
+.conn-pill.profile-button:hover .profile-avatar {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text) 8%, transparent);
+}
+.conn-pill.profile-button:focus-visible {
+  outline: none;
+}
+.conn-pill.profile-button:focus-visible .profile-avatar {
+  box-shadow: var(--ring);
+}
+/* The dot sits on the avatar's lower right, ringed in the toolbar's colour so it reads on any initial. */
+.conn-pill.profile-button .dot {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--secondary);
+  box-shadow: 0 0 0 2px var(--chrome-bar, var(--bg));
+}
+.conn-pill.profile-button.ok .dot {
+  background: var(--accent);
+}
+.conn-pill.profile-button.trying .dot {
+  background: var(--amber);
+  animation: profile-dot 1.4s var(--ease) infinite;
+}
+@keyframes profile-dot {
+  50% {
+    opacity: 0.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conn-pill.profile-button.trying .dot {
+    animation: none;
+  }
+}

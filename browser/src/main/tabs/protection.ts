@@ -5,6 +5,7 @@ import type { AppServices } from '../app/services.ts';
 import { buildInjectionScript, buildWorkerScript } from '../../../anonymity/inject.js';
 import { normalizeProxy, type ProxyConfig } from '../../anonymity/proxy.ts';
 import { personaIdentity } from '../identity/identity.ts';
+import { SIGN_IN_TAKEOVER } from '../shell/takeover-prompt.ts';
 import {
   isNativeEngine,
   NativeSessionProtection,
@@ -17,7 +18,16 @@ import type { TabView } from './types.ts';
 /** Services needed to derive one complete immutable session policy. */
 type Deps = Pick<
   AppServices,
-  'persona' | 'config' | 'world' | 'shield' | 'tabs' | 'dialogs' | 'governance' | 'nativeBrowsing' | 'electron'
+  | 'persona'
+  | 'config'
+  | 'world'
+  | 'shield'
+  | 'tabs'
+  | 'dialogs'
+  | 'governance'
+  | 'nativeBrowsing'
+  | 'electron'
+  | 'agentTab'
 >;
 /** A persona's optional outbound proxy. */
 interface ProxyProfile {
@@ -155,12 +165,23 @@ export class Protection {
   protectPopup(childWindow: BrowserWindow): void {
     try {
       this.assertSession(childWindow.webContents.session);
-      this.deps.shield.adoptPopup(childWindow);
-      this.deps.dialogs.watch(childWindow.webContents);
+      this.adoptPopup(childWindow);
     } catch (error) {
       childWindow.destroy();
       console.error('[anonymity] native popup protection failed; closed surface:', error);
     }
+  }
+  /**
+   * A protected popup joins the shield and the dialog watch. Under the agent the person is
+   * offered control: only they can answer a passkey or a code, and a fenced window would
+   * otherwise sit there unexplained.
+   */
+  private adoptPopup(childWindow: BrowserWindow): void {
+    // ponytail: the popup is the person's when their window shows another tab than the agent's; an opener lookup if that misjudges.
+    const own = this.deps.agentTab.scoped() && this.deps.agentTab.humanMay(this.deps.tabs.activeTabId);
+    this.deps.shield.adoptPopup(childWindow, own);
+    if (!own) void this.deps.shield.takeover.request(SIGN_IN_TAKEOVER);
+    this.deps.dialogs.watch(childWindow.webContents);
   }
   /** The analyzer runs only in its native isolated world. */
   async injectScripts(view?: TabView | null, eager = false): Promise<void> {

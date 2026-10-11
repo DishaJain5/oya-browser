@@ -1,5 +1,5 @@
 /**
- * A project's routines: saved prompts its desktop apps run on a schedule. The
+ * A project's routines: saved prompts or playbooks its desktop apps run on a schedule. The
  * server keeps them and their history, so every desktop on the project sees
  * the same list; the desktops run them. Before a desktop runs one it claims
  * the run: the claim succeeds for exactly one desktop per due run, because it

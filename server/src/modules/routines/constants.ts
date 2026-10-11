@@ -39,6 +39,8 @@ export const ROUTINE_CLOUD_TICK_MS = 60_000;
 export const ROUTINE_CLOUD_READY_MS = 180_000;
 /** How often the runner checks whether that browser has connected. */
 export const ROUTINE_CLOUD_POLL_MS = 3_000;
+/** How long a cloud routine's playbook may play before its run is given up as failed. */
+export const ROUTINE_PLAY_MS = 1_800_000;
 /**
  * Where the runner reaches this server's own API. The chat request goes through
  * the API rather than a function call so cluster forwarding takes it to whichever

@@ -4,6 +4,7 @@
  */
 import { registry, summarise } from '../registry.ts';
 import { metrics } from '../../../platform/metrics.ts';
+import { currentLane } from './lane.ts';
 
 /** A command on its way to a browser. */
 export interface Call {
@@ -19,6 +20,8 @@ export interface Call {
   visible: boolean;
   /** One-line description for the activity log. */
   summary: string;
+  /** The agent it comes from, which an Oya desktop gives a tab of its own. */
+  lane?: string;
 }
 
 /**
@@ -30,7 +33,7 @@ const HIDDEN_ACTIONS = new Set(['evaluate_raw', 'record']);
 /** Describes a command for sending and reporting. */
 export function describeCall(browserId: string, action: string, params: object, timeout: number): Call {
   const visible = !HIDDEN_ACTIONS.has(action);
-  return { browserId, action, params, timeout, visible, summary: summarise(action, params) };
+  return { browserId, action, params, timeout, visible, summary: summarise(action, params), lane: currentLane() };
 }
 
 /** Counts one command outcome; both transports report through here so the numbers compare. */

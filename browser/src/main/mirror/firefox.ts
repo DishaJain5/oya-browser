@@ -52,10 +52,16 @@ interface FirefoxRow {
 /** profiles.ini as `{ section: { key: value } }`. */
 type Ini = Record<string, Record<string, string>>;
 
-/** Firefox's sameSite numbers; anything else (0, or a newer bitfield) is left unspecified. */
-const FF_SAME_SITE: Record<number, string> = { 1: 'Lax', 2: 'Strict' };
-/** The columns read from moz_cookies. */
-const COOKIE_SQL = 'SELECT name,value,host,path,expiry,isSecure,isHttpOnly,sameSite FROM moz_cookies';
+/** Firefox's sameSite numbers: 0 is an explicit None, 256 is unset; anything else is left unspecified. */
+const FF_SAME_SITE: Record<number, string> = { 0: 'None', 1: 'Lax', 2: 'Strict' };
+/**
+ * The columns read from moz_cookies, first-party jar only. Total Cookie Protection keeps
+ * a copy of a cookie per top-level site (originAttributes `^partitionKey=...`), and
+ * containers keep their own; read as one jar, a copy made inside another site replaced
+ * the real one, which signed LinkedIn out.
+ */
+const COOKIE_SQL =
+  "SELECT name,value,host,path,expiry,isSecure,isHttpOnly,sameSite FROM moz_cookies WHERE originAttributes = ''";
 
 /** The Firefox data directory for this OS, or null when there is none. */
 function firefoxDir(): string | null {
@@ -109,12 +115,18 @@ export function slimFirefox(c: FirefoxRow): SlimCookie {
   return { name: c.name, value: c.value, domain: c.host, path: c.path || '/', ...firefoxFlags(c) };
 }
 
+/** A cookie's sameSite; None only on a secure cookie, since Chromium refuses an insecure None. */
+function sameSiteOf(c: FirefoxRow): string {
+  const value = FF_SAME_SITE[c.sameSite] || 'unspecified';
+  return value === 'None' && !c.isSecure ? 'unspecified' : value;
+}
+
 /** A Firefox cookie's flags and expiry in the server's spelling; expiry is milliseconds, stored as seconds. */
 function firefoxFlags(c: FirefoxRow): Omit<SlimCookie, 'name' | 'value' | 'domain' | 'path'> {
   return {
     secure: !!c.isSecure,
     httpOnly: !!c.isHttpOnly,
-    sameSite: FF_SAME_SITE[c.sameSite] || 'unspecified',
+    sameSite: sameSiteOf(c),
     hostOnly: !String(c.host).startsWith('.'),
     ...(c.expiry > 0 ? { expirationDate: Math.floor(c.expiry / MS_PER_SECOND) } : {}),
   };

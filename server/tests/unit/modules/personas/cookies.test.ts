@@ -84,6 +84,30 @@ describe('cookie jar', () => {
     assert.deepEqual(stamps, { sid: 9000, pref: 5000, cart: 9000 });
   });
 
+  it('re-imports refresh what Oya left untouched, and keep a login made in Oya since the last import', () => {
+    cookies.mergeImport('p-reimport', [cookie('li_at', 'a.com', { value: 'old session' }), cookie('pref', 'a.com')]);
+    // The desktop dumps its jar back unchanged, then the person signs in again inside Oya.
+    cookies.mergeDump('p-reimport', [cookie('li_at', 'a.com', { value: 'old session' }), cookie('pref', 'a.com')]);
+    cookies.applyChange('p-reimport', { cookie: cookie('li_at', 'a.com', { value: 'signed in here' }) });
+    cookies.mergeImport('p-reimport', [
+      cookie('li_at', 'a.com', { value: 'stale copy' }),
+      cookie('pref', 'a.com', { value: 'newer there' }),
+      cookie('new', 'a.com'),
+    ]);
+    const values = Object.fromEntries(cookies.getAll('p-reimport').map((c) => [c.name, c.value]));
+    assert.deepEqual(values, { li_at: 'signed in here', pref: 'newer there', new: 'v-new' });
+  });
+
+  it('an import never removes or replaces a cookie the persona got by browsing, even an expired copy of it', () => {
+    cookies.mergeDump('p-own', [cookie('sid', 'a.com', { value: 'mine' })]);
+    cookies.mergeImport('p-own', [cookie('sid', 'a.com', { value: 'theirs' })]);
+    cookies.mergeImport('p-own', [cookie('sid', 'a.com', { expirationDate: 1 })]);
+    assert.deepEqual(
+      cookies.getAll('p-own').map((c) => c.value),
+      ['mine'],
+    );
+  });
+
   it('ignores a dump without a persona or a list', () => {
     assert.deepEqual(cookies.mergeDump('', [cookie('a', 'a.com')]), []);
     assert.deepEqual(cookies.mergeDump('p-x', 'nope' as any), []);

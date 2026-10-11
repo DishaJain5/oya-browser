@@ -19,6 +19,35 @@ function setup() {
   };
 }
 describe('BrowsingLibrary', () => {
+  it("imports another browser's library into a named persona, keeping its own and only safe addresses", () => {
+    const { library, switchTo } = setup();
+    switchTo('imported');
+    library.addBookmark('https://mine.test/', 'Mine');
+    library.visit('https://both.test/', 'Seen here');
+    switchTo('first');
+    library.importInto('imported', {
+      bookmarks: [
+        { url: 'https://mine.test/', title: 'Theirs', time: 1 },
+        { url: 'https://new.test/', title: 'New', time: 2 },
+        { url: 'javascript:alert(1)', title: 'Bad', time: 3 },
+      ],
+      history: [
+        { url: 'https://both.test/', title: 'Older there', time: 5 },
+        { url: 'https://only.test/', title: 'Only there', time: 6 },
+      ],
+    });
+    assert.deepEqual(library.snapshot(), { history: [], bookmarks: [] }, 'the persona in use is untouched');
+    const imported = library.snapshot('imported');
+    assert.deepEqual(
+      imported.bookmarks.map((e) => e.title),
+      ['Mine', 'New'],
+    );
+    assert.deepEqual(
+      imported.history.map((e) => e.title),
+      ['Seen here', 'Only there'],
+    );
+  });
+
   it('adds and removes bookmarks idempotently, with optional title updates', () => {
     const { library } = setup();
     library.addBookmark('https://a.test/', 'A');

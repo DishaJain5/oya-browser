@@ -9,10 +9,13 @@ import type { AppServices } from '../app/services.ts';
 import { captureAll, type Capture, type CaptureDeps, type ProfileCapture } from './capture.ts';
 import { seedStorage, type StorageElectron } from './storage.ts';
 import { installedSources, type ListedSource } from './locate.ts';
-import { MIRROR_ANSWER_TIMEOUT_MS, IMPORTS_KEPT } from './constants.ts';
+import { readLibrary } from './library-read.ts';
+import { FULL_DISK_ACCESS } from './safari.ts';
+import { personaPartition } from '../app/persona.ts';
+import { MIRROR_ANSWER_TIMEOUT_MS, IMPORTS_KEPT, FULL_DISK_ACCESS_PANE } from './constants.ts';
 
 /** What the mirror uses of the app: settings, the socket, the shell, and Electron. */
-type Deps = Pick<AppServices, 'config' | 'socket' | 'shell' | 'electron'>;
+type Deps = Pick<AppServices, 'config' | 'socket' | 'shell' | 'electron' | 'library'>;
 
 /** The two steps that touch the machine, replaceable in tests. */
 export interface MirrorSteps {
@@ -20,6 +23,8 @@ export interface MirrorSteps {
   capture?: (ctx: CaptureDeps, sourceId?: string) => Promise<Capture | null>;
   /** Copies a profile's site storage into a persona's partition. */
   seed?: (electron: StorageElectron, personaId: string, userDataDir: string, profileDir: string) => void;
+  /** Reads a profile's bookmarks and history. */
+  readLibrary?: typeof readLibrary;
 }
 
 /** The server's mirror_ok: the personas it made, in capture order, and the one to use. */
@@ -88,6 +93,8 @@ export class Mirror {
   private readonly capture: NonNullable<MirrorSteps['capture']>;
   /** Seeds a persona's partition with site storage. */
   private readonly seed: NonNullable<MirrorSteps['seed']>;
+  /** Reads a profile's bookmarks and history. */
+  private readonly readLibrary: typeof readLibrary;
   /** The capture waiting for the server's mirror_ok, or null. */
   private pending: Capture | null = null;
   /** Gives up on a server that never answers. */
@@ -98,10 +105,14 @@ export class Mirror {
   private running = false;
 
   /** `ctx` is the app's services; `steps` replaces the capture and the storage seeding (tests). */
-  constructor(ctx: Deps, { capture = captureAll, seed = seedStorage }: MirrorSteps = {}) {
+  constructor(
+    ctx: Deps,
+    { capture = captureAll, seed = seedStorage, readLibrary: read = readLibrary }: MirrorSteps = {},
+  ) {
     this.ctx = ctx;
     this.capture = capture;
     this.seed = seed;
+    this.readLibrary = read;
   }
 
   /**
@@ -139,7 +150,7 @@ export class Mirror {
     this.running = true;
     this.notify({ started: true });
     const captured = await this.capture(this.ctx, sourceId).catch((e: unknown) => e);
-    if (captured instanceof Error) return this.failed(captured.message);
+    if (captured instanceof Error) return this.refused(captured.message);
     if (!captured) return this.done('none', { empty: true });
     this.send(captured as Capture);
   }
@@ -149,6 +160,12 @@ export class Mirror {
     this.pending = captured;
     this.ctx.socket.send(mirrorMessage(captured));
     this.answerTimer = setTimeout(() => this.failed(NO_ANSWER), MIRROR_ANSWER_TIMEOUT_MS);
+  }
+
+  /** The capture failed: say why, and when macOS kept the files private, open the setting that allows them. */
+  private refused(error: string): void {
+    if (error === FULL_DISK_ACCESS) void this.ctx.electron.shell.openExternal(FULL_DISK_ACCESS_PANE);
+    this.failed(error);
   }
 
   /** The import did not happen: say why, and leave it free to be tried again. */
@@ -167,11 +184,11 @@ export class Mirror {
     return captured;
   }
 
-  /** The server made the personas: seed the default's storage, remember it and the import, and reconnect as it. */
+  /** The server made the personas: fill the default's storage and library, remember it and the import, and reconnect as it. */
   onOk(msg: MirrorOk): void {
     const captured = this.settle();
     if (!captured) return;
-    this.seedDefault(captured, msg);
+    this.fillDefault(captured, msg);
     const record = this.remember(captured);
     this.ctx.config.merge({ mirroredFrom: captured.source, persona: msg.defaultPersonaId });
     this.ctx.config.save();
@@ -191,13 +208,19 @@ export class Mirror {
     this.failed(msg.error || 'The server refused the import.');
   }
 
-  /** Copies the default persona's site storage into its partition before it is loaded. */
-  private seedDefault(captured: Capture, msg: MirrorOk): void {
-    const at = (msg.personaIds || []).indexOf(msg.defaultPersonaId);
-    const profile = captured.profiles[at];
+  /** Fills the default persona before it is loaded: the profile's site storage, bookmarks and history. */
+  private fillDefault(captured: Capture, msg: MirrorOk): void {
+    const profile = captured.profiles[(msg.personaIds || []).indexOf(msg.defaultPersonaId)];
     if (!profile) return;
+    this.seedStorage(captured, msg.defaultPersonaId, profile.profile);
+    const imported = this.readLibrary(captured.source, captured.userDataDir, profile.profile);
+    this.ctx.library.importInto(personaPartition(msg.defaultPersonaId), imported);
+  }
+
+  /** Copies a profile's site storage into the persona's partition; a failure is a warning, not a failed import. */
+  private seedStorage(captured: Capture, personaId: string, profileDir: string): void {
     try {
-      this.seed(this.ctx.electron, msg.defaultPersonaId, captured.userDataDir, profile.profile);
+      this.seed(this.ctx.electron, personaId, captured.userDataDir, profileDir);
     } catch (e) {
       (captured.warnings ??= []).push(`Site storage could not be copied: ${(e as Error).message}`);
     }

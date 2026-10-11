@@ -5,6 +5,7 @@
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Status } from '../platform/http-status.ts';
+import { inLane, laneFrom } from '../modules/browsers/connection/lane.ts';
 
 /** Connects `server` to a stateless transport and lets it answer the request. */
 export async function serve(server: McpServer, req, res) {
@@ -12,7 +13,8 @@ export async function serve(server: McpServer, req, res) {
     sessionIdGenerator: undefined, // stateless
   });
   await server.connect(transport);
-  await transport.handleRequest(req, res, req.body);
+  // An MCP client that names itself (X-Oya-Agent, ?agent=) drives a tab of its own on an Oya desktop.
+  await inLane(laneFrom(req), () => transport.handleRequest(req, res, req.body));
 }
 
 /** A request that failed before answering gets a 500. */

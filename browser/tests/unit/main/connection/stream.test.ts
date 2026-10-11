@@ -39,7 +39,7 @@ describe('LiveStream', () => {
   /** A stream over `view` and the shared fake socket. */
   const streamOf = (view) => {
     const live = new LiveStream({
-      tabs: { getActiveView: () => view },
+      agentTab: { view: () => view },
       socket: {
         get ws() {
           return socket;

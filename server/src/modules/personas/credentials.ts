@@ -16,7 +16,7 @@ import { dataPath } from '../../platform/paths.ts';
 import { RecordTable, importLegacyFile } from '../../platform/storage/index.ts';
 import { HttpError, invalid } from '../../platform/errors.ts';
 import { Status } from '../../platform/http-status.ts';
-import { REGISTRABLE_LABELS } from './constants.ts';
+import { REGISTRABLE_LABELS, MAX_LOGIN_CHARS } from './constants.ts';
 
 /** `personaId|domain` -> sealed { username, password } */
 const configs = new Map();
@@ -80,6 +80,33 @@ export async function set(personaId, domain, config) {
   configs.set(keyFor(personaId, site), sealed);
   return describe(personaId, site);
 }
+
+/**
+ * Seal many logins in one write, from a password manager export. The store holds
+ * one login per site, so the first account listed for a site is kept and the rest
+ * are skipped, as are rows with no web address, username or password.
+ */
+export async function importMany(personaId, entries) {
+  const rows = new Map();
+  for (const entry of entries) {
+    const row = importedRow(personaId, entry);
+    if (row && !rows.has(row[0])) rows.set(row[0], row[1]);
+  }
+  await table.put([...rows]);
+  for (const [key, sealed] of rows) configs.set(key, sealed);
+  return { imported: rows.size, skipped: entries.length - rows.size };
+}
+
+/** One export row as a sealed store row, or null when it is not a web login. */
+function importedRow(personaId, entry) {
+  const { url, username, password } = entry || {};
+  const site = /^[a-z][a-z0-9+.-]*:\/\//i.test(url) && !/^https?:/i.test(url) ? null : domainOf(url);
+  if (!site || !importable(username) || !importable(password)) return null;
+  return [keyFor(personaId, site), sealText(scopeFor(personaId, site), { username, password })];
+}
+
+/** A username or password worth keeping: a non-empty string of sane length. */
+const importable = (value) => typeof value === 'string' && value.length > 0 && value.length <= MAX_LOGIN_CHARS;
 
 /** The username and password from `config`, both required. */
 function loginFrom(config) {

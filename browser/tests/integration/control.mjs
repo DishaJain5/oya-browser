@@ -28,7 +28,10 @@ await new Promise((resolve) => wss.once('listening', resolve));
 let state = { mode: 'agent', mine: false, revision: 1 },
   socket,
   app,
-  rejectNext = false;
+  rejectNext = false,
+  nextCommand = 0;
+/** Commands sent as the server's agent, waiting for their results. */
+const waiting = new Map();
 wss.on('connection', (ws) => {
   socket = ws;
   ws.on('message', (raw) => {
@@ -36,6 +39,7 @@ wss.on('connection', (ws) => {
     if (message.type === 'auth')
       ws.send(JSON.stringify({ type: 'auth_ok', browser_id: 'control-ui', control: state, fingerprint: PERSONA }));
     if (message.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
+    if (message.type === 'cmd_result') waiting.get(message.id)?.(message);
     if (message.type !== 'desktop_control') return;
     if (rejectNext) {
       rejectNext = false;
@@ -94,13 +98,11 @@ try {
   // Browsing opens on the Oya start page, which is never shielded: nothing of a site is there to protect.
   await page.locator('#start-page').waitFor();
   assert.equal((await views()).length, 0, 'the start page is the shell itself: no page view, no shield');
-  // The agent holds control, so the fixture is loaded as the agent would, from the main process.
-  await app.evaluate(async ({ webContents }, url) => {
-    const tab = webContents
-      .getAllWebContents()
-      .find((c) => c.getType() === 'browserView' && !/control-shield/.test(c.getURL()));
-    await tab.loadURL(url);
-  }, fixtureUrl);
+  // Agent mode alone fences nothing: a connected desktop sits in it even when no agent runs.
+  assert.notEqual(await page.locator('#url-bar').getAttribute('readonly'), '', 'idle agent mode leaves the page open');
+  // The agent starts on the shown tab with a real command, which makes that tab its own.
+  const loaded = await command('navigate', { url: fixtureUrl });
+  assert.equal(loaded.ok, true, loaded.error);
   await page.waitForFunction(() => document.getElementById('start-page').hidden);
   assert.equal((await views()).length, 2, 'native input shield sits above the page');
   assert.equal(await page.locator('#url-bar').getAttribute('readonly'), '');
@@ -111,6 +113,7 @@ try {
     ),
   );
   assert(rejected, 'IPC enforces navigation ownership');
+  await personBesideAgent(page, views);
   // Taking control from a working agent asks first; the person answers "Take control".
   await app.evaluate(({ dialog }) => {
     globalThis.shownDialogs = [];
@@ -158,6 +161,8 @@ try {
   );
   await page.locator('#control-action').click();
   await page.getByText('Agent control', { exact: true }).waitFor();
+  // Released to the agent, its next command takes the page back.
+  assert.equal((await command('run_script', { script: 'return 1' })).ok, true);
   await app.evaluate(async ({ BrowserWindow }) => {
     const view = BrowserWindow.getAllWindows()[0]
       .getBrowserViews()
@@ -224,7 +229,7 @@ try {
   assert.equal((await views()).length, 1);
   assert.deepEqual(errors, []);
   console.log(
-    'Desktop control UI passed: handoff, native input gating, dialogs, reduced motion, compact layouts, conflicts, stale updates and disconnect.',
+    'Desktop control UI passed: per-tab agent control, handoff, native input gating, dialogs, reduced motion, compact layouts, conflicts, stale updates and disconnect.',
   );
 } finally {
   await app?.close();
@@ -232,6 +237,96 @@ try {
   await new Promise((resolve) => wss.close(resolve));
   await new Promise((resolve) => fixture.close(resolve));
   await rm(profile, { recursive: true, force: true });
+}
+
+/** Sends one command as the server's agent would, and answers its result. */
+function command(action, params = {}) {
+  const id = `c${nextCommand++}`;
+  const answered = new Promise((resolve) => waiting.set(id, resolve));
+  socket.send(JSON.stringify({ type: 'cmd', id, action, params }));
+  return answered;
+}
+
+/** The address of the shown view's page, and how many views the window holds. */
+async function shownPage(application) {
+  return application.evaluate(({ BrowserWindow }) => {
+    const views = BrowserWindow.getAllWindows()[0].getBrowserViews();
+    return { top: views.at(-1)?.webContents.getURL(), count: views.length };
+  });
+}
+
+/**
+ * While the agent drives its tab, the person opens another and uses it: no shield there,
+ * keys reach it, the address bar works; the agent keeps acting on its own tab, still
+ * painting beneath; the agent's tab stays fenced and cannot be closed by the person.
+ */
+async function personBesideAgent(page, views) {
+  const mine = `${fixtureUrl}mine`;
+  await page.evaluate((url) => window.oyaBrowser.newTab(url), mine);
+  await page.waitForFunction(() => !document.getElementById('url-bar').hasAttribute('readonly'));
+  await waitFor(async () => (await shownPage(app)).top === mine);
+  const stack = await views();
+  assert.deepEqual(
+    stack.map((v) => v.url),
+    [fixtureUrl, mine],
+    "the agent's page sits beneath, no shield",
+  );
+  assert.deepEqual(stack[0].bounds, stack[1].bounds, 'beneath with the same bounds, so it keeps painting');
+  const typed = await app.evaluate(async ({ BrowserWindow }) => {
+    const view = BrowserWindow.getAllWindows()[0].getBrowserViews().at(-1);
+    view.webContents.focus();
+    await view.webContents.executeJavaScript('document.querySelector("input").focus()');
+    let prevented = false;
+    view.webContents.once('before-input-event', (event) => setImmediate(() => (prevented = event.defaultPrevented)));
+    view.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'M' });
+    view.webContents.sendInputEvent({ type: 'char', keyCode: 'm' });
+    view.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'M' });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    return { prevented, value: await view.webContents.executeJavaScript('document.querySelector("input").value') };
+  });
+  assert.deepEqual(typed, { prevented: false, value: 'm' }, "the person's keys reach their own tab");
+  const where = await command('run_script', { script: 'return location.href' });
+  assert.equal(where.data?.value, fixtureUrl, 'the agent keeps acting on its own tab');
+  const shot = await command('screenshot', { format: 'jpeg' });
+  assert.ok(shot.ok && shot.data.screenshot.length > 1000, "the agent's hidden tab still captures");
+  const tabs = (await command('list_tabs')).data.tabs;
+  const agentTab = tabs.find((t) => t.active);
+  const myTab = tabs.find((t) => !t.active);
+  assert.equal(agentTab.url, fixtureUrl, "list_tabs marks the agent's tab active");
+  const refusedSwitch = await command('switch_tab', { tab_id: myTab.id });
+  assert.match(refusedSwitch.error, /person is using that tab/);
+  const closeAgentTab = await page.evaluate(
+    (id) =>
+      window.oyaBrowser.closeTab(id).then(
+        () => 'closed',
+        (e) => e.message,
+      ),
+    agentTab.id,
+  );
+  assert.match(closeAgentTab, /Take control/, "the person cannot close the agent's tab");
+  await page.evaluate((id) => window.oyaBrowser.activateTab(id), agentTab.id);
+  await waitFor(async () => (await shownPage(app)).top?.includes('control-shield'));
+  await page.waitForFunction(() => document.getElementById('url-bar').hasAttribute('readonly'));
+  // Looking at the agent's tab, the person clicks + : a tab of their own opens, as in any browser.
+  const before = (await command('list_tabs')).data.tabs.length;
+  await page.locator('#btn-new-tab').click();
+  await waitFor(async () => (await command('list_tabs')).data.tabs.length === before + 1);
+  await page.waitForFunction(() => !document.getElementById('url-bar').hasAttribute('readonly'));
+  const opened = (await command('list_tabs')).data.tabs.at(-1);
+  await page.evaluate((id) => window.oyaBrowser.closeTab(id), opened.id);
+  await page.evaluate((id) => window.oyaBrowser.activateTab(id), agentTab.id);
+  await page.evaluate((id) => window.oyaBrowser.closeTab(id), myTab.id).catch(() => {});
+  await page.evaluate((id) => window.oyaBrowser.activateTab(id), agentTab.id);
+  await waitFor(async () => (await shownPage(app)).count === 2);
+}
+
+/** Polls `check` until it holds, failing after a few seconds. */
+async function waitFor(check) {
+  for (let i = 0; i < 100; i++) {
+    if (await check()) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error('Condition not met in time');
 }
 
 /** Waits until the app showed a native dialog whose detail carries `text`. */

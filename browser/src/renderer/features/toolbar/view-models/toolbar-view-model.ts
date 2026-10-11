@@ -5,6 +5,7 @@
  * becoming Stop), and the page's title for the window. Other features ask
  * it to focus the address bar (the command palette's Cmd/Ctrl L).
  */
+import { BookmarksBarViewModel } from './bookmarks-bar-view-model.ts';
 import { AddressCompletion } from './address-completion.ts';
 import { ViewModel } from '../../../core/view-model.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
@@ -63,6 +64,11 @@ export type ToolbarBridge = Pick<
   | 'hideOverlay'
   | 'showLibrary'
   | 'navigate'
+  | 'bookmarksBar'
+  | 'onBookmarksBar'
+  | 'setBookmarksBar'
+  | 'toggleBookmark'
+  | 'newTab'
   | 'goBack'
   | 'goForward'
   | 'reload'
@@ -104,6 +110,8 @@ export const askClass = (open: boolean, recording: boolean): string =>
 export class ToolbarViewModel extends ViewModel<ToolbarState> {
   /** The local address dropdown, with its own asynchronous lifecycle. */
   readonly completion: AddressCompletion;
+  /** The bookmarks bar under the toolbar. */
+  readonly bookmarks: BookmarksBarViewModel;
   /** The main process. */
   private readonly bridge: ToolbarBridge;
   /** Last selected tab, to focus a new start page only once. */
@@ -114,7 +122,13 @@ export class ToolbarViewModel extends ViewModel<ToolbarState> {
     super({ url: '', title: '', nav: IDLE, focusRequest: 0 });
     this.bridge = bridge;
     this.completion = new AddressCompletion(bridge);
-    this.own(() => this.completion.dispose());
+    this.bookmarks = new BookmarksBarViewModel(bridge);
+    this.own(() => (this.completion.dispose(), this.bookmarks.dispose()));
+    this.follow(bridge);
+  }
+
+  /** Follows the active page's address and title, and the tabs; the address starts from the status. */
+  private follow(bridge: ToolbarBridge): void {
     this.own(bridge.onUrlChanged((url) => this.set({ url })));
     this.own(bridge.onTitleChanged((title) => this.set({ title })));
     this.own(bridge.onTabsUpdated((tabs) => this.tabsChanged(tabs)));
@@ -132,13 +146,13 @@ export class ToolbarViewModel extends ViewModel<ToolbarState> {
   }
 
   /** The person typed in the address bar. */
-  edit(url: string): void {
+  edit(url: string, typing = false): void {
     this.set({ url });
-    void this.completion.search(url);
+    void this.completion.search(url, typing);
   }
 
   /** Enter in the address bar: loads what it says (an address or a search). */
-  submit(destination = this.completion.selectedUrl ?? this.state.url): void {
+  submit(destination = this.completion.selectedUrl ?? this.state.url + this.completion.state.inline): void {
     this.completion.dismiss();
     void this.bridge.navigate(destination.trim());
   }

@@ -66,6 +66,21 @@ describe('routines', () => {
     await assert.rejects(routines.create(KEY, { ...HOURLY, tz: 'Mars/Olympus' }), { status: 400, message: /IANA/ });
   });
 
+  it('runs a prompt or a saved playbook, and refuses a routine with neither', async () => {
+    const played = await routines.create(KEY, { ...HOURLY, prompt: undefined, playbook: 'check-prices' });
+    assert.deepEqual([played.playbook, played.prompt], ['check-prices', '']);
+    await assert.rejects(routines.create(KEY, { ...HOURLY, prompt: '' }), {
+      status: 400,
+      message: /prompt or a saved playbook/,
+    });
+    await assert.rejects(routines.edit(KEY, played.id, { playbook: null }), {
+      status: 400,
+      message: /prompt or a saved playbook/,
+    });
+    const asked = await routines.edit(KEY, played.id, { playbook: null, prompt: 'Check prices' });
+    assert.deepEqual([asked.playbook, asked.prompt], [undefined, 'Check prices']);
+  });
+
   it('stores routines sealed, never the prompt in the clear', async () => {
     await routines.create(KEY, HOURLY);
     const [row] = await getConnection().select('routines', { owner: fingerprint(KEY) });

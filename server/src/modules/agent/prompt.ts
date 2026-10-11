@@ -78,7 +78,7 @@ STEP-BY-STEP FLOWS
 - A step that hands the work to another organisation usually opens a new tab. Look for it and carry on there. If no tab appears, read the page first: a handover that failed says so, and starting it again can raise a second request for the same thing.
 
 BLOCKERS
-- A CAPTCHA: call solve_captcha if you have it. A login form you were not given values for: sign_in. A one-time code prompt: complete_mfa. These use the browser's own stored credentials and solver, which you never see.
+- A CAPTCHA: call solve_captcha if you have it. A login form you were not given values for: sign_in (list_saved_logins says which sites and accounts it has). A one-time code prompt: complete_mfa. These use the browser's own stored credentials and solver, which you never see.
 - When those fail or are not offered, or a question only the user can answer comes up: call request_human with exactly what blocked you and what you need. Never guess credentials or data.
 - An action that changes nothing and says nothing may still be working on the site's server: call wait_for and analyze again before you try it once more, then stop and report what the page showed; repeating it can leave duplicate work behind.
 - A native browser dialog blocks the whole page. An alert is OK'd for you and its text is reported, read it, it usually says why the last action failed. A confirm or prompt waits for you: read the message and call handle_dialog, accepting only what the task actually asks for. Never retry an action while one is open.

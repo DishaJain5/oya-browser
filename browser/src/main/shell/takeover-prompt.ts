@@ -14,6 +14,15 @@ const TAKEOVER_OPTIONS: MessageBoxOptions = {
   noLink: true,
 };
 
+/** A sign-in window the page opened while the agent drives: only the person can finish it. */
+export const SIGN_IN_TAKEOVER: MessageBoxOptions = {
+  ...TAKEOVER_OPTIONS,
+  message: 'This sign-in needs you',
+  defaultId: 1,
+  detail:
+    'A passkey, a code or your phone cannot be answered by the agent. Take control to sign in, then use Return to agent.',
+};
+
 /** Main-process services used for a native, window-parented confirmation. */
 type Deps = Pick<AppServices, 'electron' | 'shell' | 'control'>;
 /** Deduplicates explicit handoff requests and rechecks ownership after confirmation. */
@@ -34,11 +43,11 @@ export class TakeoverPrompt {
     });
   }
   /** Ask only for agent ownership; never steal a different person's hold. */
-  async request(): Promise<void> {
+  async request(options: MessageBoxOptions = TAKEOVER_OPTIONS): Promise<void> {
     const state = this.deps.control.snapshot();
     if (this.pending || state.interactive || state.busy || state.mode !== 'agent') return;
     this.pending = true;
-    await this.confirm()
+    await this.confirm(options)
       .catch(() => {})
       .finally(() => this.settled());
   }
@@ -57,10 +66,9 @@ export class TakeoverPrompt {
     });
   }
   /** A native modal leaves the automation gate intact until the user explicitly accepts. */
-  private async confirm(): Promise<void> {
+  private async confirm(options: MessageBoxOptions): Promise<void> {
     const window = this.deps.shell.window;
     if (!window || window.isDestroyed()) return;
-    const options = TAKEOVER_OPTIONS;
     const result = await this.deps.electron.dialog.showMessageBox(window, options);
     if (result.response !== TAKEOVER_CHOICE || this.deps.control.snapshot().mode !== 'agent') return;
     await this.deps.control.change('acquire').catch((error: Error) => this.failed(error));

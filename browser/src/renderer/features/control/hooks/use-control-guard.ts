@@ -15,18 +15,26 @@ import {
   type ControlState,
   type ControlViewModel,
 } from '../view-models/control-view-model.ts';
-import { ACTION_ID, ADDRESS_ID, GUARDED, PAGE_ACTIONS, RECORD_ID } from '../model/constants.ts';
+import { ACTION_ID, ADDRESS_ID, GUARDED, NEW_TAB_ID, PAGE_ACTIONS, RECORD_ID } from '../model/constants.ts';
 
 /** The guarded control a click landed on, if any. */
 function guardedTarget(event: MouseEvent): HTMLElement | null {
   return event.target instanceof Element ? event.target.closest<HTMLElement>(GUARDED) : null;
 }
 
+/**
+ * Whether the click opens or closes a tab of the person's own: New tab, or the close
+ * button of a tab no agent drives. Those stay theirs even while they look at an agent's tab.
+ */
+function ownsTarget(target: HTMLElement): boolean {
+  return target.id === NEW_TAB_ID || (target.matches('.tab-close') && !target.closest('.tab-item.agent'));
+}
+
 /** Refuses a click on a page action while watch-only; Start recording takes control first. */
 function guardClick(event: MouseEvent, vm: ControlViewModel): void {
   const target = guardedTarget(event);
   if (!target) return;
-  const verdict = vm.guard(target.id === RECORD_ID);
+  const verdict = vm.guard(target.id === RECORD_ID, ownsTarget(target));
   if (verdict === 'allow') return;
   event.preventDefault();
   event.stopImmediatePropagation();
@@ -51,9 +59,9 @@ export function useControlGate(state: ControlState): void {
 }
 
 /** Marks each page action blocked or not, and the address bar read-only or not. */
-function applyGate({ pageBlocked, recordBlocked }: Blocked): void {
+function applyGate({ pageBlocked, newTabBlocked, recordBlocked }: Blocked): void {
   for (const id of PAGE_ACTIONS) {
-    const blocked = id === RECORD_ID ? recordBlocked : pageBlocked;
+    const blocked = id === RECORD_ID ? recordBlocked : id === NEW_TAB_ID ? newTabBlocked : pageBlocked;
     document.getElementById(id)?.toggleAttribute('data-control-blocked', blocked);
     document.getElementById(id)?.setAttribute('aria-disabled', String(blocked));
   }

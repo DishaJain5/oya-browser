@@ -69,6 +69,36 @@ describe('Import logins', () => {
     assert.equal(canImport(app), true);
   });
 
+  it('imports a passwords export and says how many, reminding that the file is unencrypted', async () => {
+    const app = build({ importPasswords: { imported: 12, skipped: 3 } });
+    await settle();
+    await app.imports.importPasswords();
+    assert.equal(
+      importStatus(app.imports.state).text,
+      'Imported 12 passwords, skipped 3. Delete the exported file: it holds them unencrypted.',
+    );
+    assert.equal(app.imports.state.running, false);
+  });
+
+  it('says nothing when the person cancels choosing a passwords file', async () => {
+    const app = build({ importPasswords: null });
+    await settle();
+    await app.imports.importPasswords();
+    assert.deepEqual([app.imports.state.note.text, app.imports.state.running], ['', false]);
+  });
+
+  it('closes the first-run offer on Not now, and offers making Oya the default browser', async () => {
+    const app = build({ makeDefaultBrowser: undefined });
+    await settle();
+    let closed = 0;
+    app.imports.onDecline = () => closed++;
+    await app.imports.notNow();
+    assert.equal(closed, 1);
+    assert.deepEqual(app.fake.called('saveUiPreferences'), [[{ importOffered: true }]]);
+    await app.imports.makeDefault();
+    assert.equal(app.fake.called('makeDefaultBrowser').length, 1);
+  });
+
   it('still says what was imported after the reconnect that follows an import', async () => {
     const app = await connected();
     app.fake.emit('onMirrorStatus', { done: true, source: 'Firefox', profiles: 1, cookies: 2 });
@@ -156,7 +186,7 @@ describe('Import logins', () => {
     );
     assert.equal(
       emptyImportText(null),
-      'Bring your logins from Chrome, Arc or Firefox, so you are already signed in here.',
+      'Bring your logins from Chrome, Safari or Firefox, so you are already signed in here.',
     );
   });
 

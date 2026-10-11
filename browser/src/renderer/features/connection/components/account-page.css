@@ -1,10 +1,10 @@
 /**
  * The account page of the shell dialog (account-page.tsx), and every rule for
- * it in one place: an account card on top (who, which project and plan, the
- * connection), then quiet groups under small uppercase labels (sync, imports, the
- * profile Oya browses as, this device), Advanced folded away, and the account's
- * actions. Spacing runs on an 8px grid; colours come from the theme's tokens only, so
- * light and dark both hold.
+ * it in one place: the account card on top (who, which project and plan, the
+ * connection, and the account's own actions), then sections under small uppercase
+ * labels, each one card of rows (what it is on the left, its control on the right,
+ * hairlines between), and Advanced folded away. Spacing runs on an 8px grid; colours
+ * come from the theme's tokens only, so light and dark both hold.
  */
 /* The account page is long: the header and footer stay, the page between them scrolls. */
 .shell-dialog:has(#profile-section:not([hidden])) {
@@ -41,10 +41,12 @@
 }
 /* ── The account card ── */
 .account-card {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 16px;
   padding: 16px;
+  padding-bottom: 52px;
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--text) 4%, transparent);
   box-shadow: inset 0 0 0 0.5px var(--hairline);
@@ -279,13 +281,15 @@
   font: var(--text-sm) var(--mono);
   user-select: text;
 }
-/* ── The account's actions ── */
-.profile-actions {
+/* ── The account's actions, on its card: Switch account, then Log out, along its foot ── */
+.account-card .profile-actions {
+  position: absolute;
+  left: 80px;
+  right: 12px;
+  bottom: 10px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-top: 24px;
+  gap: 4px;
 }
 .profile-actions .sign-out {
   max-width: 70%;
@@ -315,4 +319,81 @@
   color: var(--secondary);
   line-height: 1.6;
   margin: 0 0 12px;
+}
+
+/* The first-run offer's second step: make Oya the default browser, beside a one-line why. */
+.import-offer-default {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Sections: a label over one card of rows ── */
+.settings-section {
+  margin-top: 24px;
+}
+.settings-card {
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--text) 3.5%, transparent);
+  box-shadow: inset 0 0 0 0.5px var(--hairline);
+  overflow: hidden;
+}
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+}
+.settings-row[hidden] {
+  display: none;
+}
+/* A hairline between rows, inset to the text so the card reads as one list. */
+.settings-row + .settings-row {
+  background: linear-gradient(var(--hairline), var(--hairline)) 16px 0 / calc(100% - 16px) 0.5px no-repeat;
+}
+/* A row whose control is its main action: the control on its own line under the text. */
+.settings-row.wide {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.settings-row.wide .settings-control {
+  justify-content: flex-start;
+}
+.settings-row.wide .import-controls {
+  width: 100%;
+}
+.settings-row.wide #import-source {
+  flex: 1;
+  width: auto;
+}
+.settings-control {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.settings-row .import-controls {
+  margin-top: 0;
+}
+.settings-row #import-source {
+  width: 180px;
+  flex: none;
+}
+.settings-row .device-name {
+  width: 200px;
+  margin: 0;
+}
+#persona-name {
+  margin: 0 !important;
+  color: var(--accent);
+}
+/* Narrow dialogs stack a row's control under its text. */
+@media (max-width: 560px) {
+  .settings-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-control {
+    justify-content: flex-start;
+  }
 }

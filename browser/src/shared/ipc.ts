@@ -29,6 +29,8 @@ export interface TabSummary {
   favicon: string | null;
   /** Whether this is the tab on screen. */
   active: boolean;
+  /** Whether the agent drives this tab; the strip marks it while the agent works. */
+  agent?: boolean;
   /** Whether the page is loading. */
   loading?: boolean;
   /** Why the last load failed, if it did. */
@@ -79,6 +81,10 @@ export interface ControlState extends Payload {
   mine?: boolean;
   /** Whether a person may use the page right now. */
   interactive?: boolean;
+  /** Whether the person may use the tab this window shows: while the agent drives one tab, any other. */
+  pageInteractive?: boolean;
+  /** Whether the person may open a new tab: beside agents' tabs always, under local automation not. */
+  newTabInteractive?: boolean;
 }
 
 /** The connection as the status pill shows it. */
@@ -104,6 +110,14 @@ export interface PageSource {
   markdown: string;
   /** Why it could not be read, if it could not. */
   error?: string;
+}
+
+/** How a passwords import went: logins kept, and rows skipped as not web logins or a second account for a site. */
+export interface PasswordImportResult {
+  /** Logins stored. */
+  imported: number;
+  /** Rows left out. */
+  skipped: number;
 }
 
 /** The connection, the active address and when cookies last synced. */
@@ -154,6 +168,8 @@ export interface AgentEvent {
   runId: string;
   /** What happened. */
   event: Payload;
+  /** The tab whose chat it is, so only that tab's panel shows it; null for an agent no tab owns. */
+  tabId?: number | null;
 }
 
 /**
@@ -183,6 +199,12 @@ export interface ShellCalls {
   makeDefaultBrowser(): Promise<void>;
   /** Opens local bookmarks and browsing history. */
   showLibrary(): Promise<void>;
+  /** The bookmarks bar: whether it shows, and the bookmarks on it. */
+  bookmarksBar(): Promise<Payload>;
+  /** Shows or hides the bookmarks bar. */
+  setBookmarksBar(shown: boolean): Promise<void>;
+  /** Bookmarks the page in the shown tab, or removes its bookmark (the toolbar's star, Cmd/Ctrl+D). */
+  toggleBookmark(): Promise<void>;
   /** Confirms handoff when the person interacts with an agent-owned page. */
   requestTakeover(): Promise<void>;
   /** Lists, manages, imports, exports, and runs project playbooks on this browser. */
@@ -210,6 +232,8 @@ export interface ShellCalls {
   importSources(): Promise<Payload[]>;
   /** Imports a browser's logins again. */
   reimportBrowser(sourceId: string): Promise<void>;
+  /** Imports a passwords CSV the person chooses; null when they cancel. */
+  importPasswords(): Promise<PasswordImportResult | null>;
   /** The connection, the active address and when cookies last synced. */
   getStatus(): Promise<ShellStatus>;
   /** Who drives the browser. */
@@ -267,9 +291,9 @@ export interface ShellCalls {
   /** Runs an agent page action by hand. */
   devAction(action: string, params?: Payload): Promise<Payload>;
   /** Sends the conversation to the agent; answers its reply. */
-  sendChat(messages: Payload[], data?: Payload): Promise<Payload & Failure>;
+  sendChat(messages: Payload[], data?: Payload, tabId?: number): Promise<Payload & Failure>;
   /** Stops the running chat. */
-  stopChat(): Promise<void>;
+  stopChat(tabId?: number): Promise<void>;
   /** The project's model and whether it has a key. */
   modelStatus(): Promise<Payload>;
   /** Saves the project's model provider and key. */
@@ -344,6 +368,8 @@ export interface ShellEvents {
   onViewSource: PageSource;
   /** The tab list changed. */
   onTabsUpdated: TabSummary[];
+  /** The bookmarks bar changed: shown or hidden, or a bookmark added or removed. */
+  onBookmarksBar: Payload;
   /** The routines or their runs changed. */
   onRoutinesChanged: Payload;
   /** The server stored the profile. */
@@ -393,6 +419,8 @@ export const CALL_CHANNELS = {
   importSources: 'import-sources',
   /** Imports a browser's logins again. */
   reimportBrowser: 'reimport-browser',
+  /** Imports a passwords CSV the person chooses; null when they cancel. */
+  importPasswords: 'import-passwords',
   /** The connection, the active address and when cookies last synced. */
   getStatus: 'get-status',
   /** Who drives the browser. */
@@ -417,6 +445,12 @@ export const CALL_CHANNELS = {
   toggleDevPanel: 'toggle-dev-panel',
   /** Opens a tab; answers its id. */
   showLibrary: 'show-library',
+  /** The bookmarks bar: whether it shows, and the bookmarks on it. */
+  bookmarksBar: 'bookmarks-bar-state',
+  /** Shows or hides the bookmarks bar. */
+  setBookmarksBar: 'set-bookmarks-bar',
+  /** Bookmarks the page in the shown tab, or removes its bookmark (the toolbar's star, Cmd/Ctrl+D). */
+  toggleBookmark: 'toggle-bookmark',
   newTab: 'new-tab',
   newWindow: 'new-window',
   detachTab: 'detach-tab',
@@ -524,6 +558,8 @@ export const EVENT_CHANNELS = {
   onViewSource: 'view-source',
   /** The tab list changed. */
   onTabsUpdated: 'tabs-updated',
+  /** The bookmarks bar changed: shown or hidden, or a bookmark added or removed. */
+  onBookmarksBar: 'bookmarks-bar',
   /** The routines or their runs changed. */
   onRoutinesChanged: 'routines-changed',
   /** The server stored the profile. */

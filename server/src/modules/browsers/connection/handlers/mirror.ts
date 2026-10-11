@@ -7,7 +7,7 @@
  * the payload is validated and capped before any of it becomes a persona.
  */
 import { container } from '../../../../app/container.ts';
-import { mergeDump, mergeStorage } from '../../../personas/cookies.ts';
+import { mergeImport, mergeStorage } from '../../../personas/cookies.ts';
 import { MAX_MIRROR_PROFILES, MAX_MIRROR_COOKIES } from '../constants.ts';
 import type { Handler } from './types.ts';
 
@@ -50,7 +50,7 @@ function rejection(msg: any): string | null {
 /** Turns one validated profile into a persona and seeds its jar. Returns the persona id. */
 function mirrorOne(apiKey: string, p: MirrorMsg): string {
   const persona = container.personas.mirror(apiKey, p);
-  if (Array.isArray(p.cookies)) mergeDump(persona.id, p.cookies.slice(0, MAX_MIRROR_COOKIES));
+  if (Array.isArray(p.cookies)) mergeImport(persona.id, p.cookies.slice(0, MAX_MIRROR_COOKIES));
   if (p.origins && typeof p.origins === 'object') mergeStorage(persona.id, p.origins);
   return persona.id;
 }

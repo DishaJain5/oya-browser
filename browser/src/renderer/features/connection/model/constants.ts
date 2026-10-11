@@ -15,7 +15,7 @@ export const SERVER_URL = /^(wss:\/\/[^\s]+|ws:\/\/(localhost|127\.0\.0\.1|\[::1
 export const OVERLAYS = { shell: 'shell', reconnect: 'legacy' } as const;
 
 /** The browsers named in the empty import state before the ones on this computer are known. */
-export const DEFAULT_IMPORT_BROWSERS = ['Chrome', 'Arc', 'Firefox'] as const;
+export const DEFAULT_IMPORT_BROWSERS = ['Chrome', 'Safari', 'Firefox'] as const;
 
 /** What people call each platform a persona can claim. */
 export const PLATFORM_NAMES: Readonly<Record<string, string>> = {

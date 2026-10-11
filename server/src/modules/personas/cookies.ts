@@ -1,4 +1,5 @@
 /** Durable, persona-scoped login state. Cookies and localStorage share one store. */
+import { createHash } from 'node:crypto';
 import { defaultPersonaSeed } from './fingerprint.ts';
 import { sealText, openText } from '../../platform/secrets.ts';
 import { dataPath } from '../../platform/paths.ts';
@@ -13,7 +14,7 @@ import {
   validOrigin,
   storageEntries,
 } from './cookie-rules.ts';
-import { LOGIN_FILE_VERSION, LOGIN_SAVE_DELAY_MS, MAX_STORAGE_ORIGINS } from './constants.ts';
+import { IMPORT_MARK_CHARS, LOGIN_FILE_VERSION, LOGIN_SAVE_DELAY_MS, MAX_STORAGE_ORIGINS } from './constants.ts';
 
 /** Where login state is kept, sealed per persona. */
 const table = new RecordTable('persona_logins');
@@ -150,8 +151,10 @@ function jarOf(id) {
   return jars.get(id);
 }
 
-/** A cookie as the browser sent it: without the stamp this store adds. */
-const unstamped = ({ t: _t, ...cookie }) => JSON.stringify(cookie);
+/** A cookie as the browser sent it: without the stamp and the import mark this store adds. */
+const unstamped = ({ t: _t, i: _i, ...cookie }) => JSON.stringify(cookie);
+/** A short fingerprint of a cookie as it was imported, so a later import can tell whether Oya changed it since. */
+const markOf = (c) => createHash('sha256').update(unstamped(c)).digest('base64url').slice(0, IMPORT_MARK_CHARS);
 
 /**
  * Keeps a cookie, stamped with when it last really changed. A dump repeats the
@@ -159,10 +162,28 @@ const unstamped = ({ t: _t, ...cookie }) => JSON.stringify(cookie);
  * browser tells a cookie another browser refreshed since it last synced from
  * one it already has, and stale copies stopped overwriting fresh logins.
  */
-function keep(jar, c) {
+function keep(jar, c, mark = jar.get(cookieKey(c))?.i) {
   const key = cookieKey(c);
   const old = jar.get(key);
-  jar.set(key, { ...c, t: old && unstamped(old) === unstamped(c) ? old.t : Date.now() });
+  jar.set(key, { ...c, t: old && unstamped(old) === unstamped(c) ? old.t : Date.now(), ...(mark ? { i: mark } : {}) });
+}
+
+/** Whether an import may replace `old`: nothing is there, or it is still exactly what an import brought. */
+const replaceable = (old) => !old || (!!old.i && markOf(old) === old.i);
+
+/**
+ * Merge another browser's cookies into the persona: fill what it lacks and refresh what
+ * Oya has not changed since the last import. A login made in Oya since is newer than the
+ * other browser's copy, so it is kept; re-importing used to sign it out. Returns the
+ * unexpired cookies.
+ */
+export function mergeImport(id, cookies) {
+  if (!id || !Array.isArray(cookies)) return [];
+  const jar = jarOf(id);
+  for (const c of cookies.filter(validCookie))
+    if (!expired(c) && replaceable(jar.get(cookieKey(c)))) keep(jar, c, markOf(c));
+  changed(id);
+  return getAll(id);
 }
 
 /** Merge a full cookie dump into the persona's jar; expired ones remove their match. Returns the unexpired cookies. */

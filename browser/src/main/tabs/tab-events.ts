@@ -14,7 +14,8 @@ import { TabWindows, joinRecording, type TabWindowsDeps } from './tab-windows.ts
 import type { Tab, TabView } from './types.ts';
 
 /** The services a tab's listeners use. */
-export type TabEventsDeps = TabWindowsDeps & Pick<AppServices, 'shortcuts' | 'shield' | 'observer' | 'library'>;
+export type TabEventsDeps = TabWindowsDeps &
+  Pick<AppServices, 'shortcuts' | 'shield' | 'observer' | 'library' | 'agentTab'>;
 
 /**
  * Makes view-source pages readable (forces the light theme). This text runs
@@ -68,7 +69,8 @@ export class TabEvents {
   private wireLoadState(tab: Tab): void {
     const contents = tab.view.webContents;
     this.deps.shortcuts.install(contents);
-    contents.on('focus', () => this.deps.shield.keepFocusOnShell());
+    // Only the agent's own tab hands focus back to the shell; the person types into any other.
+    contents.on('focus', () => !this.deps.agentTab.humanMay(tab.id) && this.deps.shield.keepFocusOnShell());
     contents.on('did-start-loading', () => {
       // A tab that could not be protected keeps saying so: nothing it starts will load.
       if (tab.protection !== 'failed') tab.loadError = null;

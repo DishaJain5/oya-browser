@@ -19,8 +19,11 @@ export const OFFLINE_MODE = 'offline';
 /** The record button: the one page action that takes control instead of being refused. */
 export const RECORD_ID = 'record-toggle';
 
+/** New tab: a tab of the person's own, open to them beside an agent's tab. */
+export const NEW_TAB_ID = 'btn-new-tab';
+
 /** Toolbar controls that act on the page, marked blocked while it is watch-only. */
-export const PAGE_ACTIONS = ['btn-reload', 'btn-new-tab', RECORD_ID] as const;
+export const PAGE_ACTIONS = ['btn-reload', NEW_TAB_ID, RECORD_ID] as const;
 
 /** The address bar, read-only while watch-only. */
 export const ADDRESS_ID = 'url-bar';

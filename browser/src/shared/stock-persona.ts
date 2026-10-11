@@ -6,7 +6,7 @@ export const STOCK_PERSONA = {
   ARGUMENT: '--oya-stock-persona',
   /** Main asks a tab's preload to run code in an isolated world (stock executeJavaScript waits for the page to finish loading). */
   RUN: 'oya:stock-world-run',
-  /** The preload received a run request, before running anything: no reply means it never ran. */
+  /** The preload asks to run a request; main says no once the stock fallback has taken it. */
   ACK: 'oya:stock-world-ack',
   /** The run's value or error message. */
   RESULT: 'oya:stock-world-result',

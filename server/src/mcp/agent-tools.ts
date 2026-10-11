@@ -154,7 +154,7 @@ const OWN_TOOLS: Record<string, AgentTool> = {
 };
 
 /** The challenge tools, by the names the agent knows them by. */
-const CHALLENGES = ['solve_captcha', 'sign_in', 'complete_mfa'];
+const CHALLENGES = ['solve_captcha', 'sign_in', 'complete_mfa', 'list_saved_logins'];
 
 /**
  * The tools of this file, by name. Built on first use, not at load: the agent

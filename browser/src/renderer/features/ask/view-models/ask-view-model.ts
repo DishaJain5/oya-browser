@@ -98,16 +98,18 @@ export class AskViewModel extends ViewModel<AskState> {
   private nextId = 1;
   /** The timer that puts "Copied" back to "Copy". */
   private copyTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The tab this conversation belongs to: its agent drives that tab; null for none. */
+  readonly tabId: number | null;
 
-  /** An empty conversation, registered as the Ask pane's Clear; `readFile` reads attachments (FileReader by default). */
-  constructor(services: AskServices, readFile: ReadFile = readBase64) {
+  /** An empty conversation for tab `tabId`; `readFile` reads attachments (FileReader by default). */
+  constructor(services: AskServices, readFile: ReadFile = readBase64, tabId: number | null = null) {
     super({ items: [], input: '', sending: false, copied: null, limited: false });
     this.services = services;
-    this.run = new RunViewModel(services.bridge);
+    this.tabId = tabId;
+    this.run = new RunViewModel(services.bridge, tabId);
     this.files = new FilesViewModel(readFile);
     this.persona = new PersonaViewModel(services.bridge);
     this.model = new ModelSetupViewModel(services.bridge, () => void this.turn());
-    this.own(services.panel.onClear('chat', () => this.clear()));
     this.own(() => this.disposeParts());
   }
 
@@ -142,7 +144,7 @@ export class AskViewModel extends ViewModel<AskState> {
 
   /** Stops the agent's run: the main process hangs up, and the server ends the run at its next step. */
   stop(): void {
-    void this.services.bridge.stopChat();
+    void this.services.bridge.stopChat(this.tabId ?? undefined);
   }
 
   /** Forgets the conversation and its files, stopping a run still going. */
@@ -193,7 +195,8 @@ export class AskViewModel extends ViewModel<AskState> {
   /** The agent's answer to the conversation so far, with its files; a failure as `{ error }`. */
   private async request(): Promise<ChatAnswer> {
     try {
-      return ((await this.services.bridge.sendChat(this.messages(), this.files.data())) as ChatAnswer) ?? {};
+      const sent = this.services.bridge.sendChat(this.messages(), this.files.data(), this.tabId ?? undefined);
+      return ((await sent) as ChatAnswer) ?? {};
     } catch (e) {
       return { error: (e as Error).message };
     }

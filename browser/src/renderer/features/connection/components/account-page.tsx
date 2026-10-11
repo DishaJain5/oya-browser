@@ -1,13 +1,16 @@
 /**
- * The account page of the shell dialog (index.html's #profile-section): the
- * account card, Sync, Imported logins, Browsing as, This device, the server
- * and browser id under Advanced, and Switch account and Log out.
+ * The account page of the shell dialog (index.html's #profile-section), in the
+ * order a person looks for things: who they are (the account card, with Switch
+ * account and Log out on it); their logins (import from a browser, saved
+ * passwords, sync); this browser (make it the default, the profile it browses
+ * as, its name); and the server and browser id folded under Advanced.
  */
 import { useViewModel } from '../../../hooks/index.ts';
 import { TEXT } from '../model/constants.ts';
 import type { AccountModels } from './shell-dialog.tsx';
-import { AccountCardView, DeviceGroup, PersonaGroup, SyncGroup } from './account-groups.tsx';
-import { ImportGroup } from './import-group.tsx';
+import { AccountCardView, DeviceRow, PersonaRow, SyncRow } from './account-groups.tsx';
+import { DefaultBrowserRow, ImportGroup, ImportRows } from './import-group.tsx';
+import { SettingsSection } from './settings-list.tsx';
 import { accountCard } from '../view-models/account-view-model.ts';
 import { Button, StatusLine } from '../../../ui/index.ts';
 import './account-page.css';
@@ -59,16 +62,10 @@ function Actions({ account }: Pick<AccountModels, 'account'>) {
   const { signOut } = accountCard(useViewModel(account));
   return (
     <div className="profile-actions">
-      <Button variant="secondary" id="switch-account" onClick={() => account.switchAccount()}>
+      <Button variant="text" id="switch-account" onClick={() => account.switchAccount()}>
         Switch account
       </Button>
-      <Button
-        variant="secondary"
-        className="sign-out"
-        id="sign-out"
-        title={signOut.title}
-        onClick={() => account.signOut()}
-      >
+      <Button variant="text" className="sign-out" id="sign-out" title={signOut.title} onClick={() => account.signOut()}>
         {signOut.text}
       </Button>
     </div>
@@ -92,13 +89,17 @@ export function AccountPage({ hidden, ...m }: AccountPageProps) {
     );
   return (
     <section id="profile-section" hidden={hidden} aria-labelledby="account-name">
-      <AccountCardView vm={m.account} />
-      <SyncGroup vm={m.sync} />
-      <ImportGroup vm={m.imports} />
-      <PersonaGroup vm={m.profile} />
-      <DeviceGroup vm={m.profile} />
+      <AccountCardView vm={m.account} actions={<Actions account={m.account} />} />
+      <SettingsSection id="logins-label" label="Logins">
+        <ImportRows vm={m.imports} />
+        <SyncRow vm={m.sync} />
+      </SettingsSection>
+      <SettingsSection id="browser-label" label="This browser">
+        <DefaultBrowserRow vm={m.imports} />
+        <PersonaRow vm={m.profile} />
+        <DeviceRow vm={m.profile} />
+      </SettingsSection>
       <Advanced dialog={m.dialog} reconnect={m.reconnect} />
-      <Actions account={m.account} />
     </section>
   );
 }

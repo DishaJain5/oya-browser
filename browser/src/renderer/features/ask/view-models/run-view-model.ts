@@ -75,9 +75,13 @@ export class RunViewModel extends ViewModel<RunState> {
   /** The timer that rests the orb after a run. */
   private restTimer: ReturnType<typeof setTimeout> | undefined;
 
-  /** Resting, hearing the agent's events and the activity log. */
-  constructor(bridge: RunBridge) {
+  /** The tab whose chat this is: other tabs' runs are theirs to show; null hears every run. */
+  private readonly tabId: number | null;
+
+  /** Resting, hearing the agent's events (of its tab's chat) and the activity log. */
+  constructor(bridge: RunBridge, tabId: number | null = null) {
     super({ card: null, label: '', count: 0, seconds: 0, orb: 'idle', pulse: 0 });
+    this.tabId = tabId;
     this.own(bridge.onAgentEvent((payload) => this.event(payload)));
     this.own(bridge.onDevLog((entry) => this.note(entry as DevLogEntry)));
     this.own(() => this.stopTimers());
@@ -111,9 +115,9 @@ export class RunViewModel extends ViewModel<RunState> {
   }
 
   /** One event from the agent: its run's start names it; until then, and for any other run, events are ignored. */
-  private event({ runId, event }: AgentEvent): void {
+  private event({ runId, event, tabId }: AgentEvent): void {
     const run = event as AgentRunEvent | undefined;
-    if (!this.state.card || !run) return;
+    if (!this.state.card || !run || (this.tabId !== null && tabId != null && tabId !== this.tabId)) return;
     if (run.kind === 'start' && !this.runId) this.runId = runId;
     if (!this.runId || runId !== this.runId) return;
     if (run.kind === 'plan') this.setPlan(run.steps ?? []);

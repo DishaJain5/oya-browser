@@ -81,9 +81,32 @@ function useFocusOnOpen(opened: number): void {
   }, [opened]);
 }
 
-/** The name and the prompt. */
+/** What each run does: ask the agent the prompt below, or play one of the project's saved playbooks. */
+function TaskField({ editor }: RoutineEditorProps) {
+  const { playbook, playbooks } = useViewModel(editor);
+  const names = playbook && !playbooks.includes(playbook) ? [playbook, ...playbooks] : playbooks;
+  return (
+    <label className="routine-field">
+      {EDITOR_TEXT.task}
+      <select id="routine-task" value={playbook} onChange={(e) => editor.setField('playbook', e.target.value)}>
+        <option value="">{EDITOR_TEXT.askPrompt}</option>
+        {names.length > 0 && (
+          <optgroup label={EDITOR_TEXT.playGroup}>
+            {names.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+    </label>
+  );
+}
+
+/** The name and, unless it plays a playbook, the prompt. */
 function TextFields({ editor }: RoutineEditorProps) {
-  const { name, prompt } = useViewModel(editor);
+  const { name, prompt, playbook } = useViewModel(editor);
   return (
     <>
       <label className="routine-field">
@@ -97,7 +120,8 @@ function TextFields({ editor }: RoutineEditorProps) {
           onChange={(e) => editor.setField('name', e.target.value)}
         />
       </label>
-      <label className="routine-field">
+      <TaskField editor={editor} />
+      <label className="routine-field" hidden={!!playbook}>
         Prompt
         <textarea
           id="routine-prompt"

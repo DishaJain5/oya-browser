@@ -117,7 +117,7 @@ try {
   // 3. Server to desktop again, with the card closed: the push reaches the desktop by itself.
   await setConfig({ llm_provider: 'openai', chat_model: 'gpt-6-sol' });
   await until(
-    () => page.evaluate(() => window.oyaShell.ask.model.state.status?.model === 'gpt-6-sol'),
+    () => page.evaluate(() => window.oyaShell.ask.state.current.model.state.status?.model === 'gpt-6-sol'),
     'the pushed change to reach the desktop',
   );
   await page.locator('#chat-model-open').click();

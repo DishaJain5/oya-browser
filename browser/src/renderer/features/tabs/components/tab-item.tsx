@@ -1,8 +1,9 @@
 /**
  * One tab on the strip: its icon (the page's favicon, a spinner while it
  * loads, the Oya mark on the start page, a globe otherwise), its title (the
- * role=tab button) and its close button. A folding tab is inert and no
- * longer a tab; during a drag it slides by the drag's transform.
+ * role=tab button) and its close button. The agent's tab carries a small Oya
+ * light while the agent works, wherever the person is. A folding tab is inert
+ * and no longer a tab; during a drag it slides by the drag's transform.
  */
 import { useState, type RefObject } from 'react';
 import { Icon, IconButton } from '../../../ui/index.ts';
@@ -63,7 +64,14 @@ export interface TabItemProps {
 
 /** The class list of an item. */
 function itemClass({ tab, closing, opening }: TabItemModel, dragging: boolean): string {
-  const flags = { active: !!tab.active && !closing, failed: !!loadError(tab), closing, opening, dragging };
+  const flags = {
+    active: !!tab.active && !closing,
+    agent: !!tab.agent,
+    failed: !!loadError(tab),
+    closing,
+    opening,
+    dragging,
+  };
   return ['tab-item', ...Object.entries(flags).flatMap(([name, on]) => (on ? [name] : []))].join(' ');
 }
 

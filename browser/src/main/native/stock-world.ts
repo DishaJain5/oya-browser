@@ -2,10 +2,10 @@
  * Isolated-world code on stock Electron (desktop) through the tab preload.
  * Stock `executeJavaScriptInIsolatedWorld` waits until the page stops loading, so one
  * hung image or long-poll held every agent read for a whole command timeout. The
- * preload runs the code in the page's process at once. It acknowledges before running,
- * so a request that was never acknowledged never ran and the stock API can take over.
+ * preload runs the code in the page's process at once. It runs only after main accepts
+ * its acknowledgement, so a late one is refused and the stock fallback never runs twice.
  */
-import type { IpcMain, IpcMainEvent, WebContents } from 'electron';
+import type { IpcMain, IpcMainEvent, IpcMainInvokeEvent, WebContents } from 'electron';
 import { STOCK_PERSONA } from '../../shared/stock-persona.ts';
 import { STOCK_WORLD_ACK_MS } from './constants.ts';
 /** A preload's reply. */
@@ -49,9 +49,10 @@ class Run {
   awaitAck(fallback: () => void): void {
     this.timer = setTimeout(() => (this.release(), fallback()), STOCK_WORLD_ACK_MS);
   }
-  /** The preload has the request: the stock fallback must never run it a second time. */
-  acknowledged(): void {
+  /** The preload may run it: the stock fallback must never run it a second time. */
+  acknowledged(): true {
     clearTimeout(this.timer);
+    return true;
   }
   /** Settles with the preload's answer. */
   answer({ value, error }: Reply): void {
@@ -74,15 +75,15 @@ class Run {
 /** Wired once by the composition root; until then every run uses the stock API. */
 let installed = false;
 /** Listens for acknowledgements and results from tab preloads. */
-export function useStockWorld(ipc: Pick<IpcMain, 'on'>): void {
-  ipc.on(STOCK_PERSONA.ACK, (event: IpcMainEvent, id: number) => from(event, id)?.acknowledged());
+export function useStockWorld(ipc: Pick<IpcMain, 'on' | 'handle'>): void {
+  ipc.handle(STOCK_PERSONA.ACK, (event, id: number) => from(event, id)?.acknowledged() ?? false);
   ipc.on(STOCK_PERSONA.RESULT, (event: IpcMainEvent, reply: Reply) => from(event, reply?.id)?.answer(reply));
   installed = true;
 }
-/** The run `id`, only when the reply came from the tab it was sent to. */
-function from(event: IpcMainEvent, id: number): Run | undefined {
+/** The run `id`, only when the reply came from the main frame of the tab it was sent to, never a subframe. */
+function from(event: IpcMainEvent | IpcMainInvokeEvent, id: number): Run | undefined {
   const run = pending.get(id);
-  return run && run.contents === event.sender ? run : undefined;
+  return run && run.contents === event.sender && event.senderFrame === run.contents.mainFrame ? run : undefined;
 }
 /** Runs `code` in isolated world `world` of the tab's main frame without waiting for the page to finish loading. */
 export function runInWorld<T>(contents: WebContents, world: number, code: string): Promise<T> {

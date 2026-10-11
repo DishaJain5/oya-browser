@@ -31,6 +31,15 @@ describe('the account card', () => {
     app.account.onStatus({ connected: true });
     assert.equal(app.account.state.failure, undefined);
   });
+  it('does not say "Project" twice for a project whose name already starts with it', () => {
+    const card = accountCard({ account: { project: { name: 'Project 1b9258' } }, connected: true, config: {} } as any);
+    assert.equal(card.project, 'Project 1b9258');
+    assert.equal(
+      accountCard({ account: { project: { name: 'Acme' } }, connected: true, config: {} } as any).project,
+      'Project Acme',
+    );
+  });
+
   it('names the person, their email, project and plan, with their initial', async () => {
     const app = await accountPage({ getStatus: { connected: true } });
     const card = accountCard(app.account.state);

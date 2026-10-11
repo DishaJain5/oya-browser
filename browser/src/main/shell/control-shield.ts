@@ -20,6 +20,7 @@ import {
 import { lineFor, namesFrom, idOf, changesPage, type ActionParams, type AnalyzedElement } from './narration.ts';
 import { pageTone } from './page-tone.ts';
 import { holdStill, inContainer } from './hold-still.ts';
+import { keepAgentRendering } from './view-stack.ts';
 
 /** Carry container motion policy to the shield before its first paint. */
 function loadShield(view: BrowserView, appDir: string): void {
@@ -31,8 +32,30 @@ function loadShield(view: BrowserView, appDir: string): void {
 /** The services the shield uses. */
 type Deps = Pick<
   AppServices,
-  'electron' | 'appDir' | 'control' | 'shell' | 'recorder' | 'shortcuts' | 'overlays' | 'tabs' | 'world'
+  'electron' | 'appDir' | 'control' | 'shell' | 'recorder' | 'shortcuts' | 'overlays' | 'tabs' | 'world' | 'agentTab'
 >;
+
+/** What each window's shell was last told about its shown tab. */
+const announced = new WeakMap<object, boolean>();
+
+/** The control state as this window's shell reads it, with whether the person may use the tab it shows. */
+function shellState(deps: Deps, state: ControlSnapshot): ControlSnapshot {
+  const pageInteractive = deps.agentTab.humanMay(deps.tabs.activeTabId);
+  announced.set(deps.shell, pageInteractive);
+  return { ...state, pageInteractive, newTabInteractive: deps.agentTab.humanMay(null) };
+}
+
+/** Tells the shell when the shown tab became the person's or the agent's (a tab switch, a claim, a release). */
+function announcePage(deps: Deps): void {
+  if (announced.get(deps.shell) === deps.agentTab.humanMay(deps.tabs.activeTabId)) return;
+  deps.shell.send('control-state', shellState(deps, deps.control.snapshot()));
+}
+
+/** Install shell shortcuts and quiet input blocking on the shield alone. */
+function installShieldInput(deps: Deps, takeover: TakeoverPrompt, view: BrowserView): void {
+  deps.shortcuts.install(view.webContents);
+  takeover.install(view.webContents);
+}
 
 /** Recheck ownership and window identity before restoring focus after a native focus callback. */
 function focusFencedShell(deps: Deps, contents: WebContents): void {
@@ -141,9 +164,10 @@ function analysisBoxesJs(elements: readonly AnalyzedElement[], strict = false): 
   return MEASURE_JS.replace('__WANTED__', () => list).replace('__STRICT__', String(strict));
 }
 
-/** Whether an agent holds the page: anything that re-analyzes it would renumber the agent's element ids. */
-export function agentDriving(ctx: Pick<AppServices, 'control'>): boolean {
-  return !ctx.control.snapshot().interactive;
+/** Whether an agent holds the page (`view`'s, under per-tab control): re-analyzing it would renumber the agent's element ids. */
+export function agentDriving(ctx: Pick<AppServices, 'control' | 'agentTab' | 'tabs'>, view?: unknown): boolean {
+  if (!view || !ctx.agentTab.scoped()) return !ctx.control.snapshot().interactive;
+  return ctx.agentTab.claimed().some((id) => ctx.tabs.find(id)?.view === view);
 }
 
 /** The colour a target ring takes for each action, by the kind of element it acts on; anything else is a click. */
@@ -156,8 +180,8 @@ export const AGENT_HOLDS_PAGE = 'The agent is using this page. Take control to r
 export class ControlShield {
   /** The shield's BrowserView, created on first use. */
   view: BrowserView | null = null;
-  /** Sign-in popups, enabled only while a person has control. */
-  readonly popups = new Set<BrowserWindow>();
+  /** Sign-in popups, each marked whether it is the person's own (opened beside the agent's tab), enabled while they may use it. */
+  readonly popups = new Map<BrowserWindow, boolean>();
   /** The outlines being followed right now, or null; a newer run replaces it. */
   private tracking: TrackingRun | null = null;
   /** Analysis id to element name, from the last analysis, for the companion's lines. */
@@ -189,10 +213,10 @@ export class ControlShield {
 
   /** The control state changed: tell the shell, and fence the page accordingly. */
   controlChanged(state: ControlSnapshot): void {
-    this.deps.shell.send('control-state', state);
+    this.deps.shell.send('control-state', shellState(this.deps, state));
     this.deps.recorder.controlLost(state);
     this.enableMenus(state.interactive);
-    for (const popup of this.popups) if (!popup.isDestroyed()) popup.setEnabled(!drivenElsewhere(state));
+    for (const [popup, own] of this.popups) if (!popup.isDestroyed()) popup.setEnabled(own || !drivenElsewhere(state));
     if (this.deps.shell.alive()) this.sync();
   }
 
@@ -204,10 +228,10 @@ export class ControlShield {
     }
   }
 
-  /** A new sign-in popup: disabled only while someone else drives, forgotten once closed. */
-  adoptPopup(childWindow: BrowserWindow): void {
-    this.popups.add(childWindow);
-    childWindow.setEnabled(!drivenElsewhere(this.deps.control.snapshot()));
+  /** A new sign-in popup: disabled only while someone else drives, unless it is the person's own; forgotten once closed. */
+  adoptPopup(childWindow: BrowserWindow, own = false): void {
+    this.popups.set(childWindow, own);
+    childWindow.setEnabled(own || !drivenElsewhere(this.deps.control.snapshot()));
     childWindow.once('closed', () => this.popups.delete(childWindow));
   }
 
@@ -219,20 +243,14 @@ export class ControlShield {
     view.setBackgroundColor(TRANSPARENT);
     void holdStill(view, inContainer());
     loadShield(view, this.deps.appDir);
-    this.installShieldInput(view);
+    installShieldInput(this.deps, this.takeover, view);
     return view;
-  }
-
-  /** Install shell shortcuts and quiet input blocking on the shield alone. */
-  private installShieldInput(view: BrowserView): void {
-    this.deps.shortcuts.install(view.webContents);
-    this.takeover.install(view.webContents);
   }
 
   /** Whether the page should be covered right now. */
   shouldCover(): boolean {
-    const { shell, overlays, control } = this.deps;
-    return shell.browsingMode && !overlays.names.size && !control.snapshot().interactive;
+    const { shell, overlays, agentTab, tabs } = this.deps;
+    return shell.browsingMode && !overlays.names.size && !agentTab.humanMay(tabs.activeTabId);
   }
 
   /**
@@ -243,6 +261,7 @@ export class ControlShield {
   sync(): void {
     const win: BrowserWindow | null = this.deps.shell.window;
     if (!win || win.isDestroyed()) return;
+    announcePage(this.deps);
     const view = this.deps.tabs.getShownView() as BrowserView | null; // a tab shown in the window is a BrowserView; popups have windows of their own
     if (!this.shouldCover() || !view) return this.uncover(win);
     this.cover(win, view, this.prepare());
@@ -343,6 +362,7 @@ export class ControlShield {
   private uncover(win: BrowserWindow): void {
     this.stopTracking();
     if (this.view) win.removeBrowserView(this.view);
+    keepAgentRendering(this.deps, win);
   }
 
   /** Lays the shield exactly over `view`, on top, and keeps keyboard focus off the page. */

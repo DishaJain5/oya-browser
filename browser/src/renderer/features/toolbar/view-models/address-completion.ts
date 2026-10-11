@@ -13,6 +13,18 @@ interface State {
   selected: number;
   /** Whether the dropdown is visible. */
   open: boolean;
+  /** The rest of the best match, shown selected after what was typed (Chrome's inline completion); '' for none. */
+  inline: string;
+}
+
+/**
+ * What to complete `query` with: the rest of the best suggestion's address, when that
+ * address (without scheme or www.) starts with exactly what was typed; a home page
+ * loses its trailing slash.
+ */
+export function inlineFor(query: string, best: AddressSuggestion | undefined): string {
+  const address = best?.url.replace(/^https?:\/\/(www\.)?/i, '').replace(/^([^/?#]+)\/$/, '$1') ?? '';
+  return query && address.toLowerCase().startsWith(query.toLowerCase()) ? address.slice(query.length) : '';
 }
 /** UI state stays out of the main-process library service. */
 export class AddressCompletion extends ViewModel<State> {
@@ -24,25 +36,27 @@ export class AddressCompletion extends ViewModel<State> {
   private overlay = Promise.resolve();
   /** Starts closed, without exposing history merely because a page loads. */
   constructor(bridge: Bridge) {
-    super({ items: [], selected: -1, open: false });
+    super({ items: [], selected: -1, open: false, inline: '' });
     this.bridge = bridge;
   }
   /** Local IPC may answer out of order; only the newest edit may show suggestions. */
-  async search(query: string): Promise<void> {
+  /** `typing` is false for a deletion, which never completes inline, so Backspace can take the text back. */
+  async search(query: string, typing = false): Promise<void> {
     const revision = ++this.revision;
     if (!query.trim()) return this.dismiss();
-    this.set({ items: [], selected: -1 });
-    const items = await this.bridge.addressSuggestions(query).catch(() => []);
+    this.set({ items: [], selected: -1, inline: '' });
+    const found = await this.bridge.addressSuggestions(query).catch(() => []);
     if (revision !== this.revision) return;
-    this.set({ items: Array.isArray(items) ? items : [], selected: -1 });
-    this.visibility(this.state.items.length > 0);
+    const items = Array.isArray(found) ? found : [];
+    this.set({ items, selected: -1, inline: typing ? inlineFor(query, items[0]) : '' });
+    this.visibility(items.length > 0);
   }
   /** Arrow keys wrap without changing the user's original query. */
   move(offset: number): void {
     const count = this.state.items.length;
     if (!count) return;
     const start = this.state.selected < 0 && offset < 0 ? 0 : this.state.selected;
-    this.set({ selected: (start + offset + count) % count });
+    this.set({ selected: (start + offset + count) % count, inline: '' });
   }
   /** Enter uses the selected destination, or the original typed URL/search. */
   get selectedUrl(): string | undefined {
@@ -51,7 +65,7 @@ export class AddressCompletion extends ViewModel<State> {
   /** Blur, Escape and tab changes cancel even an in-flight query. */
   dismiss(): void {
     this.revision++;
-    this.set({ items: [], selected: -1 });
+    this.set({ items: [], selected: -1, inline: '' });
     this.visibility(false);
   }
   /** Only actual open/close transitions change the native view. */

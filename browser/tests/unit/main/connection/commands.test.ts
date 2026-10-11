@@ -117,6 +117,35 @@ describe('CommandRunner', () => {
     );
   });
 
+  it("keeps the agent on its own tab while the person uses another, and never takes the person's", async () => {
+    ctx.control.state = { mode: 'agent', mine: false, interactive: false, connected: true, localClients: 0 };
+    ctx.tabs.createTab('https://agent.test/');
+    ctx.tabs.createTab('https://person.test/');
+    ctx.tabs.activateTab(1);
+    const driven: unknown[] = [];
+    ctx.actions.runPageAction = async (id, _action, _params, view) => {
+      driven.push(view);
+      ctx.commands.sendResult(id, true, {});
+    };
+    await ctx.commands.handleCommand({ id: 'c1', action: 'click' });
+    ctx.tabs.activateTab(2); // the person turns to their own tab
+    await ctx.commands.handleCommand({ id: 'c2', action: 'click' });
+    await ctx.commands.handleCommand({ id: 'sw', action: 'switch_tab', params: { tab_id: 2 } });
+    await ctx.commands.handleCommand({ id: 'op', action: 'open_tab', params: { url: 'https://more.test/' } });
+    await ctx.commands.handleCommand({ id: 'l', action: 'list_tabs' });
+    const agentView = ctx.tabs.find(1).view;
+    assert.deepEqual(driven, [agentView, agentView]);
+    assert.equal(resultOf('sw')[0].error, 'The person is using that tab. Use another tab, or open_tab.');
+    assert.equal(ctx.tabs.activeTabId, 2, 'the agent opening a tab never pulls the person off theirs');
+    assert.equal(ctx.agentTab.id, 3, 'the tab the agent opened is its tab');
+    assert.deepEqual(
+      resultOf('l')[0]
+        .data.tabs.filter((t) => t.active)
+        .map((t) => t.id),
+      [3],
+    );
+  });
+
   it("answers a held dialog at once and drops the interrupted command's late answer", async () => {
     const page = new FakeWebContents();
     ctx.dialogs.watch(page);

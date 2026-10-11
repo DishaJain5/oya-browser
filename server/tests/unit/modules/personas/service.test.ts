@@ -587,6 +587,18 @@ describe('PersonaService.mirror', () => {
     assert.deepEqual([p.owner, p.name, p.device.chromeVersion], ['owner:key-a', 'Chrome — You', '128.0.0.0']);
   });
 
+  it('runs a Mac set up in several languages as its locale and base language, which every engine sends', () => {
+    const { service } = personaService();
+    const languages = ['en-US', 'en', 'ar-JO', 'fr'];
+    const p = service.mirror('key-a', {
+      source: 'firefox',
+      profile: 'default',
+      device: { ...device, locale: 'en-US', navigator: { platform: 'MacIntel', languages } },
+    });
+    assert.deepEqual(service.fingerprintFor(p).navigator.languages, ['en-US', 'en']);
+    assert.deepEqual(p.device.navigator.languages, languages, 'the captured device itself is left as captured');
+  });
+
   it('is idempotent per source and profile, and keeps the first captured device', () => {
     const { service } = personaService();
     const a = service.mirror('key-a', { source: 'chrome', profile: 'Default', device });

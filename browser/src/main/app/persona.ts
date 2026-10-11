@@ -99,6 +99,9 @@ export interface FingerprintProfile extends SessionProfile {
   [key: string]: unknown;
 }
 
+/** The Electron partition a persona's cookies, storage and library live in. */
+export const personaPartition = (personaId: string): string => `persist:oya-${personaId}`;
+
 /** The fingerprint debug bar's view of a profile. */
 export type FingerprintSummary = Record<string, unknown>;
 
@@ -199,7 +202,7 @@ export class Persona {
 
   /** Each persona has its own partition, so its cookies never mix with another's. */
   partitionName(): string {
-    if (this.active) return `persist:oya-${this.active.id}`;
+    if (this.active) return personaPartition(this.active.id);
     return 'persist:oya-browser';
   }
 
@@ -236,7 +239,7 @@ export class Persona {
   /** Resolve the authenticated identity explicitly; the old active persona must never receive its import. */
   private prepareNativeStorage(msg: LoginStateMessage): Promise<void> {
     if (!msg.fingerprint?.id) throw Error('Native profile storage requires an authenticated persona');
-    const session = this.deps.electron.session.fromPartition(`persist:oya-${msg.fingerprint.id}`);
+    const session = this.deps.electron.session.fromPartition(personaPartition(msg.fingerprint.id));
     return this.storage!.activate(session, msg.origins || {});
   }
 

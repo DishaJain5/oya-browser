@@ -1,4 +1,4 @@
-/** An understated library dropdown, aligned to the existing omnibox. */
+/** A compact library dropdown, aligned to the omnibox and anchored to it by a tight shadow. */
 .address-wrap {
   position: relative;
 }
@@ -7,67 +7,58 @@
 }
 .address-suggestions {
   position: absolute;
-  top: calc(100% + 7px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   z-index: 100;
   max-height: min(360px, 60dvh);
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 12px;
   background: var(--surface);
-  box-shadow: var(--shadow-lg);
-  padding: 6px;
-}
-.address-suggestions-heading {
-  padding: 8px;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  color: var(--secondary);
-  font-size: 11px;
-}
-.address-suggestions-heading span {
-  font-size: 10px;
+  /* Close to the bar, not the modal shadow: a dropdown that casts a wide halo looks like it floats off the page. */
+  box-shadow:
+    0 0 0 0.5px var(--hairline),
+    0 2px 6px color-mix(in srgb, #000 8%, transparent),
+    0 12px 28px -8px color-mix(in srgb, #000 22%, transparent);
+  padding: 4px;
 }
 .address-option {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 8px;
-  border-radius: var(--radius-sm);
+  gap: 10px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 13px;
+  min-width: 0;
 }
 .address-option[aria-selected='true'],
 .address-option:hover {
   background: var(--accent-soft);
 }
-.address-option-source {
-  flex: 0 0 58px;
-  font-size: 10px;
+.address-option-icon {
+  flex: none;
+  display: inline-flex;
   color: var(--secondary);
 }
-.address-option-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.address-option-icon .icon {
+  width: 14px;
+  height: 14px;
+}
+.address-option-title {
+  flex: 0 1 auto;
+  max-width: 55%;
+  color: var(--text);
+}
+.address-option-url {
+  flex: 1 1 0;
+  color: var(--secondary);
+}
+.address-option-title,
+.address-option-url {
   min-width: 0;
-}
-.address-option-copy strong {
-  font-size: 12px;
-  font-weight: 500;
-}
-.address-option-copy > span {
-  font-size: 11px;
-  color: var(--secondary);
-}
-.address-option-copy > * {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-@media (max-width: 700px) {
-  .address-suggestions-heading span {
-    display: none;
-  }
 }

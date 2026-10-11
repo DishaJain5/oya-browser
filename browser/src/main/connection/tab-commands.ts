@@ -84,14 +84,23 @@ async function playWorkflow(runner: CommandRunner, id: CommandId | undefined, pa
 
 /** Opens a tab on a web address and answers once it is ready; any other address is the caller's way into this machine, and a tab that could not be protected is refused. */
 async function openTab(runner: CommandRunner, id: CommandId | undefined, params?: RemoteParams): Promise<void> {
-  const { tabs, actions } = runner.deps;
+  const { tabs, actions, agentTab } = runner.deps;
   const url = params?.url || 'about:blank';
   if (!isWebAddress(url)) return runner.sendResult(id, false, null, NOT_A_WEB_ADDRESS);
-  const tabId = tabs.createTab(url, true);
+  // Shown only when the person is watching the agent's tab: never pulled out from under their own.
+  const tabId = agentTab.opened(tabs.createTab(url, agentTab.following()));
   const tab = tabs.list.find((t: ListedTab) => t.id === tabId);
   await whenProtected(tab);
   await actions.waitForTabReady(tab);
   runner.sendResult(id, true, { tab_id: tabId, url });
+}
+
+/** Why the agent may not take tab `tabId`: it does not exist, or the person is using it beside the agent's. */
+function tabRefusal(deps: CommandRunner['deps'], tabId: number | undefined): string | null {
+  if (!deps.tabs.find(tabId)) return `Tab ${tabId} not found`;
+  if (deps.agentTab.othersDrive(tabId)) return 'Another agent is using that tab. Use another tab, or open_tab.';
+  const theirs = !deps.agentTab.following() && tabId === deps.tabs.activeTabId;
+  return theirs ? 'The person is using that tab. Use another tab, or open_tab.' : null;
 }
 
 /** Command → handler, for commands that do not need the active page. */
@@ -107,9 +116,9 @@ export const TAB_COMMANDS: Record<string, TabHandler> = {
     runner.sendResult(id, true, result);
   },
   list_tabs: (runner, id) => {
-    const { list, activeTabId } = runner.deps.tabs;
+    const { list } = runner.deps.tabs;
     const tabs = list.map((t: ListedTab) => ({
-      ...tSummary(t, activeTabId),
+      ...tSummary(t, runner.deps.agentTab.tabId()),
       window_id: runner.deps.windows?.owner(t.id)?.shell.window?.id,
     }));
     runner.sendResult(id, true, { tabs });
@@ -124,13 +133,18 @@ export const TAB_COMMANDS: Record<string, TabHandler> = {
   },
   open_tab: openTab,
   switch_tab: (runner, id, params) => {
-    if (!runner.deps.tabs.find(params?.tab_id))
-      return runner.sendResult(id, false, null, `Tab ${params?.tab_id} not found`);
-    runner.deps.tabs.activateTab(params!.tab_id!); // found just above
+    const refused = tabRefusal(runner.deps, params?.tab_id);
+    if (refused) return runner.sendResult(id, false, null, refused);
+    const { tabs, agentTab } = runner.deps;
+    if (agentTab.following()) tabs.activateTab(params!.tab_id!); // found by tabRefusal
+    agentTab.claim(params?.tab_id);
     runner.sendResult(id, true, { tab_id: params?.tab_id });
   },
   close_tab: (runner, id, params) => {
-    runner.deps.tabs.closeTab(params?.tab_id || runner.deps.tabs.activeTabId!);
+    const target = params?.tab_id || runner.deps.agentTab.tabId()!;
+    const refused = tabRefusal(runner.deps, target);
+    if (refused) return runner.sendResult(id, false, null, refused);
+    runner.deps.tabs.closeTab(target);
     runner.sendResult(id, true, { closed: true });
   },
 };

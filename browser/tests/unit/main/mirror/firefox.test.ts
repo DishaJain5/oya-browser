@@ -36,6 +36,12 @@ describe('slimFirefox', () => {
     });
   });
 
+  it("maps Firefox's explicit None to None on a secure cookie, and leaves it unspecified on an insecure one", () => {
+    const row = { name: 'li_at', value: '1', host: '.linkedin.com', path: '/', expiry: 0, isHttpOnly: 0, sameSite: 0 };
+    assert.equal(slimFirefox({ ...row, isSecure: 1 }).sameSite, 'None');
+    assert.equal(slimFirefox({ ...row, isSecure: 0 }).sameSite, 'unspecified', 'Chromium refuses an insecure None');
+  });
+
   it('marks a bare host as host-only and leaves an unknown sameSite unspecified', () => {
     const c = slimFirefox({
       name: 'x',
@@ -76,9 +82,30 @@ describe('firefoxProfile', () => {
 
 describe('readFirefoxCookies', () => {
   const SCHEMA =
-    'CREATE TABLE moz_cookies (name TEXT, value TEXT, host TEXT, path TEXT, expiry INTEGER, isSecure INTEGER, isHttpOnly INTEGER, sameSite INTEGER);';
-  /** One cookie row. */
-  const insert = (name: string) => `INSERT INTO moz_cookies VALUES ('${name}', 'v', '.site.test', '/', 0, 1, 1, 1);`;
+    "CREATE TABLE moz_cookies (originAttributes TEXT NOT NULL DEFAULT '', name TEXT, value TEXT, host TEXT, path TEXT, expiry INTEGER, isSecure INTEGER, isHttpOnly INTEGER, sameSite INTEGER);";
+  /** One cookie row, first-party unless `origin` names its partition or container. */
+  const insert = (name: string, origin = '', value = 'v') =>
+    `INSERT INTO moz_cookies VALUES ('${origin}', '${name}', '${value}', '.site.test', '/', 0, 1, 1, 1);`;
+
+  it('reads only the first-party jar: a copy kept inside another site or a container never replaces it', (t) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oya-ff-part-'));
+    t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+    const rows = [
+      insert('bcookie', '', 'mine'),
+      insert('bcookie', '^partitionKey=(https,prnewswire.com)', 'theirs'),
+      insert('only-partitioned', '^partitionKey=(https,other.test)'),
+      insert('container', '^userContextId=2'),
+    ];
+    try {
+      execFileSync('sqlite3', [path.join(dir, 'cookies.sqlite'), `${SCHEMA} ${rows.join(' ')}`], { stdio: 'ignore' });
+    } catch {
+      return t.skip('no sqlite3 on this machine');
+    }
+    assert.deepEqual(
+      readFirefoxCookies(dir).map((c) => [c.name, c.value]),
+      [['bcookie', 'mine']],
+    );
+  });
 
   it('reads the newest logins too: those a running Firefox still holds in its write-ahead log', (t) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'oya-ff-wal-'));
