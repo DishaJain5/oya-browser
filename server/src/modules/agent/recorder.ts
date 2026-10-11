@@ -193,16 +193,17 @@ export function setElements(browserId, elements, modal?) {
  * Drops what the current message recorded: the agent is starting it over. Steps an
  * earlier message of the same chat recorded stay, since that part was done.
  */
-export async function restartRun(browserId) {
+export async function restartRun(browserId, values = {}) {
   const run = runs.get(browserId);
   if (!run) return;
   run.steps = run.steps.slice(0, run.mark ?? 0);
   // The new attempt starts where the agent is: it may have gone back to the form
   // before saying it was starting over, and that navigation was just dropped.
   const here = await tabHandle(browserId);
+  const url = startPlaceholder(here, values);
   const last = run.steps.at(-1);
-  const there = last?.action === 'navigate' && last.url === here;
-  if (/^https?:/.test(here || '') && !there) run.steps.push({ action: 'navigate', url: here, start: true });
+  const there = last?.action === 'navigate' && last.url === url;
+  if (/^https?:/.test(here || '') && !there) run.steps.push({ action: 'navigate', url, start: true });
 }
 
 /** Marks where the current message's steps begin, for restartRun. */
@@ -212,15 +213,21 @@ export function markMessage(browserId) {
 }
 
 /** Makes `run` the browser's current run, starting from the page it is on so a playbook replays from the same place. */
-export async function startRun(browserId, run) {
+export async function startRun(browserId, run, values = {}) {
   run.handles = new Map();
-  const tabs = await sendCommand(browserId, 'list_tabs').catch(() => null);
-  const startUrl = tabs?.data?.tabs?.find((t) => t.active)?.url;
-  if (/^https?:/.test(startUrl || '')) run.steps.push({ action: 'navigate', url: startUrl, start: true });
+  const startUrl = await tabHandle(browserId);
+  if (/^https?:/.test(startUrl || ''))
+    run.steps.push({ action: 'navigate', url: startPlaceholder(startUrl, values), start: true });
   run.mark = run.steps.length;
   runs.delete(browserId);
   runs.set(browserId, run);
   if (runs.size > MAX_RECORDED_RUNS) runs.delete(runs.keys().next().value);
+}
+
+/** Reuse an explicitly supplied whole URL, so a replay can start in a new environment without guessing at hosts. */
+function startPlaceholder(url, values) {
+  const entry = Object.entries(values).find(([, value]) => typeof value === 'string' && value === url);
+  return entry ? `{{${entry[0]}}}` : url;
 }
 
 /** The element a step acts on, with visible data and secrets alike redacted: a playbook stores placeholders, never values. */

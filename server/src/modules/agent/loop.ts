@@ -172,7 +172,7 @@ const LOCAL_TOOLS: Record<string, (ctx: LoopContext, args: any) => Promise<strin
   remember: rememberNote,
   update_plan: async (ctx, args) => ((ctx.plan = Array.isArray(args.steps) ? args.steps : []), planText(ctx.plan)),
   restart_recording: async (ctx) => (
-    await restartRun(ctx.browserId),
+    await restartRun(ctx.browserId, ctx.values),
     'Recording restarted: do the task again from the start.'
   ),
 };

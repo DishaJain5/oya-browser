@@ -32,6 +32,16 @@ describe('runChat', () => {
     keyConfig.reset();
   });
 
+  it('keeps the supplied start URL variable when the server agent starts and restarts recording', async () => {
+    stubLlm([toolReply(['restart_recording', {}]), textReply('DONE')]);
+    await runChat(BROWSER, [{ role: 'user', content: 'Continue here' }], {
+      apiKey: 'chat-key',
+      data: { start: 'https://a.test/' },
+      verify: false,
+    });
+    assert.deepEqual(lastRun(BROWSER).steps, [{ action: 'navigate', url: '{{start}}', start: true }]);
+  });
+
   it('refuses a key with no LLM credential anywhere', async () => {
     delete process.env.OPENAI_API_KEY;
     await assert.rejects(

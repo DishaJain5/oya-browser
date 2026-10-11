@@ -149,7 +149,7 @@ async function begin(browserId, messages, values, secrets) {
     run.prompt = chatPrompt(messages, values);
     run.secrets = [...new Set([...run.secrets, ...Object.keys(secrets)])];
     markMessage(browserId);
-  } else await startRun(browserId, newRun(messages, values, secrets));
+  } else await startRun(browserId, newRun(messages, values, secrets), values);
   forgetPage(browserId);
 }
 

@@ -15,10 +15,10 @@ const EL = { id: 7, type: 'input', tag: 'input', name: 'email', text: 'ada@x.tes
 let browser;
 
 /** A fresh run, started on a browser whose active tab is `url`. */
-async function started(url = 'https://a.test/start') {
+async function started(url = 'https://a.test/start', values = {}) {
   browser = scriptedBrowser(BROWSER, 'key-a', () => ({ ok: true, data: { tabs: [{ active: true, url }] } }));
   const run = { prompt: 'p', steps: [], elements: [], secrets: [] };
-  await recorder.startRun(BROWSER, run);
+  await recorder.startRun(BROWSER, run, values);
   return run;
 }
 
@@ -54,6 +54,26 @@ describe('recorder', () => {
   it('adds no start step when the page is not http(s)', async () => {
     const run = await started('about:blank');
     assert.deepEqual(run.steps, []);
+  });
+
+  it('records the supplied whole start URL as a variable and keeps it when restarting', async () => {
+    const values = { start: 'https://old-tunnel.test/home' };
+    const run = await started(values.start, values);
+    await recorder.recordStep(BROWSER, 'press_key', { key: 'Tab' }, values);
+    await recorder.restartRun(BROWSER, values);
+    assert.deepEqual(run.steps, [{ action: 'navigate', url: '{{start}}', start: true }]);
+    assert.doesNotMatch(JSON.stringify(run), /old-tunnel/);
+  });
+
+  it('does not turn a host or partial URL in unrelated task data into the start destination', async () => {
+    const run = await started('https://a.test/start', { name: 'a.test', base: 'https://a.test/' });
+    assert.equal(run.steps[0].url, 'https://a.test/start');
+  });
+
+  it('does not persist a secret supplied as the whole start URL', async () => {
+    const run = await started('https://a.test/start?token=secret', { entry: 'https://a.test/start?token=secret' });
+    assert.deepEqual(run.steps, [{ action: 'navigate', url: '{{entry}}', start: true }]);
+    assert.doesNotMatch(JSON.stringify(run), /token=secret/);
   });
 
   it('starts empty when the browser cannot list its tabs', async () => {
