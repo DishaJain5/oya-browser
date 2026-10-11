@@ -97,6 +97,12 @@ describe('CommandRunner', () => {
     );
   });
 
+  it('open_tab with no address opens the start page, so a person never sees a bare about:blank', async () => {
+    await ctx.commands.handleCommand({ id: 'h', action: 'open_tab' });
+    assert.equal(ctx.tabs.list[0].home, true);
+    assert.equal(resultOf('h')[0].ok, true);
+  });
+
   it('opens, lists, switches and closes tabs', async () => {
     await ctx.commands.handleCommand({ id: 'o', action: 'open_tab', params: { url: 'https://a.test/' } });
     await ctx.commands.handleCommand({ id: 'o2', action: 'open_tab' });

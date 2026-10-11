@@ -20,11 +20,14 @@ function setup(apiKey = '', email = 'me@x.test') {
     },
   };
   const mirror = { importOnConnect: false };
-  const chatgpt = { signIn: async () => ({ connected: true, email }), status: () => ({ connected: true, email }) };
+  const chatgpt = {
+    signIn: mock.fn(async () => ({ connected: true, email })),
+    status: () => ({ connected: true, email }),
+  };
   const electron = { app: { isDefaultProtocolClient: () => false } };
   const signUp = mock.fn(async () => ({ apiKey: 'new-key', claimUrl: 'https://oya.test/claim#k' }));
   const onboarding = new Onboarding({ config, socket, mirror, chatgpt, electron, tabs: {}, shell: {} } as any, signUp);
-  return { onboarding, values, socket, mirror, signUp };
+  return { onboarding, values, socket, mirror, signUp, chatgpt };
 }
 
 afterEach(() => mock.restoreAll());
@@ -59,4 +62,17 @@ it('without an email from ChatGPT, sends the person to the Oya sign-in', async (
   const { onboarding, signUp } = setup('', '');
   await assert.rejects(onboarding.connect({ importLogins: true }), /sign in instead/);
   assert.equal(signUp.mock.callCount(), 0);
+});
+
+it('a retry after a later step failed starts from the ChatGPT sign-in that worked, not from OpenAI again', async () => {
+  const { onboarding, signUp, chatgpt } = setup();
+  signUp.mock.mockImplementationOnce(async () => {
+    throw Error('Too many sign-ups');
+  });
+  await assert.rejects(onboarding.connect({ importLogins: false }), /Too many/);
+  mock.method(globalThis, 'fetch', async () => new Response('{}'));
+  await onboarding.connect({ importLogins: false });
+  assert.equal(chatgpt.signIn.mock.callCount(), 1);
+  await onboarding.connect({ importLogins: false });
+  assert.equal(chatgpt.signIn.mock.callCount(), 2, 'a finished connect forgets it, so the next is a fresh sign-in');
 });

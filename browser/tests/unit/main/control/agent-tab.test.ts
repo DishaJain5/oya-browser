@@ -95,7 +95,7 @@ it('gives each agent its own tab: a second one beside the first gets a fresh bac
   inLane('agent-1', () => agentTab.drive());
   tabs.activeTabId = 2; // the person turns to their own tab
   inLane('agent-2', () => agentTab.drive());
-  assert.deepEqual(tabs.created, ['about:blank'], 'opened in the background, never on the person');
+  assert.deepEqual(tabs.created, ['oya:home'], 'opened in the background, never on the person');
   assert.deepEqual([inLane('agent-1', () => agentTab.id), inLane('agent-2', () => agentTab.id)], [1, 3]);
   assert.deepEqual([agentTab.humanMay(1), agentTab.humanMay(2), agentTab.humanMay(3)], [false, true, false]);
   assert.equal(

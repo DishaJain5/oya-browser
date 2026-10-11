@@ -21,7 +21,7 @@ function setup(query: (state: string, nonce: string) => Record<string, string>, 
   const values: Record<string, unknown> = {};
   const config = { values, merge: (c: object) => Object.assign(values, c), save() {} };
   const electron = {
-    app: { getPath: () => '/tmp' },
+    app: { getPath: () => '/tmp', isDefaultProtocolClient: () => false },
     safeStorage: {},
     shell: { openExternal: async (u: string) => void (opened = u) },
   };

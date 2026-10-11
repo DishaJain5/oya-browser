@@ -63,3 +63,7 @@ export const HTTP_TOO_MANY = 429;
 export const STREAM_IDLE_MS = 45_000;
 /** The events that end a Responses stream; reading stops at the first, whether or not the connection closes. */
 export const STREAM_END = /"type":\s*"(response\.(completed|failed|incomplete)|error)"/;
+/** Browsers the sign-in may open in when Oya is the default, most likely signed in to ChatGPT first; Safari is on every Mac. */
+export const OTHER_MAC_BROWSERS = ['Google Chrome', 'Arc', 'Brave Browser', 'Microsoft Edge', 'Firefox', 'Safari'];
+/** Opens a page in Edge, which every Windows has, whatever the default browser is. */
+export const EDGE_SCHEME = 'microsoft-edge:';

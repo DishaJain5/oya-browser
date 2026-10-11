@@ -48,6 +48,8 @@ export interface OnboardingStatus {
 export class Onboarding {
   /** True from a first-run connect until the person starts browsing: the checklist stays up meanwhile. */
   active = false;
+  /** A ChatGPT sign-in that worked while a later step failed: a retry starts from it, not from OpenAI's page again. */
+  private signedIn: ChatgptAccount | null = null;
   /** The main-process services. */
   private readonly deps: Deps;
   /** The server's HTTP API. */
@@ -67,10 +69,18 @@ export class Onboarding {
 
   /** Signs in with ChatGPT and puts the project's model on it; a browser without a key gets one and connects. */
   async connect({ importLogins }: ConnectOptions): Promise<ChatgptAccount> {
-    const account = await this.deps.chatgpt.signIn();
+    const account = (this.signedIn ??= await this.signIn());
     const minted = await this.ensureKey(account.email);
     await this.api.post('config', DESKTOP_MODEL);
+    this.signedIn = null;
     if (minted) this.connectFirstTime(importLogins);
+    return account;
+  }
+
+  /** Signs in to ChatGPT, then brings Oya back in front of the browser the sign-in ran in. */
+  private async signIn(): Promise<ChatgptAccount> {
+    const account = await this.deps.chatgpt.signIn();
+    this.deps.shell.window?.show();
     return account;
   }
 

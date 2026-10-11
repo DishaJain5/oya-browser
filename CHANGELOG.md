@@ -6,6 +6,13 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- Sign in with ChatGPT works when Oya is already your default browser: the sign-in opens in your usual browser (where you are signed in to ChatGPT) instead of looping back into Oya, and Oya comes back to the front when it is done.
+- Trying again after a setup step fails no longer sends you through the ChatGPT sign-in a second time.
+- Links from other apps open in a new tab while agents work in their own tabs, instead of being refused.
+- A tab an agent opens without an address shows the Oya start page instead of a blank page.
+
 ## [1.0.175](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.175) · 2026-10-11
 
 ### Fixed

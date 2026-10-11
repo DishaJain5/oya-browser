@@ -13,6 +13,7 @@ describe('DeepLinks', () => {
   beforeEach(() => {
     ctx = mainCtx();
     ctx.tabs = { createTab() {}, enterBrowsingMode() {} };
+    ctx.agentTab = { humanMay: () => true };
     ctx.config.values = { apiKey: 'k1', serverUrl: 'wss://a.test/ws' };
     links = new DeepLinks(ctx);
   });
@@ -24,6 +25,16 @@ describe('DeepLinks', () => {
     assert.equal(await links.applyDeepLink('https://example.test/path'), true);
     assert.deepEqual(opened, ['https://example.test/path']);
     assert.ok(!ctx.config.saves);
+  });
+
+  it('opens an OS link while agents drive only their own tabs', async () => {
+    ctx.shell.browsingMode = true;
+    ctx.control.state.interactive = false;
+    ctx.agentTab.humanMay = (id) => id === null;
+    const opened = [];
+    ctx.tabs.createTab = (url) => opened.push(url);
+    assert.equal(await links.applyDeepLink('https://example.test/'), true);
+    assert.deepEqual(opened, ['https://example.test/']);
   });
 
   it('enters browsing for an external link on a fresh launch', async () => {
@@ -45,7 +56,7 @@ describe('DeepLinks', () => {
   });
 
   it('does not open an OS link while an agent controls the browser', async () => {
-    ctx.control.state.interactive = false;
+    ctx.agentTab.humanMay = () => false;
     const opened = mock.fn();
     ctx.tabs.createTab = opened;
     assert.equal(await links.applyDeepLink('https://example.test'), false);

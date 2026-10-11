@@ -15,6 +15,7 @@ import type { AppServices } from '../app/services.ts';
 import type { TabView } from '../tabs/types.ts';
 import type { ControlSnapshot } from './control-state.ts';
 import { LANE_IDLE_MS } from './constants.ts';
+import { HOME_URL } from '../tabs/constants.ts';
 
 /** What the claims read: who drives, and the tabs. */
 type Deps = Pick<AppServices, 'control' | 'tabs'>;
@@ -72,13 +73,13 @@ export class AgentTab {
 
   /**
    * An agent starts on a page with no tab of its own yet: alone, it takes the shown tab,
-   * as one agent always has; beside other agents, it gets a fresh background tab, so it
+   * as one agent always has; beside other agents, it gets a fresh background tab on the start page, so it
    * never lands in another agent's tab or the one the person is using.
    */
   start(): void {
     if (!this.scoped() || this.claims.has(currentLane())) return;
     const { tabs } = this.deps;
-    this.claim(this.claims.size ? tabs.createTab('about:blank', false) : tabs.activeTabId);
+    this.claim(this.claims.size ? tabs.createTab(HOME_URL, false) : tabs.activeTabId);
   }
 
   /** The running lane's run ended: its tab is the person's again. */

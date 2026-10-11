@@ -11,6 +11,7 @@ import { SealedJson } from './credential-store.ts';
 import { awaitCallback, type Callback } from './loopback.ts';
 import * as O from './oauth.ts';
 import * as C from './constants.ts';
+import { openOutside } from './outside.ts';
 
 /** The services sign-in uses. */
 type Deps = Pick<AppServices, 'config' | 'electron'>;
@@ -55,7 +56,7 @@ export class ChatgptAuth {
     this.store = seams.store ?? new SealedJson(dir, C.CREDENTIAL_FILE, deps.electron.safeStorage);
   }
 
-  /** Signs in: OpenAI's page in the system browser, then the code exchanged and sealed. Answers the account. */
+  /** Signs in: OpenAI's page in the person's usual browser (never Oya itself), then the code exchanged and sealed. Answers the account. */
   async signIn(): Promise<ChatgptAccount> {
     const callback = await this.listen();
     try {
@@ -70,7 +71,7 @@ export class ChatgptAuth {
   /** Opens the sign-in for `callback`'s address and waits for its credential. */
   private async through(callback: Callback): Promise<O.Credential> {
     const login = O.newLogin(callback.redirectUri, this.store.load()?.client_id);
-    await this.deps.electron.shell.openExternal(O.authorizeUrl(login, this.hostId()));
+    await openOutside(this.deps, O.authorizeUrl(login, this.hostId()));
     return this.complete(login, await callback.done);
   }
 

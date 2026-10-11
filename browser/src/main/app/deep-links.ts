@@ -12,7 +12,7 @@ import { pairFromLink, type Paired } from '../connection/pairing.ts';
 import { LINK_SCHEME } from './constants.ts';
 
 /** The services deep links use. */
-type Deps = Pick<AppServices, 'electron' | 'shell' | 'config' | 'socket' | 'mirror' | 'tabs' | 'control'>;
+type Deps = Pick<AppServices, 'electron' | 'shell' | 'config' | 'socket' | 'mirror' | 'tabs' | 'agentTab'>;
 
 /** Logs a link that could not be applied. */
 const reportLinkFailure = (e: Error): void => console.error('[deeplink]', e.message);
@@ -47,7 +47,8 @@ export class DeepLinks {
   private async openWebLink(rawUrl: string): Promise<boolean> {
     const url = new URL(rawUrl);
     if (url.username || url.password) return false;
-    if (!this.deps.control.snapshot().interactive) return this.blockedWebLink();
+    // Per tab: with agents connected, the person still owns any new tab.
+    if (!this.deps.agentTab.humanMay(null)) return this.blockedWebLink();
     if (this.deps.shell.browsingMode) this.deps.tabs.createTab(url.href, true);
     else this.deps.tabs.enterBrowsingMode(url.href);
     this.deps.shell.window?.show();
