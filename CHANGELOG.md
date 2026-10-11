@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.176](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.176) · 2026-10-11
+
 ### Fixed
 
 - Sign in with ChatGPT works when Oya is already your default browser: the sign-in opens in your usual browser (where you are signed in to ChatGPT) instead of looping back into Oya, and Oya comes back to the front when it is done.
