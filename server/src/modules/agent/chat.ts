@@ -5,6 +5,7 @@
  */
 
 import * as keyConfig from '../config/service.ts';
+import { resolveFresh } from '../config/chatgpt.ts';
 import { agentKeyUnclaimed } from '../auth/service.ts';
 import { metrics } from '../../platform/metrics.ts';
 import { checkHourly } from '../../platform/limits.ts';
@@ -15,7 +16,7 @@ import { redact, isFileValue } from './placeholders.ts';
 import { startRun, lastRun, markMessage } from './recorder.ts';
 import { forgetPage } from './changes.ts';
 import { AGENT_VERIFY } from './constants.ts';
-import { systemPrompt, FOLLOW_UP_NOTE } from './prompt.ts';
+import { systemPrompt, FOLLOW_UP_NOTE, todayLine } from './prompt.ts';
 import { agentLoop } from './loop.ts';
 import { requireLlmAllowed } from './llm-policy.ts';
 import { container } from '../../app/container.ts';
@@ -76,11 +77,13 @@ export function requireLlm(apiKey) {
  * The model settings for a run. Settings belong to the calling API key; a key
  * that has set none falls back to the deployment-wide values.
  */
-function llmFor(apiKey) {
-  const { openaiKey, baseUrl, model, own } = keyConfig.resolve(apiKey);
+async function llmFor(apiKey, browserId?: string) {
+  const { openaiKey, baseUrl, model, own, transport } = await resolveFresh(apiKey, browserId);
   enforceBudget(apiKey, own);
   if (!openaiKey) throw missingLlm(apiKey);
-  return { llm: { openaiKey, baseUrl, model, hosted: !own }, budget: () => stepAllowed(apiKey, own) };
+  const freshKey = () => resolveFresh(apiKey, browserId).then((fresh) => fresh.openaiKey);
+  const llm = { openaiKey, baseUrl, model, hosted: !own, freshKey, transport };
+  return { llm, budget: () => stepAllowed(apiKey, own) };
 }
 
 /**
@@ -94,8 +97,8 @@ async function stepAllowed(apiKey, own) {
 }
 
 /** The run's model settings, once the project's model policy and the person's plan admit another agent run. */
-async function admitted(apiKey) {
-  const settings = llmFor(apiKey);
+async function admitted(apiKey, browserId?: string) {
+  const settings = await llmFor(apiKey, browserId);
   await requireLlmAllowed(apiKey, settings.llm.baseUrl);
   await settings.budget();
   return settings;
@@ -156,7 +159,7 @@ async function begin(browserId, messages, values, secrets) {
 /** The system prompt, with the follow-up note when the chat is already under way. */
 function systemFor(messages, values, scalars, files, secrets) {
   const note = followUp(messages) ? `\n\n${FOLLOW_UP_NOTE}` : '';
-  return systemPrompt(values, scalars, files, secrets) + note;
+  return `${systemPrompt(values, scalars, files, secrets)}\n\n${todayLine()}${note}`;
 }
 
 /**
@@ -169,7 +172,7 @@ function systemFor(messages, values, scalars, files, secrets) {
  */
 export async function runChat(browserId, messages, options: any = {}) {
   const { apiKey, data = {}, secrets = {} } = options;
-  const { llm, budget } = await admitted(apiKey);
+  const { llm, budget } = await admitted(apiKey, browserId);
   const { files, scalars, values } = taskValues(data, secrets);
   await begin(browserId, messages, values, secrets);
   const system = { role: 'system', content: systemFor(messages, values, scalars, files, secrets) };
@@ -188,6 +191,7 @@ const KEY_PROBLEMS: number[] = [Status.BAD_REQUEST, Status.UNAUTHORIZED, Status.
  */
 function rejectedProvider(err): never {
   if (err instanceof LlmError && err.status === Status.PAYMENT_REQUIRED) throw providerPaymentRequired();
+  if (err instanceof LlmError && !KEY_PROBLEMS.includes(err.status as number)) throw modelUnavailable();
   if (!(err instanceof LlmError) || !KEY_PROBLEMS.includes(err.status as number)) throw err;
   throw new HttpError(
     Status.UNPROCESSABLE,
@@ -195,6 +199,12 @@ function rejectedProvider(err): never {
     { code: 'llm_rejected' },
   );
 }
+
+/** The model kept failing (no answer, an overload, a dropped stream) even after the retries: say so, not "server error". */
+const modelUnavailable = () =>
+  new HttpError(Status.BAD_GATEWAY, 'The AI model did not answer after a few tries. Send it again in a moment.', {
+    code: 'llm_unavailable',
+  });
 
 /** Explain exhausted upstream credit without exposing provider response bodies or implying an Oya subscription failure. */
 function providerPaymentRequired() {

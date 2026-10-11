@@ -3,10 +3,12 @@
  */
 
 import { Router } from 'express';
+import { Status } from '../../platform/http-status.ts';
 import { authMiddleware } from '../auth/service.ts';
 import { runtimeConfig } from '../../platform/runtime-config.ts';
 import { audit } from '../../platform/audit.ts';
 import * as keyConfig from './service.ts';
+import * as chatgpt from './chatgpt.ts';
 import { getKey, operatorOnly } from '../../app/http.ts';
 import { registry } from '../browsers/registry.ts';
 import { LLM_FIELDS } from './fields.ts';
@@ -47,6 +49,15 @@ router.post('/config', authMiddleware, async (req, res) => {
 });
 
 /**
+ * POST /config/chatgpt/login, starts Sign in with ChatGPT for the calling key and
+ * answers `{ url }` to open in a browser on the server's own machine (the sign-in
+ * returns to a loopback address). Self-hosted only; settings writes need an administrator.
+ */
+router.post('/config/chatgpt/login', authMiddleware, async (req, res) => {
+  res.json({ url: await chatgpt.startLogin(getKey(req)) });
+});
+
+/**
  * GET /config/site-notes, what the agent chose to remember about each site for
  * this key. The agent writes these from what it read on a page, so the owner
  * needs to be able to see them, and a hostile page's suggestion is removable.
@@ -72,3 +83,43 @@ router.post('/config/host', operatorOnly, async (req, res) => {
   auditUpdate(req, getKey(req), { scope: 'host', fields: Object.keys(req.body || {}) });
   res.json({ ok: true, scope: 'host', ...runtimeConfig.get() });
 });
+
+/** A small page for the browser tab sign-in returns to, so the person knows to go back to Oya. */
+const callbackPage = (title: string, line: string) =>
+  `<!doctype html><meta charset="utf-8"><title>${title}</title>` +
+  `<body style="font:16px system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem"><h1>${title}</h1><p>${line}</p>`;
+
+/** Escapes text for the callback page; the account email comes from OpenAI, but it is still not ours. */
+const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** Whether a return to /auth/callback is ChatGPT's (its state, with a client, scope or refusal), not the console's. */
+const isChatgptReturn = (query) => typeof query.state === 'string' && !!(query.client_id || query.scope || query.error);
+
+/** Signs the key in from the callback and tells its desktops; the line the page shows. */
+async function connected(query) {
+  const { apiKey, email } = await chatgpt.finishLogin(query || {});
+  registry.tell(apiKey, { type: 'settings_changed', scope: 'llm' });
+  return `Oya now runs on your ChatGPT plan${email ? ` as ${escapeHtml(email)}` : ''}. You can close this tab.`;
+}
+
+/**
+ * GET /auth/callback (mounted at the root, outside /api's key check): where
+ * Sign in with ChatGPT returns. The single-use state names the key.
+ */
+export async function chatgptCallback(req, res, next) {
+  if (!isChatgptReturn(req.query || {})) return next(); // the console's own OAuth callback page
+  const answered = await connected(req.query).then(
+    (line) => ({ status: Status.OK, page: callbackPage('ChatGPT connected', line) }),
+    (err) => notConnected(err),
+  );
+  res.status(answered.status).type('html').send(answered.page);
+}
+
+/** A failed sign-in's page; the key's desktops, whose card is waiting on it, are told to re-read. */
+function notConnected(err) {
+  if (err.apiKey) registry.tell(err.apiKey, { type: 'settings_changed', scope: 'llm' });
+  return {
+    status: err.status || Status.INTERNAL,
+    page: callbackPage('ChatGPT not connected', escapeHtml(err.message)),
+  };
+}

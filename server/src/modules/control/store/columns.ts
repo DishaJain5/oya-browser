@@ -3,6 +3,8 @@
  * field, and when the pruner may delete it.
  */
 import { DELIVERY_TTL_MS, IDEMPOTENCY_TTL_MS, INSTANCE_TTL_MS, TERMINAL_SESSION_TTL_MS } from './constants.ts';
+import { CLIENT_TTL_MS } from '../../../mcp/oauth/constants.ts';
+import { MS_PER_SECOND } from '../../../platform/constants.ts';
 
 /** States a session never leaves. */
 const TERMINAL = ['stopped', 'failed'];
@@ -25,6 +27,11 @@ const EXPIRY: Record<string, (body) => number | null> = {
   invite: ownExpiry,
   hold: ownExpiry,
   slack_state: ownExpiry,
+  chatgpt_login: ownExpiry,
+  oauth_request: ownExpiry,
+  oauth_code: ownExpiry,
+  // An MCP client (claude.ai) registers itself; one nobody has used in a while is dropped and registers again.
+  oauth_client: (body) => (body.lastUsedAt || (body.client_id_issued_at || 0) * MS_PER_SECOND) + CLIENT_TTL_MS,
   attachment: (body) => body.leaseUntil,
   idempotency: (body) => body.createdAt + IDEMPOTENCY_TTL_MS,
   delivery: (body) => (body.state === 'pending' ? null : body.at + DELIVERY_TTL_MS),

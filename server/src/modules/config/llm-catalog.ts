@@ -91,6 +91,18 @@ export const LLM_DEFAULTS = {
       ]),
     ],
   },
+  // A ChatGPT Plus or Pro plan, signed in rather than keyed: on a self-hosted server by the server
+  // itself (config/chatgpt.ts), on Oya Cloud by the desktop app, which then carries every call
+  // (browsers/connection/model-relay.ts). The Responses API only (platform/llm/responses.ts).
+  chatgpt: {
+    label: 'ChatGPT plan',
+    base: 'https://api.openai.com/v1/responses',
+    model: 'gpt-6.1-sol',
+    hint: 'Sign in with ChatGPT',
+    keysUrl: 'https://help.openai.com/en/articles/20001542-using-your-chatgpt-plan-in-other-apps-and-sites',
+    signIn: true,
+    models: models([['gpt-6.1-sol', 'GPT-6.1 Sol']]),
+  },
   // OpenAI-compatible, so it runs through platform/llm/openai.ts. Its models are read live
   // from OpenRouter (openrouter-models.ts); this list is only what a picker shows until then.
   openrouter: {
@@ -132,6 +144,8 @@ export interface CatalogEntry {
   model: string;
   /** The models to offer. */
   models: ModelChoice[];
+  /** True when the provider is signed in to (ChatGPT) rather than given a key. */
+  signIn?: boolean;
 }
 
 /** The model list a provider's picker shows: OpenRouter's live one, the built-in list for the rest. */
@@ -139,7 +153,8 @@ const modelsFor = (id: string, models: ModelChoice[]) => (id === 'openrouter' ? 
 
 /** Every provider with its models, as GET /config returns it under llm_catalog. */
 export const llmCatalog = (): CatalogEntry[] =>
-  Object.entries(LLM_DEFAULTS).map(([id, { label, hint, keysUrl, base, model, models }]) => ({
+  Object.entries(LLM_DEFAULTS).map(([id, { label, hint, keysUrl, base, model, models, ...rest }]) => ({
     ...{ id, label, hint, keysUrl, base, model },
+    ...('signIn' in rest ? { signIn: rest.signIn } : {}),
     models: modelsFor(id, models),
   }));

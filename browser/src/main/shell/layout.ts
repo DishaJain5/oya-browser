@@ -3,6 +3,7 @@
  * window is narrow, above) the dev panel. The panel slides open and shut, each
  * tab keeps its own open or shut, and its width is remembered.
  */
+import { isHome } from '../tabs/home.ts';
 import { chromeHeight } from './bookmarks-bar.ts';
 import type { BrowserView } from 'electron';
 import type { AppServices } from '../app/services.ts';
@@ -50,6 +51,16 @@ export class PanelLayout {
     const id = this.deps.tabs.activeTabId ?? null;
     if (value) this.openTabs.add(id);
     else this.openTabs.delete(id);
+  }
+
+  /** Opens tab `id`'s panel before it shows: a site tab opened from one with the panel open keeps it open. */
+  openFor(id: number): void {
+    this.openTabs.add(id);
+  }
+
+  /** A tab about to show `url`: a site keeps the panel the person was looking at; a new start page does not. */
+  inherit(id: number, url: string): void {
+    if (this.open && !isHome(url)) this.openFor(id);
   }
 
   /** Lays out the shell at `progress` (a number mid-slide; anything else means settled). */
@@ -106,6 +117,15 @@ export class PanelLayout {
     this.open = true;
     this.layoutActiveTab();
     this.deps.shell.send('dev-panel-state', this.open);
+  }
+
+  /** Shuts the panel on every tab at once (sign-out): nothing stays open over the welcome screen. */
+  closeAll(): void {
+    this.openTabs.clear();
+    clearInterval(this.motionTimer);
+    this.progress = 0;
+    this.layoutActiveTab();
+    this.deps.shell.send('dev-panel-state', false);
   }
 
   /** The person dragged the panel edge: clamp, remember, relayout. */

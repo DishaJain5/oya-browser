@@ -2,6 +2,7 @@
  * Facade: every IPC channel the shell page can call, gathered into one table
  * and registered in one place through the shell-only guard (handle.ts).
  */
+import { OnboardingHandlers } from './onboarding.ts';
 import type { AppServices } from '../app/services.ts';
 import { ShellIpc, type ShellHandlers } from './handle.ts';
 import { NavigationHandlers } from './navigation.ts';
@@ -39,6 +40,7 @@ function pageHandlers(deps: IpcDeps) {
 function appHandlers(deps: IpcDeps) {
   return {
     ...new SessionHandlers(deps).handlers,
+    ...new OnboardingHandlers(deps).handlers,
     ...new RecordingHandlers(deps).handlers,
     ...new RoutineHandlers(deps).handlers,
     ...new PlaybookHandlers(deps).handlers,

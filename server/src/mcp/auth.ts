@@ -6,6 +6,7 @@
 import { authenticateToken, shareReaches } from '../modules/auth/service.ts';
 import { Status } from '../platform/http-status.ts';
 import { BEARER } from './constants.ts';
+import { challenge } from './oauth/index.ts';
 
 /** The bearer token from an Authorization header, or ''. */
 const bearer = (header?: string) => (header?.startsWith(BEARER) ? header.slice(BEARER.length) : '');
@@ -16,6 +17,8 @@ export async function authorize(req, res) {
     return await operatorKey(req, res);
   } catch (e) {
     const status = e.status === Status.UNAVAILABLE ? Status.UNAVAILABLE : Status.UNAUTHORIZED;
+    // Where an OAuth client (claude.ai) starts signing in; a client sending a key ignores it.
+    if (status === Status.UNAUTHORIZED && challenge()) res.set('WWW-Authenticate', challenge());
     res.status(status).json({ error: 'Missing or invalid API key' });
     return null;
   }

@@ -3,6 +3,7 @@
  * always paints above the shell's own HTML, so the page view is taken away
  * while an overlay is up, and a screenshot of it stands in as the backdrop.
  */
+import { mountOnly } from './view-stack.ts';
 import { randomUUID } from 'node:crypto';
 import type { BrowserView, Rectangle } from 'electron';
 import type { AppServices } from '../app/services.ts';
@@ -89,7 +90,7 @@ export class Overlays {
     this.names.delete(name);
     const view = this.shownView();
     if (view && !this.names.size) {
-      this.deps.shell.window!.setBrowserView(view);
+      mountOnly(this.deps.shell.window!, view as BrowserView);
       this.deps.layout.layoutActiveTab();
     }
     if (!this.names.size) this.deps.shell.send('page-backdrop', null);

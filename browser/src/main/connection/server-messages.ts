@@ -2,6 +2,7 @@
  * Message type → handler: everything the server can say to this browser. The
  * socket looks the type up here; an unknown type is ignored.
  */
+import { answerModelRequest } from '../chatgpt/relay.ts';
 import { tabOfLane } from './chat.ts';
 import { captureProfile } from './profile-capture.ts';
 import { HOME_URL } from '../tabs/constants.ts';
@@ -28,6 +29,8 @@ export type ServerMessageDeps = Pick<
   | 'stream'
   | 'commands'
   | 'governance'
+  | 'chatgpt'
+  | 'onboarding'
 >;
 
 /** The persona the server signed this browser in as. */
@@ -132,6 +135,7 @@ const SERVER_MESSAGES: Record<string, Handler> = {
   stream_stop: ({ deps }) => deps.stream.stopStream(),
   // Commands run concurrently; the queue does not wait for one to finish.
   cmd: ({ deps }, msg) => void deps.commands.handleCommand(msg),
+  llm_request: ({ deps }, msg) => void answerModelRequest(deps, msg as Parameters<typeof answerModelRequest>[1]),
   cdp_open: ({ deps }, msg) => void deps.relay.openCdpRelay(msg.sid),
   cdp: ({ deps }, msg) => deps.relay.cdpRelays.get(msg.sid)?.send(String(msg.data)),
   cdp_close: (router, msg) => router.closeRelay(msg),
@@ -175,8 +179,10 @@ export class ServerMessages {
 
   /** Expose the ordinary shell only after the current connection has authenticated its persona. */
   private enterAuthenticatedBrowsing(): void {
-    const { shell, tabs, governance } = this.deps;
-    if (!shell.browsingMode) tabs.enterBrowsingMode(governance.configuration ? 'about:blank' : HOME_URL);
+    const { shell, tabs, governance, onboarding } = this.deps;
+    // The first-run checklist stays up until the person starts browsing.
+    if (!shell.browsingMode && !onboarding.active)
+      tabs.enterBrowsingMode(governance.configuration ? 'about:blank' : HOME_URL);
   }
 
   /** Suspend publication before any new identity's asynchronous initialization starts. */

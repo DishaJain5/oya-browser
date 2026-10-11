@@ -86,12 +86,12 @@ function verdictOf(reply: string): Verdict {
 
 /** Asks the checker about `answer`; `bill` counts its tokens like any other call of the run. */
 export async function verify(ctx, messages: any[], answer: string, bill: (usage: any) => void): Promise<Verdict> {
-  const { baseUrl, openaiKey, model } = ctx.llm;
+  const { baseUrl, openaiKey, model, transport } = ctx.llm;
   const checking = [
     { role: 'system', content: CHECKER },
     { role: 'user', content: await question(ctx, messages, answer) },
   ];
-  const completion = await chatCompletion({ baseUrl, apiKey: openaiKey, model, messages: checking });
+  const completion = await chatCompletion({ baseUrl, apiKey: openaiKey, model, messages: checking, transport });
   bill(completion.usage);
   return verdictOf(String(completion.choices?.[0]?.message?.content ?? ''));
 }

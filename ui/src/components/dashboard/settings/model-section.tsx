@@ -3,8 +3,11 @@
  */
 'use client';
 
+import { useState } from 'react';
 import { Check } from 'lucide-react';
-import { llmCatalog, type KeyConfig } from '../config';
+import { consoleCredential } from '@/lib/api';
+import { errorMessage } from '@/lib/api-client';
+import { llmCatalog, startChatgptSignIn, type KeyConfig } from '../config';
 import { CUSTOM_MODEL, SAVED_PLACEHOLDER } from './constants';
 import { Row, Secret, Select } from './fields';
 import { SectionHeading } from './heading';
@@ -72,9 +75,42 @@ function ModelPicker({ form, choice }: Omit<Props, 'config'>) {
   );
 }
 
+/** Opens Sign in with ChatGPT in a new tab; the server finishes it and saves the provider itself. */
+function useChatgptSignIn() {
+  const [error, setError] = useState('');
+  const start = () =>
+    startChatgptSignIn(consoleCredential()).then(
+      ({ url }) => void window.open(url, '_blank', 'noopener'),
+      (e: unknown) => setError(errorMessage(e, 'Could not start sign-in')),
+    );
+  return { error, start };
+}
+
+/** In place of the key for a provider signed in to: the sign-in button, and why it failed. */
+function SignInKey() {
+  const { error, start } = useChatgptSignIn();
+  return (
+    <Row
+      id="settings-model-signin"
+      label="Account"
+      hint="Runs on your ChatGPT Plus or Pro plan, no API key. Sign in on the computer running this server, then reload."
+    >
+      <button type="button" className="btn-ghost" onClick={() => void start()}>
+        Sign in with ChatGPT
+      </button>
+      {error && (
+        <p role="alert" className="mt-2 text-[12px] leading-5 text-yellow">
+          {error}
+        </p>
+      )}
+    </Row>
+  );
+}
+
 /** The API key for the chosen provider. A switched provider needs a new one. */
 function ModelKey({ config, form, choice }: Props) {
   const preset = llmCatalog(config).find((p) => p.id === choice.provider);
+  if (preset?.signIn) return <SignInKey />;
   const kept = !choice.providerChanged && config.openai_api_key;
   return (
     <Row

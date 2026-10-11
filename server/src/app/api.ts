@@ -13,6 +13,7 @@ import * as siteLogin from '../modules/challenges/login.ts';
 import { slackRouter } from '../modules/slack/service.ts';
 import { forwardHttp } from '../modules/control/cluster.ts';
 import { projectAccountRouter } from '../modules/control/membership.ts';
+import { connectRouter } from '../mcp/oauth/index.ts';
 import { controlRouter } from '../modules/control/routes.ts';
 import { router as authRoutes } from '../modules/auth/routes.ts';
 import { router as agentSignupRoutes } from '../modules/auth/agent-routes.ts';
@@ -53,6 +54,8 @@ router.use('/control', controlRouter);
 router.use('/slack', slackRouter);
 /** /auth/projects, the signed-in account's projects: list, join, rename, delete, keys. */
 router.use('/auth/projects', projectAccountRouter);
+/** /auth/connect, the signed-in person allows or turns down an app connecting over OAuth (claude.ai). */
+router.use('/auth/connect', connectRouter);
 /** /auth/me DELETE, the signed-in person deletes their account; GET /auth/me falls through to the auth routes. */
 router.use('/auth/me', accountRoutes(container.erasure));
 

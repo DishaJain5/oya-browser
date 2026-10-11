@@ -8,6 +8,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-provider';
 import { pendingClaim } from '@/lib/claim';
+import { pendingConnect } from '@/lib/connect';
 import { stepUpPending } from '@/lib/auth/storage';
 import { stepUpUrl } from '@/lib/auth/step-up';
 
@@ -15,12 +16,12 @@ import { stepUpUrl } from '@/lib/auth/step-up';
 export const HOME = '/dashboard';
 
 /**
- * Where a person goes right after signing in: back to a claim they were in
- * the middle of, else the console; by way of the code page when the account
+ * Where a person goes right after signing in: back to a claim or an app
+ * connection they were in the middle of, else the console; by way of the code page when the account
  * has an authenticator this session has not passed yet.
  */
 export function afterSignIn() {
-  const next = pendingClaim() ? '/claim' : HOME;
+  const next = pendingClaim() ? '/claim' : pendingConnect() ? '/connect' : HOME;
   return stepUpPending() ? stepUpUrl(next) : next;
 }
 

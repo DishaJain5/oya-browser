@@ -20,7 +20,7 @@ import * as credentials from '../modules/personas/credentials.ts';
 import * as logins from '../modules/personas/cookies.ts';
 import { PersonaService, PersonaTable, type PersonaRepository } from '../modules/personas/index.ts';
 import { createBilling } from '../modules/billing/index.ts';
-import { getKeyOwner, keyDigest, keysOf } from '../modules/auth/service.ts';
+import { claimUrl, getKeyOwner, isUnclaimedAgentKey, keyDigest, keysOf } from '../modules/auth/service.ts';
 import { registry } from '../modules/browsers/registry.ts';
 import { SERVER_RUN } from '../modules/browsers/connection/constants.ts';
 import { consoleUrl } from '../modules/slack/service.ts';
@@ -61,6 +61,10 @@ const KEYS = {
   keyDigest: (key: string) => keyDigest(key),
   keyDigestsOf: async (userId: string) => new Set((await keysOf(userId)).map((row) => String(row.key_hash))),
   billTo: (key: string, userId: string) => usage.billTo(key, userId),
+  unclaimed: (key: string) => isUnclaimedAgentKey(key),
+  stepsOfKey: async (key: string, hours: number) =>
+    (await usage.history(key, { hours })).rows.reduce((sum, row) => sum + (Number(row.agent_steps) || 0), 0),
+  claimUrl: (key: string) => claimUrl(key),
   ownsModel: (key: string) => Boolean(keyConfig.resolve(key).own),
   modelOf: (key: string) => keyConfig.resolve(key).model,
 };

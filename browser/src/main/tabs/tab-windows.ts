@@ -96,6 +96,7 @@ export class TabWindows {
   private openSibling(details: HandlerDetails, opener: Tab): void {
     const id = this.deps.tabs.createTab(details.url, true, loadOptionsFor(details), opener.view.webContents.session);
     this.markOpener(id, opener);
+    this.deps.agentTab.handOff(opener.id, id); // the agent's page opened it: still the agent's
   }
   /** Preserve sign-in and named windows with the opener's persona partition. */
   private popupOptions(details: HandlerDetails, opener: Tab): WindowOpenHandlerResponse | null {

@@ -20,6 +20,7 @@ BEFORE ACTING
 - Check whether missing constraints would materially change the answer, price, eligibility or scope. Do not invent dates, locations, quantities or service options, or accept a site's defaults as the user's choices.
 - If those constraints are missing, call request_human with one concise question grouping the essential missing details. Wait for the answer before dependent searches, form filling or other browser actions; do not batch those actions with the question.
 - Honor explicit flexibility or permission to choose. Do not ask again for details already supplied, or ask about optional preferences that do not prevent a useful answer.
+- Ask at most once before you start, and once more only if the page itself raises something the user must decide. Where a detail is minor, pick a sensible default, say which you picked, and go on; a plain "yes", "ok" or "go ahead" is an answer that means proceed with what you proposed, never a reason to ask again. When the user gives a budget, treat it as a ceiling and report what fits; do not ask whether it includes taxes and fees unless the page cannot show a total.
 
 HOW TO ACT
 1. Call analyze_page (or find, when you know what you are looking for) before your first click or type on a page. Element ids exist only in the latest analysis and reset on every call: never guess them or reuse old ones.
@@ -242,4 +243,19 @@ export function systemPrompt(values, scalars, files, secrets) {
   if (Object.keys(files).length) system.push(filesSection(files));
   if (Object.keys(secrets).length) system.push(secretsSection(secrets));
   return system.join('\n\n');
+}
+
+/**
+ * Today's date for the model, which has none of its own: without it, "Thanksgiving"
+ * or "the 24th" has no year, and the agent asks for one the person never thinks to give.
+ */
+export function todayLine(now = new Date()): string {
+  const date = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `TODAY\n- It is ${date}. A date given without a year is the next one to come; never ask which year.`;
 }

@@ -38,6 +38,18 @@ export const ASK_TEXT = {
   keyKept: 'Your saved key is kept. Paste a new one only to replace it.',
   keySaved: '••••••••  saved',
   keyPlaceholder: 'API key',
+  /** When the free trial is used up. */
+  claimNeeded: 'Your free trial is used up. Create your free Oya account to keep going.',
+  /** The card shown when today's free steps are used up. */
+  trialTitle: 'You’ve used today’s free steps',
+  trialBody: 'Create a free Oya account to keep going. This browser, your logins and ChatGPT stay as they are.',
+  trialPerks: ['500 agent steps a month', 'Cloud browsers that run while you’re away', 'Routines on a schedule'],
+  trialCreate: 'Create free account',
+  trialLater: 'Not now',
+  /** The sign-in provider's words (ChatGPT). */
+  signInHelp: 'Runs on your ChatGPT Plus or Pro plan, no API key. Sign in on this computer.',
+  signInWaiting: 'Finish signing in in your browser. This card updates when you are done.',
+  signInButton: 'Sign in with ChatGPT',
   /** The model picker's words. */
   chooseModel: 'Choose a model',
   customModel: 'Custom model id',
@@ -57,6 +69,9 @@ export const KEY_CODES: readonly string[] = ['llm_unconfigured', 'llm_rejected']
 
 /** The code for a key the provider refused; its error is shown on the model card. */
 export const REJECTED_CODE = 'llm_rejected';
+
+/** The server's refusal when a browser's free trial is used up and it needs an Oya account. */
+export const CLAIM_CODE = 'claim_required';
 
 /** How the agent opens its report: DONE: or FAILED:, shown as a verdict instead of text. */
 export const VERDICT = /^(DONE|FAILED):\s*/i;

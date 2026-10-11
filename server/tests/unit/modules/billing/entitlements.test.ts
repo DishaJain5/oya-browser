@@ -7,7 +7,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { Entitlements } from '../../../../src/modules/billing/entitlements.ts';
-import { PLANS, RESERVATION_MS } from '../../../../src/modules/billing/constants.ts';
+import { PLANS, RESERVATION_MS, TRIAL_AGENT_STEPS } from '../../../../src/modules/billing/constants.ts';
 
 /** 15 March 2026, midday UTC. */
 const NOW = Date.UTC(2026, 2, 15, 12);
@@ -18,6 +18,8 @@ function fixture({
   used = {} as Record<string, number>,
   cloud = [] as string[],
   hostedDeployment = true,
+  unclaimed = false,
+  trialSteps = 0,
 } = {}) {
   const billed: string[] = [];
   const license: number[] = [];
@@ -38,6 +40,9 @@ function fixture({
     hostedDeployment: () => hostedDeployment,
     upgradeUrl: () => 'https://console.test/dashboard/billing',
     now: () => clock.now,
+    unclaimed: async () => unclaimed,
+    stepsOfKey: async () => trialSteps,
+    claimUrl: (key) => `https://console.test/claim#${key}`,
   };
   return { e: new Entitlements(deps), billed, license, ownModel, clock, model };
 }
@@ -146,6 +151,19 @@ describe('Entitlements', () => {
     await e.admitCloud('env-key');
     await e.admitAgent('env-key');
     assert.deepEqual(billed, []);
+  });
+
+  it('gives a key nobody claimed a day of trial steps, then asks for a free account', async () => {
+    const { e } = fixture({ unclaimed: true, trialSteps: TRIAL_AGENT_STEPS - 1 });
+    await e.admitAgent('trial-key');
+    const { e: spent } = fixture({ unclaimed: true, trialSteps: TRIAL_AGENT_STEPS });
+    await assert.rejects(spent.admitAgent('trial-key'), (err: any) => {
+      assert.equal(err.status, 402);
+      assert.equal(err.code, 'claim_required');
+      assert.equal(err.claim_url, 'https://console.test/claim#trial-key');
+      assert.match(err.message, /free Oya account/);
+      return true;
+    });
   });
 
   it('counts agent steps whoever’s model runs them: a Free person’s 501st step is refused', async () => {

@@ -207,4 +207,26 @@ describe('ModelSetupViewModel', () => {
     vm.getKey();
     assert.deepEqual(fake.called('newTab'), [['https://platform.openai.com/api-keys']]);
   });
+
+  it('signing in with ChatGPT waits for the browser, then closes the card and asks the waiting question again', async () => {
+    const chatgpt = { id: 'chatgpt', label: 'ChatGPT plan', signIn: true, model: 'gpt-6.1-sol', models: [] };
+    let status: unknown = { signedIn: true, hasLlmKey: false, provider: '', model: '', catalog: [chatgpt] };
+    const { fake, vm, resent } = await setup(() => status, { signInChatgpt: { ok: true } });
+    vm.needed();
+    vm.choose('chatgpt');
+    await vm.signInWithProvider();
+    assert.equal(fake.called('signInChatgpt').length, 1);
+    assert.equal(vm.state.signingIn, true);
+    status = { signedIn: true, hasLlmKey: true, provider: 'chatgpt', model: 'gpt-6.1-sol', catalog: [chatgpt] };
+    fake.emit('onSettingsChanged', { type: 'settings_changed', scope: 'llm' });
+    await settle();
+    assert.deepEqual([vm.state.open, vm.state.signingIn, resent.length], [false, false, 1]);
+  });
+
+  it('says why when sign-in cannot start', async () => {
+    const refusal = { error: 'Sign in with ChatGPT is for self-hosted Oya only' };
+    const { vm } = await setup(ON_OPENAI, { signInChatgpt: refusal });
+    await vm.signInWithProvider();
+    assert.deepEqual([vm.state.error, vm.state.signingIn], [refusal.error, false]);
+  });
 });

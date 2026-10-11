@@ -21,6 +21,7 @@ type Deps = Pick<
   | 'world'
   | 'actions'
   | 'agentTab'
+  | 'onboarding'
 >;
 
 /** The channels this group answers. */
@@ -28,6 +29,7 @@ type Channel =
   | 'request-takeover'
   | 'model-status'
   | 'save-model-key'
+  | 'sign-in-chatgpt'
   | 'send-chat'
   | 'stop-chat'
   | 'save-chat-playbook'
@@ -172,6 +174,7 @@ export class DevHandlers {
     'request-takeover': () => this.deps.shield.takeover.request(),
     'model-status': () => this.modelStatus(),
     'save-model-key': (_e, choice) => this.saveModelKey(choice),
+    'sign-in-chatgpt': () => this.signInChatgpt(),
     'send-chat': (_e, messages, data, tabId) => this.chat.send(messages, data, tabId),
     'stop-chat': (_e, tabId) => this.chat.stop(tabId),
     // The server keeps each browser's last run, so a body with only a name saves it as a playbook.
@@ -218,6 +221,14 @@ export class DevHandlers {
     if (!config) return { error: 'Could not read your project settings. Try again.' };
     const body = modelUpdate(config, choice);
     return body.error ? body : this.saveConfig(body);
+  }
+
+  /** Sign in with ChatGPT from the Ask card: this app holds the sign-in and the project's model moves to it. */
+  private signInChatgpt(): Promise<ChatAnswer> {
+    return this.deps.onboarding.connect({ importLogins: false }).then(
+      () => ({ ok: true }),
+      (e: Error) => ({ error: e.message }),
+    );
   }
 
   /** Posts settings, as `{ ok }` or the server's reason. */

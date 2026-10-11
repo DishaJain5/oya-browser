@@ -189,6 +189,12 @@ function windowTabSummaries(tabs: TabManager, agentTabs: number[], staged?: Tab)
   const active = tabs.activeTabId ?? staged?.id ?? null;
   return visible.map((tab) => tabSummary(tab, active, agentTabs.length ? agentTabs : [active]));
 }
+/** The events a new tab is wired to: its window's, when the app has several, else this manager's own. */
+function eventsFor(deps: AppServices, tab: Tab, own: TabEvents): TabEvents {
+  const scope = deps.windows?.forTab(tab, deps);
+  return scope ? new TabEvents(scope) : own;
+}
+
 /** The open tabs and which one is showing. */
 export class TabManager {
   /** The main-process services the tabs use. */
@@ -236,9 +242,9 @@ export class TabManager {
   createTab(...args: CreateTabArguments): number {
     const [url, activate = true, loadOptions, session] = args;
     const tab = this.addTab(url, session);
-    const scope = this.deps.windows?.forTab(tab, this.deps as AppServices);
-    const tabReady = (scope ? new TabEvents(scope) : this.events).wire(tab);
+    const tabReady = eventsFor(this.deps as AppServices, tab, this.events).wire(tab);
     openFirstPage(tab, tabReady, url, loadOptions);
+    if (activate) this.deps.layout.inherit(tab.id, url);
     if (activate) this.activateTab(tab.id);
     this.sendTabList();
     return tab.id;
@@ -356,14 +362,14 @@ export class TabManager {
   leaveBrowsingMode(): void {
     if (!this.deps.shell.browsingMode) return;
     while (this.list.length) this.closeTab(this.list[0].id, { keepOne: false });
+    this.deps.layout.closeAll();
     this.deps.shell.browsingMode = false;
     this.deps.shell.send('mode-changed', 'setup');
   }
 
   /**
-   * A tab for automation (the CDP front door, workflow validation). Outside
-   * browsing mode a tab is never laid out, and a page with a 0x0 viewport is
-   * both broken and an obvious bot.
+   * A tab for automation (the CDP front door, workflow validation). Outside browsing
+   * mode a tab is never laid out, and a page with a 0x0 viewport is broken and an obvious bot.
    */
   openForAutomation(url: string): number | null {
     if (this.deps.shell.browsingMode) return this.createTab(url, true);

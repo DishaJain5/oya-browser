@@ -5,6 +5,7 @@
  * record button, the studio's record button goes through the control bar).
  * Views receive these instances; nothing else constructs a ViewModel.
  */
+import { ChecklistViewModel } from '../features/connection/view-models/checklist-view-model.ts';
 import { RendererConstants as C } from '../core/constants.ts';
 import { NotificationsViewModel } from '../features/notifications/index.ts';
 import type { OyaBrowser } from '../core/bridge.ts';
@@ -232,6 +233,8 @@ export interface ConnectionModels {
   dialog: ShellDialogViewModel;
   /** The welcome screen. */
   setup: SetupViewModel;
+  /** The first-run checklist. */
+  checklist: ChecklistViewModel;
   /** Connection settings. */
   reconnect: ReconnectViewModel;
   /** The updater. */
@@ -287,9 +290,9 @@ function connectionModels(env: PageEnvironment, root: ShellViewModels): Connecti
   const { bridge, platform } = env;
   const { shell, panel } = root;
   const { dialog, ...parts } = accountModels(env, () => root.ask.anyBusy());
-  const setup = new SetupViewModel({ bridge, shell });
+  const [setup, checklist] = [new SetupViewModel({ bridge, shell }), new ChecklistViewModel(bridge)];
   const [reconnect, updates] = [new ReconnectViewModel({ bridge, shell, dialog, setup }), new UpdatesViewModel(bridge)];
   const palette = new PaletteViewModel({ bridge, panel, shell, dialog, updates, host: paletteHost(root), platform });
   const pill = new ConnectionPillViewModel({ bridge, shell, account: dialog });
-  return { ...parts, dialog, setup, reconnect, updates, palette, pill };
+  return { ...parts, dialog, setup, checklist, reconnect, updates, palette, pill };
 }

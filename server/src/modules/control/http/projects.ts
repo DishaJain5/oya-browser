@@ -96,13 +96,26 @@ async function validInvite(tx, digest) {
 }
 
 /** A one-hour console credential for a project the user owns or belongs to, labelled so an admin's "Login as" shows in its trail. */
-export async function consoleAccess(userId, id, label = 'Console access') {
+export const consoleAccess = (userId, id, label = 'Console access') =>
+  projectAccess(userId, id, label, Date.now() + CONSOLE_ACCESS_MS);
+
+/**
+ * A credential holding the user's role in a project they own or belong to, until
+ * `expiresAt` (null: until revoked). It is tied to the member, so it stops working
+ * when they leave the project.
+ */
+export async function projectAccess(userId, id, label, expiresAt: number | null) {
+  const { project, role } = await roleIn(userId, id);
+  if (!role) throw fault('not_found', 'Project not found', Status.NOT_FOUND);
+  return control().credential(control().projectKey(project), { role, label, expiresAt }, userId);
+}
+
+/** The user's role in a live project (administrator when they own it), or no role when they have none there. */
+export async function roleIn(userId, id) {
   const [[p], [m]] = await control().store.load([
     { kind: 'project', id },
     { kind: 'membership', id: `${id}:${userId}` },
   ]);
-  const role = p?.body.ownerUser === userId ? 'administrator' : m?.body.role;
-  if (!p || p.body.deletedAt || !role) throw fault('not_found', 'Project not found', Status.NOT_FOUND);
-  const expiresAt = Date.now() + CONSOLE_ACCESS_MS;
-  return control().credential(control().projectKey(p.body), { role, label, expiresAt }, userId);
+  if (!p || p.body.deletedAt) return { project: null, role: null };
+  return { project: p.body, role: p.body.ownerUser === userId ? 'administrator' : m?.body.role || null };
 }

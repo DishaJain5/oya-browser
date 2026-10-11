@@ -6,6 +6,22 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Added
+
+- Set up in under a minute: the desktop app's first run is a short checklist. Sign in with ChatGPT, bring in your logins from your usual browser, make Oya your default browser, and start. No API key and no account to create.
+- Oya's agent runs on your ChatGPT Plus or Pro plan. The sign-in stays on your computer; the agent's model calls go to OpenAI from there, never through Oya's servers.
+- A browser set up without an account gets a free daily allowance of agent steps; past it, Ask offers a free Oya account (500 steps a month, cloud browsers and routines), and the browser keeps everything it had.
+- Connect Oya from claude.ai, Claude Desktop or Claude mobile: add `https://oyabrowser.com/mcp/pool` as a custom connector, sign in, and pick a project. No API key.
+- Self-hosted servers can sign in with ChatGPT themselves, for the agent and the console.
+
+### Fixed
+
+- Importing logins from Safari or Chrome no longer fails as a whole over a few cookies the browser cannot store, and a failed switch reopens your tabs instead of leaving an empty window.
+- Restarting after an import no longer signs the browser out ("Not connected to server").
+- A new tab no longer shows the previous page beneath it; the panel stays open on pages the agent opens, and a link the agent's page opens stays marked as the agent's.
+- Signing out closes the agent panel.
+- The agent knows today's date, asks at most once before it starts, and treats a budget as a ceiling.
+
 ## [1.0.172](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.172) · 2026-10-11
 
 ### Changed

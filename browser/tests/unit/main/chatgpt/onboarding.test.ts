@@ -1,0 +1,62 @@
+/**
+ * Unit tests for first-run onboarding: a browser without a key gets one from its
+ * ChatGPT email and connects (importing logins when asked), the project's model
+ * moves to this desktop either way, and no email means the Oya sign-in instead.
+ */
+import { it, afterEach, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { Onboarding } from '../../../../src/main/chatgpt/onboarding.ts';
+
+/** Onboarding over fakes; `apiKey` is the browser's key before it starts. */
+function setup(apiKey = '', email = 'me@x.test') {
+  const values: Record<string, unknown> = { apiKey, serverUrl: 'wss://oya.test/ws' };
+  const config = { values, merge: (c: object) => Object.assign(values, c), save() {} };
+  const socket = {
+    browserId: 'old',
+    connected: 0,
+    ready: true,
+    connect() {
+      this.connected++;
+    },
+  };
+  const mirror = { importOnConnect: false };
+  const chatgpt = { signIn: async () => ({ connected: true, email }), status: () => ({ connected: true, email }) };
+  const electron = { app: { isDefaultProtocolClient: () => false } };
+  const signUp = mock.fn(async () => ({ apiKey: 'new-key', claimUrl: 'https://oya.test/claim#k' }));
+  const onboarding = new Onboarding({ config, socket, mirror, chatgpt, electron, tabs: {}, shell: {} } as any, signUp);
+  return { onboarding, values, socket, mirror, signUp };
+}
+
+afterEach(() => mock.restoreAll());
+
+it('makes a key from the ChatGPT email, puts the model on this desktop, and connects importing the logins', async () => {
+  const posts: any[] = [];
+  mock.method(
+    globalThis,
+    'fetch',
+    async (url: string, init: RequestInit) => (posts.push([url, JSON.parse(String(init.body))]), new Response('{}')),
+  );
+  const { onboarding, values, socket, mirror, signUp } = setup();
+  await onboarding.connect({ importLogins: true });
+  assert.deepEqual(signUp.mock.calls[0].arguments, ['wss://oya.test/ws', 'me@x.test']);
+  assert.deepEqual([values.apiKey, values.claimUrl], ['new-key', 'https://oya.test/claim#k']);
+  assert.equal(posts[0][0], 'https://oya.test/api/config');
+  assert.deepEqual([posts[0][1].llm_provider, posts[0][1].openai_api_key], ['chatgpt', 'chatgpt-desktop']);
+  assert.deepEqual(
+    [socket.connected, socket.browserId, mirror.importOnConnect, onboarding.active],
+    [1, null, true, true],
+  );
+});
+
+it('a browser that already has a key only moves its model, without signing up or reconnecting', async () => {
+  mock.method(globalThis, 'fetch', async () => new Response('{}'));
+  const { onboarding, socket, signUp } = setup('existing');
+  await onboarding.connect({ importLogins: false });
+  assert.deepEqual([signUp.mock.callCount(), socket.connected, onboarding.active], [0, 0, false]);
+});
+
+it('without an email from ChatGPT, sends the person to the Oya sign-in', async () => {
+  const { onboarding, signUp } = setup('', '');
+  await assert.rejects(onboarding.connect({ importLogins: true }), /sign in instead/);
+  assert.equal(signUp.mock.callCount(), 0);
+});

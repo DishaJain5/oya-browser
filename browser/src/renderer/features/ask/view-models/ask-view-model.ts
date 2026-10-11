@@ -9,7 +9,7 @@
 import { ViewModel } from '../../../core/view-model.ts';
 import { RendererConstants as C } from '../../../core/constants.ts';
 import type { RendererServices } from '../../../app/services.ts';
-import { ASK_TEXT, FAILED_REPLY, KEY_CODES, REJECTED_CODE } from '../model/constants.ts';
+import { ASK_TEXT, FAILED_REPLY, KEY_CODES, REJECTED_CODE, CLAIM_CODE } from '../model/constants.ts';
 import type { ChatAnswer, ToolCall } from '../model/types.ts';
 import { canReplay, suggestName } from '../model/reply.ts';
 import { RunViewModel, type FinishedRun } from './run-view-model.ts';
@@ -62,6 +62,8 @@ export type ChatItem = ChatMessage | RunItem;
 export interface AskState {
   /** A bounded continuation is available after a run reaches its limit. */
   limited: boolean;
+  /** Today's free trial is used up: the card offering a free Oya account shows. */
+  trialSpent: boolean;
   /** The conversation so far. */
   items: ChatItem[];
   /** The Ask box's text. */
@@ -103,7 +105,7 @@ export class AskViewModel extends ViewModel<AskState> {
 
   /** An empty conversation for tab `tabId`; `readFile` reads attachments (FileReader by default). */
   constructor(services: AskServices, readFile: ReadFile = readBase64, tabId: number | null = null) {
-    super({ items: [], input: '', sending: false, copied: null, limited: false });
+    super({ items: [], input: '', sending: false, copied: null, limited: false, trialSpent: false });
     this.services = services;
     this.tabId = tabId;
     this.run = new RunViewModel(services.bridge, tabId);
@@ -154,7 +156,7 @@ export class AskViewModel extends ViewModel<AskState> {
     this.withdraw();
     this.files.clear();
     this.run.reset();
-    this.set({ items: [], limited: false });
+    this.set({ items: [], limited: false, trialSpent: false });
   }
 
   /** Shows the agent's answer, offering to save the run as a playbook (`replayable` from the server, else judged by its tools). */
@@ -208,10 +210,37 @@ export class AskViewModel extends ViewModel<AskState> {
     this.set({ limited });
     const run = this.run.finish(!data.error && !data.failed && !limited && !FAILED_REPLY.test(data.text || ''));
     if (run) this.set({ items: [...this.state.items, { kind: 'run', id: this.nextId++, run, folded: !!run.summary }] });
+    if (!this.refused(data)) this.show(data);
+  }
+
+  /** A refusal that needs the person (no model, a rejected key, the trial used up): handled, and true. */
+  private refused(data: ChatAnswer): boolean {
     if (data.code && KEY_CODES.includes(data.code)) this.model.needed(data.code === REJECTED_CODE ? data.error : '');
-    else if (data.error === ASK_TEXT.stoppedError) this.say('assistant', ASK_TEXT.stopped);
+    else if (data.code === CLAIM_CODE) this.claim(data.error || '');
+    else return false;
+    return true;
+  }
+
+  /** Shows an answer: stopped, an error, or the reply. */
+  private show(data: ChatAnswer): void {
+    if (data.error === ASK_TEXT.stoppedError) this.say('assistant', ASK_TEXT.stopped);
     else if (data.error) this.say('assistant', ASK_TEXT.errorPrefix + data.error);
     else this.reply(data.text || ASK_TEXT.noResponse, data.toolCalls, data.replayable);
+  }
+
+  /** The free trial is used up: the card that offers a free account takes over from the error text. */
+  private claim(_reason: string): void {
+    this.set({ trialSpent: true });
+  }
+
+  /** "Create free account": the claim page in the web browser; the card stays until the next task. */
+  createAccount(): void {
+    void this.services.bridge.openClaim();
+  }
+
+  /** "Not now": the card goes. */
+  dismissTrial(): void {
+    this.set({ trialSpent: false });
   }
 
   /** Adds one message. */

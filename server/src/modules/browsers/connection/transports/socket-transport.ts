@@ -7,6 +7,9 @@ import type { Call } from '../reporter.ts';
 import type { CommandResult, CommandTransport } from './transport.ts';
 import { pendingCommands } from './pending-commands.ts';
 
+/** The message types a call may go out as: a command, a profile capture, or a model call to relay. */
+type Wire = 'cmd' | 'profile_capture' | 'llm_request';
+
 /** Sends commands over one browser's socket. */
 export class SocketTransport implements CommandTransport {
   /** The browser's control socket. */
@@ -18,7 +21,7 @@ export class SocketTransport implements CommandTransport {
   }
 
   /** Sends the call and waits for its result (or its timeout); a failed write fails it at once. */
-  send(call: Call, type: 'cmd' | 'profile_capture' = 'cmd'): Promise<CommandResult> {
+  send(call: Call, type: Wire = 'cmd'): Promise<CommandResult> {
     const id = randomUUID();
     const answer = pendingCommands.wait(id, call);
     console.log(`[ws] → cmd to ${call.browserId}: id=${id} action=${call.action}`);
@@ -29,7 +32,7 @@ export class SocketTransport implements CommandTransport {
   }
 
   /** Writes the `cmd` message; returns the write error, if any. */
-  private post(id: string, call: Call, type: 'cmd' | 'profile_capture'): Error | null {
+  private post(id: string, call: Call, type: Wire): Error | null {
     try {
       this.ws.send(JSON.stringify({ type, id, action: call.action, params: call.params, lane: call.lane }));
       return null;

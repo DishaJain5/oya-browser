@@ -3,6 +3,15 @@
  * Each key only sees its own browsers.
  */
 
+import { DEFAULT_PROVIDER } from './connection/constants.ts';
+
+/** A desktop app a model call can be relayed to: its id and its open control socket. */
+export interface DesktopLink {
+  /** The browser's id. */
+  id: string;
+  /** Its control socket, open. */
+  ws: { send(data: string): void };
+}
 import { EventEmitter } from 'events';
 import WebSocket from 'ws';
 import { MS_PER_SECOND } from '../../platform/constants.ts';
@@ -153,6 +162,21 @@ class ConnectionRegistry extends EventEmitter {
       (b) => b.apiKey === apiKey && b.clientType === 'oya' && b.ws?.readyState === WebSocket.OPEN,
     );
     return open.filter((b) => sendQuietly(b.ws, message)).length;
+  }
+
+  /**
+   * The desktop app on `apiKey` to relay a model call to: `preferred` (the run's own
+   * browser) when it is one and its socket is open, else any open desktop on the key.
+   */
+  desktopOf(apiKey, preferred?: string): DesktopLink | null {
+    const desktop = (b) =>
+      b?.apiKey === apiKey &&
+      b.provider === DEFAULT_PROVIDER &&
+      b.clientType === 'oya' &&
+      b.ws?.readyState === WebSocket.OPEN;
+    const ids = preferred ? [preferred, ...this.browsers.keys()] : [...this.browsers.keys()];
+    const id = ids.find((candidate) => desktop(this.browsers.get(candidate)));
+    return id === undefined ? null : { id, ws: this.browsers.get(id).ws };
   }
 
   /** Sends `message` to one Oya browser this replica holds, if its socket is open; answers whether it went. */

@@ -52,6 +52,8 @@ export interface CatalogEntry {
   model?: string;
   /** The models it offers. */
   models?: ModelOption[];
+  /** Signed in to (ChatGPT) rather than given a key. */
+  signIn?: boolean;
 }
 
 /** The answer to `modelStatus`. */

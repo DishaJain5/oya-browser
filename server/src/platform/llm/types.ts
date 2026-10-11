@@ -4,6 +4,19 @@
  * so the agent loop, its tools and its tests never know which model answered.
  */
 
+/** What a relayed model call came back with: the status, the raw event stream, and any retry-after. */
+export type RelayedAnswer = {
+  /** The HTTP status the model endpoint answered. */
+  status: number;
+  /** The whole response body, an event stream. */
+  text: string;
+  /** The endpoint's retry-after header, when it sent one. */
+  retryAfter?: string;
+};
+
+/** Carries one model request body to wherever the credential lives (a desktop) and answers the raw stream. */
+export type ModelTransport = (body: unknown) => Promise<RelayedAnswer>;
+
 /** One chat request, as chatCompletion takes it. */
 export type ChatRequest = {
   /** Provider base URL; it picks the provider (see index.ts). */
@@ -18,6 +31,8 @@ export type ChatRequest = {
   tools?: any[];
   /** OpenAI tool_choice; defaults to 'auto' when tools are given. */
   toolChoice?: any;
+  /** Sends the request from elsewhere (the person's desktop) when the credential is not this server's to use. */
+  transport?: ModelTransport;
 };
 
 /** One answer, OpenAI-shaped: the assistant message and the tokens it cost. */

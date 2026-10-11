@@ -1,3 +1,8 @@
+/** The message that carries a model call to a desktop; it answers with a cmd_result. */
+export const LLM_REQUEST = 'llm_request';
+/** The desktop's code when it holds no usable ChatGPT credential any more. */
+export const SIGNED_OUT_CODE = 'chatgpt_signed_out';
+
 /**
  * Every number the browser connection runs on, by name: WebSocket close codes,
  * timings and limits. Values an operator may tune come from the environment.

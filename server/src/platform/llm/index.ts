@@ -7,10 +7,11 @@ import type { ChatRequest, ChatResponse, LlmProvider } from './types.ts';
 import { anthropic } from './anthropic.ts';
 import { gemini } from './gemini.ts';
 import { openai } from './openai.ts';
+import { responses } from './responses.ts';
 import { withRetries } from './transport.ts';
 
 /** The providers, most specific first: the OpenAI-compatible one takes any base URL the others do not claim. */
-const PROVIDERS: LlmProvider[] = [anthropic, gemini, openai];
+const PROVIDERS: LlmProvider[] = [anthropic, gemini, responses, openai];
 
 /** Every provider's name, what a project's model policy lists. */
 export const LLM_PROVIDERS = PROVIDERS.map((p) => p.name);
@@ -26,4 +27,4 @@ export function chatCompletion(request: ChatRequest): Promise<ChatResponse> {
 
 export { toGemini, fromGemini } from './gemini.ts';
 export { LlmError } from './transport.ts';
-export type { ChatRequest, ChatResponse, LlmProvider } from './types.ts';
+export type { ChatRequest, ChatResponse, LlmProvider, ModelTransport, RelayedAnswer } from './types.ts';

@@ -9,6 +9,12 @@
 /** A value the main process sends as it is; its shape is owned by the feature that reads it. */
 export type Payload = Record<string, unknown>;
 
+/** How the person asked to connect ChatGPT on first run. */
+export interface ConnectChatgptOptions {
+  /** Bring in the default browser's logins once connected. */
+  importLogins: boolean;
+}
+
 /** The fields every failed call answers with. */
 export interface Failure {
   /** What went wrong, in words for the person. */
@@ -197,6 +203,14 @@ export interface ShellCalls {
   addressSuggestions(query: string): Promise<AddressSuggestion[]>;
   /** Opens the OS default-browser choice only after a person asks. */
   makeDefaultBrowser(): Promise<void>;
+  /** First run: signs in with ChatGPT (making this browser's Oya key when it has none) and connects; importLogins brings in the default browser's logins. */
+  connectChatgpt(options: ConnectChatgptOptions): Promise<Payload & Failure>;
+  /** Where each first-run step stands: ChatGPT, logins, default browser, and the claim link. */
+  onboardingStatus(): Promise<Payload>;
+  /** Ends the first-run checklist and opens the start page. */
+  finishOnboarding(): Promise<void>;
+  /** Opens the page where the person turns this browser's key into an Oya account. */
+  openClaim(): Promise<void>;
   /** Opens local bookmarks and browsing history. */
   showLibrary(): Promise<void>;
   /** The bookmarks bar: whether it shows, and the bookmarks on it. */
@@ -298,6 +312,8 @@ export interface ShellCalls {
   modelStatus(): Promise<Payload>;
   /** Saves the project's model provider and key. */
   saveModelKey(choice: Payload): Promise<Payload & Failure>;
+  /** Starts Sign in with ChatGPT for the project, in the system browser. */
+  signInChatgpt(): Promise<Payload & Failure>;
   /** The project's personas and the active one. */
   listPersonas(): Promise<PersonaList>;
   /** The routines and their runs. */
@@ -406,6 +422,10 @@ export const CALL_CHANNELS = {
   /** The saved settings. */
   addressSuggestions: 'address-suggestions',
   makeDefaultBrowser: 'make-default-browser',
+  connectChatgpt: 'connect-chatgpt',
+  onboardingStatus: 'onboarding-status',
+  finishOnboarding: 'finish-onboarding',
+  openClaim: 'open-claim',
   getConfig: 'get-config',
   /** Saves settings and reconnects. */
   saveConfig: 'save-config',
@@ -488,6 +508,8 @@ export const CALL_CHANNELS = {
   modelStatus: 'model-status',
   /** Saves the project's model provider and key. */
   saveModelKey: 'save-model-key',
+  /** Starts Sign in with ChatGPT for the project, in the system browser. */
+  signInChatgpt: 'sign-in-chatgpt',
   /** The project's personas and the active one. */
   listPersonas: 'list-personas',
   /** The routines and their runs. */

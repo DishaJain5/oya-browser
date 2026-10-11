@@ -147,7 +147,7 @@ export function ShellRoot({ vms }: ShellRootProps) {
   useChromeRoot({ theme: vms.chrome.theme, activity: vms.chrome.activity, shell: vms.shell });
   return (
     <>
-      <SetupScreen vm={vms.connection.setup} />
+      <SetupScreen vm={vms.connection.setup} checklist={vms.connection.checklist} />
       <BrowserChrome vms={vms} />
       <PageBackdrop vm={vms.chrome.backdrop} />
       <StartPage vm={vms.start} />

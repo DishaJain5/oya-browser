@@ -12,6 +12,7 @@ import {
   INSTANCE_TTL_MS,
   TERMINAL_SESSION_TTL_MS,
 } from '../../../../../src/modules/control/store/constants.ts';
+import { CLIENT_TTL_MS } from '../../../../../src/mcp/oauth/constants.ts';
 
 describe('columns', () => {
   it('indexes a session by its project and state', () => {
@@ -79,5 +80,12 @@ describe('matches', () => {
   it('matches on the indexed state', () => {
     assert.equal(matches('session', body, { states: ['queued', 'ready'] }), true);
     assert.equal(matches('session', body, { states: ['queued'] }), false);
+  });
+
+  it('forgets an MCP client a while after it last signed someone in, else after it registered', () => {
+    const issued = 1_700_000_000;
+    assert.equal(columns('oauth_client', { client_id_issued_at: issued }).expiresAt, issued * 1000 + CLIENT_TTL_MS);
+    const used = { client_id_issued_at: issued, lastUsedAt: 1_800_000_000_000 };
+    assert.equal(columns('oauth_client', used).expiresAt, 1_800_000_000_000 + CLIENT_TTL_MS);
   });
 });

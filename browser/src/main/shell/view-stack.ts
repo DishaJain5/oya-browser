@@ -20,6 +20,17 @@ function hiddenAgentViews(deps: Deps): BrowserView[] {
   return views.filter((view) => view !== shown && !view.webContents.isDestroyed());
 }
 
+/**
+ * Shows only `view` (or no view, over the start page). Electron 44's own
+ * setBrowserView removes the old views while walking the same list it removes
+ * from, so every other one stays on: a stale page then shows under a new tab,
+ * with its old bounds. getBrowserViews() hands back a copy, so this walk is safe.
+ */
+export function mountOnly(win: BrowserWindow, view: BrowserView | null): void {
+  for (const mounted of win.getBrowserViews()) if (mounted !== view) win.removeBrowserView(mounted);
+  if (view && !win.getBrowserViews().includes(view)) win.addBrowserView(view);
+}
+
 /** Mounts the agents' views beneath the shown view with its bounds, or takes them off when nothing covers them. */
 export function keepAgentRendering(deps: Deps, win: BrowserWindow): void {
   const agents = hiddenAgentViews(deps);

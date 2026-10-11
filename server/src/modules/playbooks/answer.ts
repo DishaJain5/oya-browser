@@ -8,6 +8,7 @@ import { chatCompletion } from '../../platform/llm.ts';
 import { HttpError } from '../../platform/errors.ts';
 import { Status } from '../../platform/http-status.ts';
 import * as keyConfig from '../config/service.ts';
+import { resolveFresh } from '../config/chatgpt.ts';
 import { fill, requireLlmAllowed } from '../agent/chat.ts';
 import { MAX_ANSWER_CHARS } from './constants.ts';
 import { container } from '../../app/container.ts';
@@ -29,15 +30,15 @@ function brief(question: string, task = '', values: Record<string, unknown> = {}
 }
 
 /** The key's model, or a refusal a caller can act on. */
-function modelFor(apiKey) {
-  const { openaiKey, baseUrl, model } = keyConfig.resolve(apiKey);
+async function modelFor(apiKey) {
+  const { openaiKey, baseUrl, model, transport } = await resolveFresh(apiKey);
   if (!openaiKey) throw new HttpError(Status.UNPROCESSABLE, 'No LLM key configured to answer this field.');
-  return { apiKey: openaiKey, baseUrl, model };
+  return { apiKey: openaiKey, baseUrl, model, transport };
 }
 
 /** The key's model, once its project's policy allows page content to go to it. */
 async function allowedModel(apiKey) {
-  const model = modelFor(apiKey);
+  const model = await modelFor(apiKey);
   await requireLlmAllowed(apiKey, model.baseUrl);
   return model;
 }

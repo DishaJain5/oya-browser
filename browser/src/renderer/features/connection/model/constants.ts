@@ -29,6 +29,25 @@ export const NAME_MAX_LENGTH = 64;
 
 /** The words the ViewModels say. */
 export const TEXT = {
+  /** The first-run checklist. */
+  checklistTitle: 'Set up in under a minute',
+  checklistSub: 'Oya runs on your ChatGPT plan. No API key, no account to create.',
+  stepChatgptDone: 'Connected',
+  stepImportSkipped: 'Skipped. You can bring them in later from Settings.',
+  stepImportBusy: 'Bringing in your logins…',
+  skipForNow: 'Skip for now',
+  stepChatgpt: 'Connect ChatGPT',
+  stepChatgptHint: 'Sign in once in your web browser. Plus or Pro plan.',
+  chatgptConnect: 'Sign in with ChatGPT',
+  chatgptWaiting: 'Finish in your web browser…',
+  chatgptImport: 'Bring in my logins from my usual browser',
+  stepImport: 'Your logins',
+  stepImportHint: 'Your sites stay signed in, so Oya can work on them.',
+  stepDefault: 'Make Oya your default browser',
+  stepDefaultHint: 'Links open here, where Oya can help.',
+  makeDefault: 'Make Oya the default',
+  startBrowsing: 'Start browsing',
+  haveAccount: 'I have an Oya account',
   badServer: 'Enter a valid wss:// server address (ws:// only for this computer).',
   noKey: 'API key is required',
   saveFailed: 'Could not save connection settings.',

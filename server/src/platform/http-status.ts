@@ -11,6 +11,8 @@ export const Status = {
   NO_CONTENT: 204,
   /** A range of a file, as a resumable download asks for. */
   PARTIAL_CONTENT: 206,
+  /** The first status that is not a success, as a range check names it. */
+  MULTIPLE_CHOICES: 300,
   FOUND: 302,
   PERMANENT_REDIRECT: 308,
   BAD_REQUEST: 400,

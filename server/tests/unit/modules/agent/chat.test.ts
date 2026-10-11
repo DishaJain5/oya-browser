@@ -64,6 +64,17 @@ describe('runChat', () => {
     }
   });
 
+  it('a model that keeps failing to answer is a clear 502 after the retries, not a server error', async () => {
+    mock.method(globalThis, 'fetch', async () => new Response('overloaded', { status: 503 }));
+    mock.method(globalThis, 'setTimeout', (fn: () => void) => (fn(), 0));
+    await assert.rejects(runChat(BROWSER, [{ role: 'user', content: 'x' }], { apiKey: 'bad-key' }), (err: any) => {
+      assert.deepEqual([err.status, err.code], [502, 'llm_unavailable']);
+      assert.doesNotMatch(err.message, /overloaded/);
+      return true;
+    });
+    mock.restoreAll();
+  });
+
   it('reports provider credit failures without retrying or exposing the upstream body', async () => {
     const fetch = mock.method(
       globalThis,

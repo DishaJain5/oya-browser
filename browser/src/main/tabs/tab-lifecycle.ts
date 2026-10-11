@@ -1,4 +1,5 @@
 /** Rendering and initial tab records, independent of the manager's selection and lifetime. */
+import { mountOnly } from '../shell/view-stack.ts';
 import type { BrowserView } from 'electron';
 import type { AppServices } from '../app/services.ts';
 import type { Tab, TabView } from './types.ts';
@@ -12,7 +13,7 @@ export function initialTab(id: number, view: TabView, url: string): Tab {
 /** Mount the owned view without recreating its renderer, cookies or navigation history. */
 export function mountTab(deps: Pick<AppServices, 'overlays' | 'shell' | 'layout' | 'tabs'>, tab: Tab): void {
   const shown = shownViewOf(tab) as BrowserView | null;
-  if (!deps.overlays.names.size) deps.shell.window!.setBrowserView(shown);
+  if (!deps.overlays.names.size) mountOnly(deps.shell.window!, shown);
   if (tab.home) deps.shell.window!.webContents.focus();
   deps.layout.layoutActiveTab();
   deps.shell.send('url-changed', tab.url);

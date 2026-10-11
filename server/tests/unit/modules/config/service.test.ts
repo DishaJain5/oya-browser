@@ -45,12 +45,22 @@ describe('key settings', () => {
       const catalog = keyConfig.get(KEY).llm_catalog;
       assert.deepEqual(
         catalog.map((p) => p.id),
-        ['openai', 'anthropic', 'gemini', 'vertex', 'openrouter'],
+        ['openai', 'anthropic', 'gemini', 'vertex', 'chatgpt', 'openrouter'],
       );
       const claude = catalog.find((p) => p.id === 'anthropic');
       assert.equal(claude.model, 'claude-opus-5');
       assert.ok(claude.models.some((m) => m.id === 'claude-opus-5-5'));
       assert.ok(catalog.every((p) => p.label && p.hint && p.keysUrl.startsWith('https://') && p.models.length));
+    });
+
+    it('offers the ChatGPT plan as a sign-in, hosted or not (the desktop app carries it on Oya Cloud)', () => {
+      assert.equal(keyConfig.get(KEY).llm_catalog.find((p) => p.id === 'chatgpt').signIn, true);
+      process.env.STRIPE_SECRET_KEY = 'sk_test';
+      try {
+        assert.equal(keyConfig.get(KEY).llm_catalog.find((p) => p.id === 'chatgpt').signIn, true);
+      } finally {
+        delete process.env.STRIPE_SECRET_KEY;
+      }
     });
 
     it('masks a secret to its last four characters', async () => {

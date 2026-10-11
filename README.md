@@ -94,6 +94,12 @@ claude mcp add --transport http oya https://oyabrowser.com/mcp/pool \
   --header "Authorization: Bearer $OYA_API_KEY"
 ```
 
+**In claude.ai, Claude Desktop or Claude mobile**, on your Claude plan with no API key: Settings →
+Connectors → Add custom connector, paste `https://oyabrowser.com/mcp/pool`, sign in to Oya and
+allow it for a project. A self-hosted server works the same way once it is reachable over HTTPS
+(a tunnel is enough) and `OYA_CONSOLE_URL` is set to that address: Claude connects from
+Anthropic's cloud, not from your machine.
+
 Then just ask: _"Start a browser, open Hacker News and summarise the top 3 stories."_ Oya is in
 the MCP registry as `io.github.OyadotAI/oya-browser`, on [Smithery](https://smithery.ai/skills/oyaai/oya-browser)
 and on ClawHub as `oya-browser`.

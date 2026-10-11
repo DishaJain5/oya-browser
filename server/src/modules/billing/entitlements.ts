@@ -8,7 +8,7 @@
 import { HttpError } from '../../platform/errors.ts';
 import { Status } from '../../platform/http-status.ts';
 import { hosted } from './config.ts';
-import { MODEL_PRICES, PLANS, SALES_EMAIL, type Plan } from './constants.ts';
+import { MODEL_PRICES, PLANS, SALES_EMAIL, type Plan, TRIAL_AGENT_STEPS, TRIAL_WINDOW_HOURS } from './constants.ts';
 import { includedFor, type CreditReader } from './adjustments.ts';
 import { priced } from './cost.ts';
 import { Reservations, SERVER } from './reservations.ts';
@@ -24,6 +24,12 @@ export type EntitlementDeps = CreditReader & {
   usageSince(userId: string, since: string): Promise<Record<string, number>>;
   /** The person who owns a key; null for keys nobody owns (env keys, the fleet token). */
   ownerOf(key: string): Promise<string | null>;
+  /** Whether a key is an agent's or a desktop's own, made without an account and not claimed by one yet. */
+  unclaimed(key: string): Promise<boolean>;
+  /** How many agent steps a key ran in the last `hours`. */
+  stepsOfKey(key: string, hours: number): Promise<number>;
+  /** Where the person claims a key into an account. */
+  claimUrl(key: string): string;
   /** The digests of every key a person owns. */
   keyDigestsOf(userId: string): Promise<Set<string>>;
   /** A key's digest. */
@@ -79,11 +85,20 @@ export class Entitlements {
   async admitAgent(key: string) {
     if (!hosted()) return;
     const standing = await this.standingFor(key);
-    if (!standing) return;
+    if (!standing) return this.admitTrial(key);
     await this.checkAllowance(standing, 'agent_steps', 'steps', 'agent steps');
     if (this.deps.ownsModel(key)) return;
     if (!priced(this.deps.modelOf(key))) throw unpricedModel(this.deps.modelOf(key));
     await this.checkAllowance(standing, 'hosted_llm_microusd', 'llmMicroUsd', 'hosted model use');
+  }
+
+  /** A key nobody has claimed runs a day's trial of agent steps; past it, the way on is a free account. */
+  async admitTrial(key: string) {
+    if (!(await this.deps.unclaimed(key))) return;
+    if ((await this.deps.stepsOfKey(key, TRIAL_WINDOW_HOURS)) < TRIAL_AGENT_STEPS) return;
+    const claim_url = this.deps.claimUrl(key);
+    const why = `Today's ${TRIAL_AGENT_STEPS} free agent steps are used up. Create a free Oya account to keep going, with ${PLANS.free.steps} steps a month, cloud browsers and routines: ${claim_url}`;
+    throw new HttpError(Status.PAYMENT_REQUIRED, why, { code: 'claim_required', claim_url });
   }
 
   /** Whether a cloud browser on `key` may use the operator's residential proxy: only on a paid plan. */

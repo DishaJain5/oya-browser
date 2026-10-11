@@ -6,6 +6,7 @@
 import type { Session } from 'electron';
 import type { AppServices } from './services.ts';
 import { addressOf } from '../tabs/home.ts';
+import { HOME_URL } from '../tabs/constants.ts';
 import type { Origins } from '../../page/login-state.ts';
 import { ProfileStore } from '../../anonymity/profile-store.ts';
 import { type SessionProfile } from '../identity/session.ts';
@@ -256,8 +257,17 @@ export class Persona {
     // changes so the tabs, listener and cookie exporter all use the same jar.
     const switched = this.active?.id !== profile.id;
     const reopen = switched ? this.leaveJar() : [];
-    await this.enterNativeProfile(profile, () => this.enterJar(cookies, now, reopen));
+    await this.enterNativeProfile(profile, () => this.enterJar(cookies, now, reopen)).catch((error) =>
+      this.reopenAfterFailure(epoch, switched ? reopen : null, error),
+    );
     this.publishProfile(epoch, profile, switched);
+  }
+
+  /** A failed switch already closed the old tabs: reopen them (or the start page) so the window is never left tabless. */
+  private reopenAfterFailure(epoch: symbol, reopen: string[] | null, error: unknown): never {
+    if (reopen && this.policyEpoch === epoch && !this.deps.tabs.list.length)
+      for (const url of reopen.length ? reopen : [HOME_URL]) this.deps.tabs.createTab(url);
+    throw error;
   }
 
   /** Never publish an activation superseded in the final promise continuation. */

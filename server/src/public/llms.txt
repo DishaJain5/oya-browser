@@ -272,6 +272,13 @@ Cursor / Windsurf / Claude Desktop:
       }
     }
 
+claude.ai, Claude Desktop and Claude mobile (Pro, Max, Team, Enterprise), no
+API key: Settings → Connectors → Add custom connector, paste
+https://oyabrowser.com/mcp/pool, and sign in to Oya when asked. Pick the
+project to connect and allow it. The Claude plan pays for the model; Oya is the
+browser. The connection shows as a credential in the project's settings, where
+it can be revoked. Any MCP client that signs in with OAuth works the same way.
+
 Claude Code plugin (MCP server + skill): `claude plugin marketplace add
 OyadotAI/oya-browser`, then `claude plugin install oya-browser@oya`. The skill
 alone, for any agent that reads skills: `npx skills add OyadotAI/oya-browser`.

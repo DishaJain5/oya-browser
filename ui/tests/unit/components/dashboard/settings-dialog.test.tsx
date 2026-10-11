@@ -111,6 +111,32 @@ describe('SettingsDialog', () => {
     expect(apiMock).toHaveBeenLastCalledWith('/config', { key: 'k', method: 'POST', body });
   });
 
+  it('offers Sign in with ChatGPT instead of a key field for the ChatGPT plan, and opens its sign-in', async () => {
+    const chatgpt = {
+      id: 'chatgpt',
+      label: 'ChatGPT plan',
+      hint: '',
+      keysUrl: '',
+      base: '',
+      model: 'gpt-6.1-sol',
+      models: [],
+      signIn: true,
+    };
+    apiMock.mockImplementation(async (path: string) =>
+      path === '/config/chatgpt/login'
+        ? { url: 'https://auth.openai.com/x' }
+        : { ...CONFIG, llm_catalog: [...LLM_CATALOG, chatgpt] },
+    );
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    setup();
+    await userEvent.click(await screen.findByRole('button', { name: 'ChatGPT plan' }));
+    expect(screen.queryByLabelText('API key')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
+    await waitFor(() => expect(open).toHaveBeenCalledWith('https://auth.openai.com/x', '_blank', 'noopener'));
+    expect(apiMock).toHaveBeenCalledWith('/config/chatgpt/login', expect.objectContaining({ method: 'POST' }));
+    open.mockRestore();
+  });
+
   it('keeps the dialog open with the reason when saving fails', async () => {
     const onClose = setup('verification');
     await userEvent.selectOptions(await screen.findByLabelText('CAPTCHA solver'), 'capsolver');

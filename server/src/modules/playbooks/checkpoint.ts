@@ -9,6 +9,8 @@ import * as mfa from '../challenges/mfa.ts';
 import * as siteLogin from '../challenges/login.ts';
 import * as credentials from '../personas/credentials.ts';
 import * as keyConfig from '../config/service.ts';
+import { resolveFresh } from '../config/chatgpt.ts';
+import type { LlmConfig } from '../config/service.ts';
 import { allowedLlm } from '../agent/chat.ts';
 import { NATIVE_CAPTCHA, announce, evaluateIn } from '../../app/http.ts';
 import { LOGIN_ROUNDS } from './constants.ts';
@@ -28,8 +30,8 @@ interface RunContext {
   liveViewUrl: string;
   /** Runs an expression in the browser's page. */
   evaluate: (expr: string) => Promise<any>;
-  /** The key's own LLM settings. */
-  llm: any;
+  /** The key's own LLM settings, with a live credential, read when a step needs them. */
+  llm: () => Promise<LlmConfig>;
 }
 
 /** Who the page is signed in as, and where it is. */
@@ -46,9 +48,9 @@ interface PageContext {
 function runContext(apiKey, browserId, requestHuman?): RunContext {
   const liveViewUrl = `/dashboard/?browser=${encodeURIComponent(browserId)}`;
   const evaluate = (expr) => evaluateIn(browserId, expr);
-  // Resolved once for the run, not per step: it decrypts this key's settings,
-  // and the key cannot change underneath a run that is already going.
-  const llm = keyConfig.resolve(apiKey);
+  // Read when a step needs it (an MFA code), not up front: a ChatGPT plan's
+  // access token is refreshed on the way, so a long run never holds a stale one.
+  const llm = () => resolveFresh(apiKey);
   return { apiKey, browserId, requestHuman, liveViewUrl, evaluate, llm };
 }
 
@@ -180,7 +182,8 @@ async function tryMfa(run: RunContext, { personaId, domain }: PageContext, l?) {
   // The tenant's own LLM reads the code out of the message: these email
   // templates are rewritten constantly and the code is not always digits.
   // A project whose policy refuses that model gets the pattern match alone.
-  const llm = await allowedLlm(run.apiKey, run.llm);
+  // A model that cannot be reached right now (a refused token refresh) leaves the pattern match alone.
+  const llm = await allowedLlm(run.apiKey, await run.llm().catch(() => null));
   const m = await mfa
     .complete(run.evaluate, personaId, { liveViewUrl: run.liveViewUrl, domain, since, llm })
     .catch(() => null);

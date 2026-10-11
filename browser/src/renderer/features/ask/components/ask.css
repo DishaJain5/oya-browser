@@ -960,3 +960,35 @@
     animation: none;
   }
 }
+
+/* Today's free steps are used up: one calm card, the way on in green. */
+.trial-card {
+  position: relative;
+  gap: 8px;
+  padding: 18px 16px 16px;
+  border-color: color-mix(in srgb, var(--logo-green) 35%, var(--border));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--logo-green) 7%, var(--surface)), var(--surface) 60%);
+}
+.trial-card-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--logo-green);
+  background: color-mix(in srgb, var(--logo-green) 14%, transparent);
+}
+.trial-card-perks {
+  display: grid;
+  gap: 4px;
+  margin: 2px 0 6px;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+.trial-card-perks li::before {
+  content: '✓';
+  margin-right: 8px;
+  color: var(--logo-green);
+  font-weight: 650;
+}

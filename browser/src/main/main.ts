@@ -51,6 +51,7 @@ import { CdpRelay } from './connection/cdp-relay.ts';
 import { ControlSocket } from './connection/socket.ts';
 import { CommandRunner } from './connection/commands.ts';
 import { Mirror } from './mirror/mirror.ts';
+import { ChatgptAuth, Onboarding } from './chatgpt/index.ts';
 import { BrowserWindows } from './windows/index.ts';
 import { type AnalysisResult } from './shell/control-shield.ts';
 import type { ActionParams } from './shell/narration.ts';
@@ -201,6 +202,8 @@ ctx.relay = new CdpRelay({
     ctx.control.state.mode === 'agent',
 });
 ctx.mirror = new Mirror(ctx);
+ctx.chatgpt = new ChatgptAuth(ctx);
+ctx.onboarding = new Onboarding(ctx);
 ctx.stream = new LiveStream(ctx);
 ctx.actions = new PageDriver({
   config: ctx.config,

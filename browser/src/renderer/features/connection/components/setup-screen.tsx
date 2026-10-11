@@ -10,6 +10,14 @@ import './setup-screen.css';
 import type { SetupView, SetupViewModel } from '../view-models/setup-view-model.ts';
 import type { ViewProps } from '../model/models.ts';
 import { ManualView, StartView, WaitingView } from './setup-views.tsx';
+import { ChecklistView } from './checklist-view.tsx';
+import type { ChecklistViewModel } from '../view-models/checklist-view-model.ts';
+
+/** The welcome screen's view-models. */
+interface SetupScreenProps extends ViewProps<SetupViewModel> {
+  /** The first-run checklist. */
+  checklist: ChecklistViewModel;
+}
 
 /** Focuses the first field (or else button) of the view shown, as the view changes. */
 function useFocusView(view: SetupView) {
@@ -57,7 +65,7 @@ function WelcomeStage() {
 }
 
 /** The welcome screen. */
-export function SetupScreen({ vm }: ViewProps<SetupViewModel>) {
+export function SetupScreen({ vm, checklist }: SetupScreenProps) {
   const s = useViewModel(vm);
   const panel = useFocusView(s.view);
   return (
@@ -66,18 +74,23 @@ export function SetupScreen({ vm }: ViewProps<SetupViewModel>) {
       <div className="window-drag" aria-hidden="true"></div>
       <WelcomeStage />
       <section className="setup-card welcome-panel" aria-label="Connect this browser" ref={panel}>
+        <ChecklistView vm={checklist} onAccount={() => vm.show('start')} onSkip={() => vm.skip()} />
         <StartView vm={vm} />
         <WaitingView vm={vm} />
         <ManualView vm={vm} />
         <div role="alert" className="setup-error" id="setup-error">
           {s.error}
         </div>
-        <Button type="button" variant="secondary" onClick={() => void vm.makeDefaultBrowser()}>
-          Make Oya Browser default…
-        </Button>
-        <Button type="button" className="welcome-skip" id="btn-skip" onClick={() => vm.skip()}>
-          Just browse for now
-        </Button>
+        {s.view !== 'checklist' && (
+          <>
+            <Button type="button" variant="secondary" onClick={() => void vm.makeDefaultBrowser()}>
+              Make Oya Browser default…
+            </Button>
+            <Button type="button" className="welcome-skip" id="btn-skip" onClick={() => vm.skip()}>
+              Just browse for now
+            </Button>
+          </>
+        )}
       </section>
     </div>
   );

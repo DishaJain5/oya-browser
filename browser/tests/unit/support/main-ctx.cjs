@@ -158,9 +158,13 @@ class FakeWindow extends EventEmitter {
     return { x: 0, y: 0, width: 1280, height: 800 };
   }
 
-  /** Replaces every view with `view`. */
+  /**
+   * As Electron 44's, bug included: it removes the views while walking the list it
+   * removes from, so every other one stays mounted.
+   */
   setBrowserView(view) {
-    this.views = view ? [view] : [];
+    this.views.forEach((v) => this.removeBrowserView(v));
+    if (view) this.addBrowserView(view);
   }
 
   /** As Electron's. */
@@ -168,9 +172,10 @@ class FakeWindow extends EventEmitter {
     this.views.push(view);
   }
 
-  /** As Electron's. */
+  /** As Electron's: in place. */
   removeBrowserView(view) {
-    this.views = this.views.filter((v) => v !== view);
+    const i = this.views.indexOf(view);
+    if (i >= 0) this.views.splice(i, 1);
   }
 
   /** As Electron's. */
@@ -399,7 +404,7 @@ function mainCtx(real = {}) {
         this.ended = (this.ended || 0) + 1;
       },
     },
-    layout: { layoutActiveTab() {}, reveal() {}, flush() {} },
+    layout: { open: false, layoutActiveTab() {}, reveal() {}, closeAll() {}, flush() {}, inherit() {}, openFor() {} },
     overlays: { names: new Set() },
     protection: {
       assertSession() {},
@@ -453,6 +458,13 @@ function mainCtx(real = {}) {
     cookies: { pullCookiesFor: async () => {}, flushCookieChanges() {} },
     routines: { start() {}, refresh() {} },
     mirror: { maybeRun() {}, onOk() {}, onFailed() {}, reimport() {} },
+    onboarding: { active: false, status() {}, finish() {}, connect: async () => ({ connected: true, email: '' }) },
+    chatgpt: {
+      status: () => ({ connected: false, email: '' }),
+      accessToken: async () => 'token',
+      signIn: async () => ({ connected: true, email: '' }),
+      signOut() {},
+    },
     // Each tab's chat in flight.
     chatRuns: new Map(),
     // No tabs until a test gives some.

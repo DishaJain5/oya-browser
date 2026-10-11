@@ -1,4 +1,5 @@
 /** Immutable native session setup with identity fences across all asynchronous work. */
+import { canonicalJson } from '../../shared/canonical-json.ts';
 import type { Session } from 'electron';
 import type { AppServices } from './services.ts';
 import type { Persona } from './persona.ts';
@@ -25,6 +26,24 @@ interface NativeSessionPlan {
   key: string;
   /** This partition's resolved exit timezone, restored when switching back. */
   exitZone: string | null;
+}
+
+/** The dotted names of the fields two plans disagree on, values left out (they hold a device's fingerprint). */
+function changedFields(before: string, after: string, at = ''): string[] {
+  const [a, b] = [JSON.parse(before), JSON.parse(after)];
+  const keys = [...new Set([...Object.keys(a ?? {}), ...Object.keys(b ?? {})])];
+  return keys.flatMap((k) => {
+    const [x, y] = [JSON.stringify(a?.[k]), JSON.stringify(b?.[k])];
+    if (x === y) return [];
+    const nested = a?.[k] && b?.[k] && typeof a[k] === 'object' && typeof b[k] === 'object';
+    return nested ? changedFields(x, y, `${at}${k}.`) : [`${at}${k}`];
+  });
+}
+
+/** A live session's persona or egress really changed: say which fields (never their values), then refuse. */
+function refuseChange(before: string, after: string): never {
+  console.warn(`[oya] persona plan changed in: ${changedFields(before, after).join(', ') || 'unknown'}`);
+  throw Error('Native persona or egress changed; restart Oya to apply it safely');
 }
 
 /** One exclusive setup owner for every persistent persona partition. */
@@ -60,7 +79,7 @@ export class PersonaSessionSetup {
   /** Configure the persistent browser session, user-agent, cookies, privacy. */
   async configure(): Promise<void> {
     const session = this.persona.session();
-    const plan = JSON.stringify({ profile: this.persona.active, governance: this.deps.governance.configuration });
+    const plan = canonicalJson({ profile: this.persona.active, governance: this.deps.governance.configuration });
     if (this.reuseSessionPlan(session, plan)) return;
     if (this.configuring.has(session))
       throw Error('Native session configuration already in progress or incomplete; restart Oya');
@@ -81,7 +100,7 @@ export class PersonaSessionSetup {
   private reuseSessionPlan(session: Session, plan: string): boolean {
     const existing = this.sessionPlans.get(session);
     if (existing === undefined) return false;
-    if (existing.key !== plan) throw Error('Native persona or egress changed; restart Oya to apply it safely');
+    if (existing.key !== plan) refuseChange(existing.key, plan);
     this.deps.protection.assertSession(session);
     this.persona.exitZone = existing.exitZone;
     return true;

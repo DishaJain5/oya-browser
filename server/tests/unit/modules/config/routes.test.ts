@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { ownDataDir } from '../../support/data-dir.ts';
 
 ownDataDir();
-const { router } = await import('../../../../src/modules/config/routes.ts');
+const { router, chatgptCallback } = await import('../../../../src/modules/config/routes.ts');
 const { runtimeConfig } = await import('../../../../src/platform/runtime-config.ts');
 const { allowKey, callRoute } = await import('../../support/agent.ts');
 const keyConfig = await import('../../../../src/modules/config/service.ts');
@@ -81,5 +81,33 @@ describe('config routes', () => {
     });
     assert.equal(res.body.scope, 'host');
     assert.equal(runtimeConfig.getChatModel(), 'host-model');
+  });
+});
+
+describe('GET /auth/callback', () => {
+  /** A response that records what was sent, and a `next` that counts. */
+  function answered(query: Record<string, string>) {
+    const out: any = { status: 200, body: '', nexts: 0 };
+    const res: any = {
+      status: (s) => ((out.status = s), res),
+      type: () => res,
+      send: (b) => ((out.body = b), res),
+    };
+    return { out, run: () => chatgptCallback({ query }, res, () => out.nexts++) };
+  }
+
+  it("hands the console's own sign-in return through to the next handler", async () => {
+    for (const query of [{}, { code: 'supabase-pkce' }, { error: 'access_denied', error_description: 'no' }]) {
+      const { out, run } = answered(query);
+      await run();
+      assert.equal(out.nexts, 1, JSON.stringify(query));
+    }
+  });
+
+  it("answers ChatGPT's return itself, lapsed or not", async () => {
+    const { out, run } = answered({ state: 'never-issued', code: 'c', client_id: 'oaiapp_x', scope: 's' });
+    await run();
+    assert.deepEqual([out.nexts, out.status], [0, 410]);
+    assert.match(out.body, /ChatGPT not connected/);
   });
 });

@@ -19,6 +19,7 @@ import type { ControlSocket } from '../connection/socket.ts';
 import type { LiveStream } from '../connection/stream.ts';
 import type { DesktopControl } from '../control/control-state.ts';
 import type { Mirror } from '../mirror/mirror.ts';
+import type { ChatgptAuth, Onboarding } from '../chatgpt/index.ts';
 import type { Observer } from '../observe/observer.ts';
 import type { Recorder } from '../recording/recorder.ts';
 import type { Routines } from '../routines/routines.ts';
@@ -117,6 +118,10 @@ export interface AppServices {
   relay: CdpRelay;
   /** Logins imported from the person's browsers (src/main/mirror/mirror.ts). */
   mirror: Mirror;
+  /** This app's ChatGPT sign-in, which makes the model calls for the server's agent (src/main/chatgpt). */
+  chatgpt: ChatgptAuth;
+  /** The first-run checklist: ChatGPT, logins, default browser (src/main/chatgpt/onboarding.ts). */
+  onboarding: Onboarding;
   /** The live view (src/main/connection/stream.ts). */
   stream: LiveStream;
   /** The agent's page commands (src/main/actions/driver.ts). */

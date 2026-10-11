@@ -134,3 +134,12 @@ it("gives a quiet agent's tab back to the person: an API or MCP agent never says
     mock.timers.reset();
   }
 });
+
+it("a link the agent's page opens in a new tab stays the agent's, and the old tab is the person's again", () => {
+  const { agentTab } = setup();
+  agentTab.drive();
+  agentTab.handOff(1, 2);
+  assert.deepEqual([agentTab.humanMay(1), agentTab.humanMay(2)], [true, false]);
+  agentTab.handOff(1, 3);
+  assert.deepEqual(agentTab.claimed(), [2], 'a tab no agent drives hands nothing on');
+});

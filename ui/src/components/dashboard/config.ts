@@ -95,6 +95,8 @@ export interface LlmPreset {
   base: string;
   /** The models its picker offers; anything else is a custom model id. */
   models: ModelPreset[];
+  /** Signed in to (ChatGPT) rather than given a key. */
+  signIn?: boolean;
 }
 
 /** What POST /pairing returns. */
@@ -102,6 +104,14 @@ interface Pairing {
   /** Single-use code the desktop redeems. */
   code: string;
 }
+
+/** Starts Sign in with ChatGPT for the key; the OpenAI address to open on the server's own machine. */
+export const startChatgptSignIn = (apiKey: string) =>
+  api<{ /** OpenAI's sign-in address. */ url: string }>('/config/chatgpt/login', {
+    key: apiKey,
+    method: 'POST',
+    body: {},
+  });
 
 /** Reads the key's settings. */
 export const loadConfig = (apiKey: string) => api<KeyConfig>('/config', { key: apiKey });

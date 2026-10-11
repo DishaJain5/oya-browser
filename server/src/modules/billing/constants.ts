@@ -38,6 +38,13 @@ const STARTUP_HOURS = 500;
 /** Startup's included proxy GiB. */
 const STARTUP_PROXY_GIB = 5;
 
+/** Agent steps a day a key nobody has claimed yet may run on Oya Cloud: a taste, then a free account. */
+export const DEFAULT_TRIAL_AGENT_STEPS = 50;
+/** The same, as OYA_TRIAL_AGENT_STEPS sets it. */
+export const TRIAL_AGENT_STEPS = Number(process.env.OYA_TRIAL_AGENT_STEPS) || DEFAULT_TRIAL_AGENT_STEPS;
+/** The window the trial's steps are counted over. */
+export const TRIAL_WINDOW_HOURS = 24;
+
 /** Every plan by name. Free is what anyone without a paid subscription is on. */
 export const PLANS = {
   free: {

@@ -16,6 +16,7 @@ export type CommandDeps = Pick<
   AppServices,
   | 'control'
   | 'agentTab'
+  | 'layout'
   | 'windows'
   | 'shell'
   | 'tabs'

@@ -14,6 +14,7 @@ import { fill, redact } from './placeholders.ts';
 import { trimContext } from './context.ts';
 import { takeScreenshot, addImageTurn } from './screenshot.ts';
 import { chatCompletion } from '../../platform/llm.ts';
+import type { ModelTransport } from '../../platform/llm/index.ts';
 import { metrics } from '../../platform/metrics.ts';
 import * as usage from '../../platform/usage.ts';
 import { DEFAULT_MAX_ITERATIONS, AGENT_LOG, AGENT_LOG_CHARS, WRAP_UP_STEPS, STOPPED_TEXT } from './constants.ts';
@@ -51,6 +52,10 @@ export type LlmSettings = {
   model: string;
   /** Whether it is the operator's model, whose cost the person is billed for. */
   hosted?: boolean;
+  /** A credential that expires (a ChatGPT plan's): read again before each step, so a long run outlives it. */
+  freshKey?: () => Promise<string>;
+  /** Sends the call from the person's desktop when the credential lives there. */
+  transport?: ModelTransport;
 };
 
 /** One run's settings and callbacks, shared by every step of the loop. */
@@ -323,12 +328,17 @@ async function handleToolCalls(ctx: LoopContext, allMessages, msg) {
   ctx.image = undefined;
 }
 
+/** One step's request: the run's model, a credential fresh enough for it, its tools, and where the call goes out from. */
+async function requestFor(ctx: LoopContext, messages) {
+  const { baseUrl, model, transport } = ctx.llm;
+  const apiKey = ctx.llm.freshKey ? await ctx.llm.freshKey() : ctx.llm.openaiKey;
+  return { baseUrl, apiKey, model, messages, tools: toolsFor(ctx), transport };
+}
+
 /** Asks the model for its next move, billing the tokens. */
 async function complete(ctx: LoopContext, allMessages) {
-  const { baseUrl, openaiKey, model } = ctx.llm;
   await ctx.budget?.();
-  const tools = toolsFor(ctx);
-  const completion = await chatCompletion({ baseUrl, apiKey: openaiKey, model, messages: allMessages, tools });
+  const completion = await chatCompletion(await requestFor(ctx, allMessages));
   // Every iteration of the agentic loop bills, so account per iteration
   // rather than once per request. Each is also one agent step, the unit the
   // platform fee is on, whoever's model it ran on; the verifier's calls are not steps.

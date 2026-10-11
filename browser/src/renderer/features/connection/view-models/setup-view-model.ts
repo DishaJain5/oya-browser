@@ -13,7 +13,7 @@ import { SERVER_URL, TEXT } from '../model/constants.ts';
 import { messageOf, shape, type Config } from '../model/models.ts';
 
 /** The panel's views. */
-export type SetupView = 'start' | 'waiting' | 'manual';
+export type SetupView = 'checklist' | 'start' | 'waiting' | 'manual';
 
 /** The manual form's fields. */
 export type SetupField = 'server' | 'apiKey' | 'name';
@@ -62,7 +62,7 @@ export class SetupViewModel extends ViewModel<SetupState> {
 
   /** On the start view, filled from the saved settings, following the connection and the mode. */
   constructor(deps: SetupDeps) {
-    super({ view: 'start', server: '', apiKey: '', name: '', error: '', busy: false });
+    super({ view: 'checklist', server: '', apiKey: '', name: '', error: '', busy: false });
     this.bridge = deps.bridge;
     this.shell = deps.shell;
     this.own(() => clearTimeout(this.timer));
@@ -151,6 +151,6 @@ export class SetupViewModel extends ViewModel<SetupState> {
 
   /** Logged out: back to the start, with nothing of the old key left in the form. */
   private loggedOut(): void {
-    this.set({ apiKey: '', view: 'start', error: '' });
+    this.set({ apiKey: '', view: 'checklist', error: '' });
   }
 }

@@ -44,6 +44,8 @@ export interface ModelSetupState {
   baseUrl: string;
   /** Why saving failed, or ''. */
   error: string;
+  /** Sign-in was opened in the system browser and the server has not said it finished. */
+  signingIn: boolean;
 }
 
 /** What the key field says. */
@@ -57,7 +59,7 @@ export interface KeyHint {
 /** The parts of the bridge the setup cards use. */
 export type ModelBridge = Pick<
   OyaBrowser,
-  'modelStatus' | 'saveModelKey' | 'openConsole' | 'newTab' | 'onWsStatus' | 'onSettingsChanged'
+  'modelStatus' | 'saveModelKey' | 'signInChatgpt' | 'openConsole' | 'newTab' | 'onWsStatus' | 'onSettingsChanged'
 >;
 
 /** What an unreadable status counts as: signed in with a key, so nothing nags. */
@@ -69,6 +71,13 @@ export function keyHint(status: ModelSummary, entry: CatalogEntry | undefined): 
   if (keeps) return { placeholder: ASK_TEXT.keySaved, help: ASK_TEXT.keyKept };
   return { placeholder: entry?.hint || ASK_TEXT.keyPlaceholder, help: `Paste your ${entry?.label || ''} key.` };
 }
+
+/** Before the server answers: signed in with a key, so nothing nags, and nothing being edited. */
+const INITIAL: ModelSetupState = {
+  ...{ signedIn: true, open: false, optional: false },
+  status: { catalog: [], provider: '', model: '', hasLlmKey: true },
+  ...{ picked: '', key: '', baseUrl: '', error: '', signingIn: false },
+};
 
 /** The setup cards. */
 export class ModelSetupViewModel extends ViewModel<ModelSetupState> {
@@ -83,8 +92,7 @@ export class ModelSetupViewModel extends ViewModel<ModelSetupState> {
 
   /** Hears the connection and settings changes, and reads the server now; `resend` asks a waiting question again. */
   constructor(bridge: ModelBridge, resend: () => void) {
-    const status = { catalog: [], provider: '', model: '', hasLlmKey: true };
-    super({ signedIn: true, open: false, optional: false, status, picked: '', key: '', baseUrl: '', error: '' });
+    super(INITIAL);
     this.bridge = bridge;
     this.resend = resend;
     this.own(bridge.onWsStatus(() => void this.refresh()));
@@ -161,6 +169,12 @@ export class ModelSetupViewModel extends ViewModel<ModelSetupState> {
     return { provider, key, baseUrl, model: this.picker.state.value.trim() };
   }
 
+  /** "Sign in with ChatGPT": the system browser signs in, and the server's settings change closes the card. */
+  async signInWithProvider(): Promise<void> {
+    const started = await this.bridge.signInChatgpt().catch((e: Error) => ({ error: e.message }));
+    this.set(started?.error ? { error: started.error, signingIn: false } : { error: '', signingIn: true });
+  }
+
   /** Opens the picked provider's key page in a new tab. */
   getKey(): void {
     const url = this.entry?.keysUrl;
@@ -174,9 +188,19 @@ export class ModelSetupViewModel extends ViewModel<ModelSetupState> {
 
   /** The settings changed elsewhere: re-read them, and redraw the card unless the person is editing it. */
   private async changed(): Promise<void> {
-    const editing = this.state.open;
+    const editing = this.state.open && !this.state.signingIn;
     await this.refresh();
     if (!editing) this.render();
+    if (this.state.signingIn) this.signedInElsewhere();
+  }
+
+  /** A sign-in finished in the system browser: close the card and ask a waiting question again. */
+  private signedInElsewhere(): void {
+    this.set({ signingIn: false });
+    if (!this.state.status.hasLlmKey) return;
+    this.hide();
+    if (this.pending) this.resend();
+    this.pending = false;
   }
 
   /** Reads the project's model from the server; unsure counts as signed in with a key. */

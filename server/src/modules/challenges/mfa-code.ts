@@ -75,7 +75,8 @@ async function askForCode(llm, body) {
     { role: 'system', content: EXTRACT_PROMPT },
     { role: 'user', content: body },
   ];
-  const completion = await chatCompletion({ baseUrl: llm.baseUrl, apiKey: llm.openaiKey, model: llm.model, messages });
+  const { baseUrl, openaiKey: apiKey, model, transport } = llm;
+  const completion = await chatCompletion({ baseUrl, apiKey, model, messages, transport });
   return String(completion.choices?.[0]?.message?.content || '').trim();
 }
 

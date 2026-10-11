@@ -4,7 +4,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { systemPrompt, REQUEST_HUMAN } from '../../../../src/modules/agent/prompt.ts';
+import { systemPrompt, REQUEST_HUMAN, todayLine } from '../../../../src/modules/agent/prompt.ts';
 
 const FILE = { file: 'cv.pdf', type: 'application/pdf', b64: 'A'.repeat(4096) };
 
@@ -79,4 +79,12 @@ describe('systemPrompt', () => {
 it('offers request_human as a function tool that takes a message', () => {
   assert.equal(REQUEST_HUMAN.function.name, 'request_human');
   assert.deepEqual(REQUEST_HUMAN.function.parameters.required, ['message']);
+});
+
+describe('todayLine', () => {
+  it('names today with its year, so a date given without one is never asked about', () => {
+    const line = todayLine(new Date('2026-10-11T12:00:00Z'));
+    assert.match(line, /Sunday, October 11, 2026/);
+    assert.match(line, /never ask which year/);
+  });
 });

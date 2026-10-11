@@ -116,6 +116,7 @@ describe('signing in with Oya', () => {
 
   it('says the server address is not valid when the dashboard cannot open', async () => {
     const app = build({ openConsole: null });
+    app.setup.show('start');
     await app.setup.signIn();
     assert.equal(app.setup.state.view, 'start');
     assert.match(app.setup.state.error, /not valid/);
@@ -129,10 +130,10 @@ describe('signing in with Oya', () => {
 });
 
 describe('logging out', () => {
-  it('goes back to the start, with nothing of the old key left in the form', async () => {
+  it('goes back to the first-run checklist, with nothing of the old key left in the form', async () => {
     const app = await filled('wss://oya.example.com/ws');
     app.setup.show('manual');
     app.fake.emit('onModeChanged', 'setup');
-    assert.deepEqual([app.setup.state.view, app.setup.state.apiKey], ['start', '']);
+    assert.deepEqual([app.setup.state.view, app.setup.state.apiKey], ['checklist', '']);
   });
 });

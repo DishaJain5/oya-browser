@@ -62,6 +62,9 @@ import { closeConnection } from './platform/storage/index.ts';
 import { handleConnection } from './modules/browsers/socket.ts';
 import { drainChats } from './modules/browsers/http/command.ts';
 import { handleMcpRequest, handlePoolMcpRequest } from './mcp/server.ts';
+import { oauthRouter } from './mcp/oauth/index.ts';
+import { chatgptCallback } from './modules/config/routes.ts';
+import { CHATGPT_CALLBACK_PATH } from './modules/config/constants.ts';
 import { validateApiKey, authReady } from './modules/auth/service.ts';
 import { registry } from './modules/browsers/registry.ts';
 import { pool } from './modules/gateway/routing.ts';
@@ -210,7 +213,13 @@ app.get(['/downloads', '/downloads/'], (req, res) => res.redirect(Status.FOUND, 
 // Counted on the way out (installers, update checks, updates), then served as plain files.
 app.use('/downloads', trackDownloads, express.static(DOWNLOADS_DIR));
 
+// Sign in with ChatGPT returns here, on the loopback address (config/chatgpt.ts).
+app.get(CHATGPT_CALLBACK_PATH, chatgptCallback);
+
 // ── MCP endpoints (root level, clients connect directly) ──
+// OAuth sign-in for connector clients (claude.ai): /authorize, /token, /register, /revoke, .well-known.
+const oauth = oauthRouter();
+if (oauth) app.use(oauth);
 // A per-browser MCP request is served by the replica holding that browser.
 app.use('/mcp', express.json(), forwardHttp);
 app.post('/mcp/pool', handlePoolMcpRequest);

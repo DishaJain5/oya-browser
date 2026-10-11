@@ -30,6 +30,8 @@ import { llmCatalog } from './llm-catalog.ts';
 import { store, state, scopeFor, flush, markChanged, changed } from './store.ts';
 import { MASK_TAIL } from './constants.ts';
 import { agentKeyUnclaimed } from '../auth/service.ts';
+import { credentialOf, desktopHeld } from './chatgpt-credential.ts';
+import type { ModelTransport } from '../../platform/llm/index.ts';
 
 export { FIELDS, PROVIDER_CHOICES } from './fields.ts';
 
@@ -58,6 +60,9 @@ function reveal(owner, field, raw) {
     return '';
   }
 }
+
+/** The llm_provider a key saved, or ''. */
+export const llmProviderOf = (apiKey): string => plain(apiKey).llm_provider || '';
 
 /** Every field for one key, plaintext. Server-side only. */
 function plain(apiKey) {
@@ -182,7 +187,7 @@ function commit(owner, row) {
 export async function set(apiKey, updates = {}) {
   checkUpdates(updates);
   const owner = ownerOf(apiKey);
-  const row = { ...(store.get(owner) || {}) };
+  const row = rowToEdit(owner, updates);
   let changed = false;
   for (const entry of Object.entries(FIELDS)) changed = (await apply(owner, row, entry, updates[entry[0]])) || changed;
   if (!changed) return false;
@@ -190,8 +195,22 @@ export async function set(apiKey, updates = {}) {
   return true;
 }
 
+/**
+ * Moving a key off the ChatGPT plan drops the sign-in with it: the stored
+ * credential is a refresh token, which must never be sent on as another
+ * provider's API key. The desktop asks for a new key on a switch; the REST API
+ * takes the switch alone, so this is where it is caught.
+ */
+function rowToEdit(owner, updates) {
+  const row = { ...(store.get(owner) || {}) };
+  const switching = typeof updates.llm_provider === 'string' && updates.llm_provider !== 'chatgpt';
+  const stored = reveal(owner, 'openai_api_key', row.openai_api_key);
+  if (switching && (credentialOf(stored) || desktopHeld(stored))) delete row.openai_api_key;
+  return row;
+}
+
 /** The LLM settings a request runs with. */
-type LlmConfig = {
+export type LlmConfig = {
   /** True when the credential is the key's own rather than the deployment's. */
   own?: boolean;
   /** The API key sent to the LLM provider. */
@@ -200,6 +219,8 @@ type LlmConfig = {
   baseUrl: string;
   /** The chat model to ask for. */
   model: string;
+  /** Sends the call from the person's desktop when the credential lives there. */
+  transport?: ModelTransport;
 };
 
 /** The LLM config of a key that brought its own credential. */

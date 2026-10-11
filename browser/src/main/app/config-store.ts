@@ -50,6 +50,10 @@ export interface ConfigValues {
   account?: Record<string, unknown> | null;
   /** The persona's display name, as the server sent it. */
   profileName?: string;
+  /** This install's ChatGPT agent host id: opaque, made once (src/main/chatgpt/auth.ts). */
+  chatgptHostId?: string;
+  /** Where the person claims a key this app made into an Oya account. */
+  claimUrl?: string;
   /** The shell's appearance and panel. */
   ui?: UiPreferences;
   /** Any other field the app keeps (routines from before the move, import records, sync marks). */

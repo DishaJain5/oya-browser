@@ -138,6 +138,22 @@ describe('AskViewModel', () => {
     assert.deepEqual(shown(ask), ['user: find flights']);
   });
 
+  it('shows the free-account card, not the raw link, when the trial is used up; the page opens only on the button', async () => {
+    const spent = {
+      error: 'Today’s 3 free agent steps are used up. … http://x/claim#secret-key',
+      code: 'claim_required',
+    };
+    const { fake, ask } = await chatting({ sendChat: spent, openClaim: undefined });
+    await ask.ask('find flights');
+    assert.equal(ask.state.trialSpent, true);
+    assert.deepEqual(shown(ask), ['user: find flights'], 'the key in the link never lands in the conversation');
+    assert.equal(fake.called('openClaim').length, 0);
+    ask.createAccount();
+    assert.equal(fake.called('openClaim').length, 1);
+    ask.dismissTrial();
+    assert.equal(ask.state.trialSpent, false);
+  });
+
   it('offers Save as playbook under the newest reply only, named from the prompt', async () => {
     const { ask } = await chatting({ sendChat: { text: 'ok', toolCalls: [{ name: 'click' }] } });
     await ask.ask('Check my inbox!');

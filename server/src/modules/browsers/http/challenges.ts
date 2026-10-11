@@ -9,6 +9,7 @@ import * as captcha from '../../challenges/captcha.ts';
 import * as mfa from '../../challenges/mfa.ts';
 import * as credentials from '../../personas/credentials.ts';
 import * as keyConfig from '../../config/service.ts';
+import { resolveFresh } from '../../config/chatgpt.ts';
 import { auditBrowser } from './helpers.ts';
 import { allowedLlm } from '../../agent/chat.ts';
 
@@ -48,5 +49,5 @@ const mfaOptions = async (req, browser) => ({
   liveViewUrl: `/dashboard/?browser=${encodeURIComponent(req.params.browserId)}`,
   domain: credentials.domainOf(browser?.currentUrl || ''),
   since: Number(req.body?.since) || 0,
-  llm: await allowedLlm(getKey(req), keyConfig.resolve(getKey(req))),
+  llm: await allowedLlm(getKey(req), await resolveFresh(getKey(req))),
 });

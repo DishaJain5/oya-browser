@@ -251,6 +251,7 @@ body.mode-setup .setup-screen {
 .welcome-view {
   display: none;
 }
+.setup-screen[data-view='checklist'] .welcome-view[data-view='checklist'],
 .setup-screen[data-view='start'] .welcome-view[data-view='start'],
 .setup-screen[data-view='waiting'] .welcome-view[data-view='waiting'],
 .setup-screen[data-view='manual'] .welcome-view[data-view='manual'] {
@@ -482,4 +483,161 @@ body.mode-setup .setup-screen {
   font-family: var(--font);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── First-run stepper: one open step, the rest quiet ─────────────────────── */
+.stepper-view h2 {
+  margin-bottom: 6px;
+}
+.stepper {
+  margin: 4px 0 20px;
+  padding: 0;
+  list-style: none;
+}
+.stepper-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 14px;
+  padding-bottom: 22px;
+  transition: opacity 240ms ease;
+}
+/* The rail between markers, green once the step above it is done. */
+.stepper-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 32px;
+  bottom: 4px;
+  left: 13.5px;
+  width: 1px;
+  background: var(--border);
+}
+.stepper-step[data-state='done']:not(:last-child)::before,
+.stepper-step[data-state='skipped']:not(:last-child)::before {
+  background: color-mix(in srgb, var(--logo-green) 45%, var(--border));
+}
+.stepper-marker {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: lining-nums;
+  color: var(--secondary);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition:
+    background 240ms ease,
+    color 240ms ease,
+    box-shadow 240ms ease;
+}
+.stepper-step[data-state='active'] .stepper-marker {
+  color: var(--logo-green);
+  box-shadow:
+    inset 0 0 0 1.5px var(--logo-green),
+    0 0 0 4px color-mix(in srgb, var(--logo-green) 12%, transparent);
+}
+.stepper-step[data-state='done'] .stepper-marker {
+  color: var(--surface);
+  background: var(--logo-green);
+  box-shadow: none;
+}
+.stepper-step[data-state='ahead'],
+.stepper-step[data-state='skipped'] {
+  opacity: 0.5;
+}
+.stepper-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding-top: 4px;
+}
+.stepper-body strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.stepper-detail {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+.stepper-action {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  animation: welcome-in 320ms var(--spring) both;
+}
+/* "Bring in my logins": a small switch, drawn here so the shared input styles never reach it. */
+.stepper-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.stepper-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.stepper-switch-track {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 200ms ease;
+}
+.stepper-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2);
+  transition: transform 200ms var(--spring);
+}
+.stepper-switch input:checked + .stepper-switch-track {
+  background: var(--logo-green);
+}
+.stepper-switch input:checked + .stepper-switch-track::after {
+  transform: translateX(12px);
+}
+.stepper-switch input:focus-visible + .stepper-switch-track {
+  outline: 2px solid var(--logo-green);
+  outline-offset: 2px;
+}
+/* The quiet ways out, side by side under everything. */
+.stepper-links {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 18px;
+}
+.stepper-links button {
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--secondary);
+  cursor: pointer;
+}
+.stepper-links button:hover {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

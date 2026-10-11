@@ -1,4 +1,5 @@
 /** Install immutable document and worker protection before a session creates any renderer. */
+import { canonicalJson } from '../../shared/canonical-json.ts';
 import { NativeSessionPolicies } from './install.ts';
 import type { PolicySession } from './types.ts';
 /** Exact original sources executed by the engine before website code. */
@@ -48,7 +49,7 @@ export class NativeSessionProtection {
   private readonly bindings = new WeakMap<ProtectedSession, ProtectionBinding>();
   /** Install once, or demand an identical immutable policy on reconnect. */
   configure(session: ProtectedSession, policy: unknown, sources: PreScriptPolicy): void {
-    const key = JSON.stringify({ policy, sources });
+    const key = canonicalJson({ policy, sources });
     const existing = this.bindings.get(session);
     if (existing) return this.reuse(existing, key);
     if (protectionState(session).rendererStarted) throw Error('Native protection requires a cold session');

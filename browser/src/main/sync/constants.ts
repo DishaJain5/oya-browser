@@ -49,7 +49,32 @@ export const COOKIE_REJECTION_CODES = [
   'EXCLUDE_USER_PREFERENCES',
   'EXCLUDE_DOMAIN_MISMATCH',
   'EXCLUDE_NOT_ON_PATH',
+  'EXCLUDE_SECURE_ONLY',
 ] as const;
 
 /** Native refusal preserves an existing stronger local cookie instead of importing a weaker server copy. */
 export const COOKIE_LOCAL_CONFLICT_CODES = ['EXCLUDE_OVERWRITE_SECURE', 'EXCLUDE_OVERWRITE_HTTP_ONLY'] as const;
+
+/**
+ * Refusals of a cookie Chromium can never store as given: a bad domain, prefix,
+ * path or character, an oversize value, a Secure cookie for an http address.
+ * Retrying cannot succeed, so failing the whole restore over one (a browser
+ * import carries thousands) only leaves the persona unusable. Storage failures
+ * (EXCLUDE_FAILURE_TO_STORE, EXCLUDE_UNKNOWN_ERROR) and unknown reasons are not here.
+ */
+export const COOKIE_UNSTORABLE_CODES = [
+  'EXCLUDE_INVALID_DOMAIN',
+  'EXCLUDE_INVALID_PREFIX',
+  'EXCLUDE_INVALID_PATH',
+  'EXCLUDE_SAMESITE_NONE_INSECURE',
+  'EXCLUDE_NAME_VALUE_PAIR_EXCEEDS_MAX_SIZE',
+  'EXCLUDE_ATTRIBUTE_VALUE_EXCEEDS_MAX_SIZE',
+  'EXCLUDE_DOMAIN_NON_ASCII',
+  'EXCLUDE_DISALLOWED_CHARACTER',
+  'EXCLUDE_NO_COOKIE_CONTENT',
+  'EXCLUDE_AMBIGUOUS_SERIALIZATION',
+  'EXCLUDE_DOMAIN_MISMATCH',
+  'EXCLUDE_NOT_ON_PATH',
+  'EXCLUDE_SECURE_ONLY',
+  'EXCLUDE_USER_PREFERENCES',
+] as const;

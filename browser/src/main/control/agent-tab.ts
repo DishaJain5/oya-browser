@@ -142,6 +142,14 @@ export class AgentTab {
     if (!this.humanMay(tabId)) throw new Error('Take control before interacting with this page');
   }
 
+  /** A link the agent's tab `from` opened in tab `to`: whichever lane drives `from` drives `to` now, as with open_tab. */
+  handOff(from: number, to: number): void {
+    const lane = [...this.claims].find(([, id]) => id === from)?.[0];
+    if (lane === undefined) return;
+    this.update(() => this.claims.set(lane, to));
+    this.keepAlive(lane);
+  }
+
   /** Whether the window shows the running lane's tab, so what it opens is shown too. */
   following(): boolean {
     return !this.scoped() || this.id === null || this.deps.tabs.activeTabId === this.id;

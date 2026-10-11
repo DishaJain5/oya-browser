@@ -2,8 +2,9 @@
  * The Ask pane (`#pane-chat`): the toolbar (profile picker, Model, Clear), the
  * Sign in and model cards, the conversation, and the input bar.
  */
+import { ASK_TEXT } from '../model/constants.ts';
 import { useViewModel } from '../../../hooks/index.ts';
-import { Button, IconButton } from '../../../ui/index.ts';
+import { Button, Icon, IconButton } from '../../../ui/index.ts';
 import './ask.css';
 import type { RendererServices } from '../../../app/services.ts';
 import type { AskViewModel } from '../view-models/ask-view-model.ts';
@@ -96,6 +97,32 @@ function StepLimitCard({ ask }: AskPartProps) {
   );
 }
 
+/** Today's free steps are used up: what a free account adds, and the way to make one. */
+function TrialCard({ ask }: AskPartProps) {
+  const { trialSpent } = useViewModel(ask);
+  if (!trialSpent) return null;
+  return (
+    <div className="chat-card trial-card" role="status">
+      <span className="trial-card-mark" aria-hidden="true">
+        <Icon name="spark" />
+      </span>
+      <h2>{ASK_TEXT.trialTitle}</h2>
+      <p>{ASK_TEXT.trialBody}</p>
+      <ul className="trial-card-perks">
+        {ASK_TEXT.trialPerks.map((perk) => (
+          <li key={perk}>{perk}</li>
+        ))}
+      </ul>
+      <div className="chat-card-actions">
+        <Button onClick={() => ask.dismissTrial()}>{ASK_TEXT.trialLater}</Button>
+        <Button variant="primary" onClick={() => ask.createAccount()}>
+          {ASK_TEXT.trialCreate}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** The Ask pane, shown while the panel is on Ask. */
 export function AskPane({ ask, panel, onViewPlaybook }: AskPaneProps) {
   const { pane } = useViewModel(panel);
@@ -106,6 +133,7 @@ export function AskPane({ ask, panel, onViewPlaybook }: AskPaneProps) {
       <ModelCard model={ask.model} />
       <Messages ask={ask} onViewPlaybook={onViewPlaybook} />
       <StepLimitCard ask={ask} />
+      <TrialCard ask={ask} />
       <Composer ask={ask} panel={panel} />
     </div>
   );

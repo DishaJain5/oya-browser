@@ -75,6 +75,59 @@ function KeyField({ model }: ModelCardProps) {
   );
 }
 
+/** Whether the picked provider is signed in to and has no sign-in on the project yet: the card offers sign-in, not Save. */
+const needsSignIn = (model: ModelSetupViewModel) =>
+  !!model.entry?.signIn && !(model.state.status.provider === model.entry.id && model.state.status.hasLlmKey);
+
+/** In place of the key field for a provider that is signed in to: what it uses, and the wait once started. */
+function SignInField({ model }: ModelCardProps) {
+  const { signingIn } = useViewModel(model);
+  return (
+    <div className="model-field">
+      <span className="model-help" id="chat-model-signin-help">
+        {signingIn ? ASK_TEXT.signInWaiting : ASK_TEXT.signInHelp}
+      </span>
+    </div>
+  );
+}
+
+/** The key and endpoint fields, or the sign-in line for a provider signed in to. */
+function Credentials({ model }: ModelCardProps) {
+  useViewModel(model);
+  if (model.entry?.signIn) return <SignInField model={model} />;
+  return (
+    <>
+      <KeyField model={model} />
+      <EndpointField model={model} />
+    </>
+  );
+}
+
+/** The card's buttons: Get a key and Save, or Sign in with ChatGPT until the project is signed in. */
+function CardActions({ model }: ModelCardProps) {
+  const { optional } = useViewModel(model);
+  const signIn = needsSignIn(model);
+  return (
+    <div className="chat-card-actions">
+      <Button type="button" id="chat-model-get" hidden={!!model.entry?.signIn} onClick={() => model.getKey()}>
+        Get a key
+      </Button>
+      <Button type="button" id="chat-model-cancel" hidden={!optional} onClick={() => model.hide()}>
+        Cancel
+      </Button>
+      {signIn ? (
+        <Button type="button" variant="primary" id="chat-model-signin" onClick={() => void model.signInWithProvider()}>
+          {ASK_TEXT.signInButton}
+        </Button>
+      ) : (
+        <Button type="submit" variant="primary" id="chat-model-save">
+          Save
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /** The card's head: "Connect an AI model" until the project has a key, then "AI model". */
 function ModelCardHead({ model }: ModelCardProps) {
   const { status } = useViewModel(model);
@@ -113,7 +166,7 @@ function EndpointField({ model }: ModelCardProps) {
 
 /** The model card. */
 export function ModelCard({ model }: ModelCardProps) {
-  const { open, optional, error } = useViewModel(model);
+  const { open, error } = useViewModel(model);
   return (
     <form
       className="chat-card model-card"
@@ -134,22 +187,11 @@ export function ModelCard({ model }: ModelCardProps) {
         </span>
         <ModelPicker picker={model.picker} />
       </div>
-      <KeyField model={model} />
-      <EndpointField model={model} />
+      <Credentials model={model} />
       <p className="chat-card-error" id="chat-model-error" role="alert" hidden={!error}>
         {error}
       </p>
-      <div className="chat-card-actions">
-        <Button type="button" id="chat-model-get" onClick={() => model.getKey()}>
-          Get a key
-        </Button>
-        <Button type="button" id="chat-model-cancel" hidden={!optional} onClick={() => model.hide()}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="primary" id="chat-model-save">
-          Save
-        </Button>
-      </div>
+      <CardActions model={model} />
     </form>
   );
 }

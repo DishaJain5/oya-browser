@@ -105,6 +105,30 @@ describe('PanelLayout', () => {
     assert.deepEqual(ctx.shell.sentOn('dev-panel-state'), [true]);
   });
 
+  it('shuts the panel on every tab at sign-out and says so, with no slide left running', () => {
+    ctx.tabs.activeTabId = 1;
+    ctx.layout.toggle();
+    ctx.tabs.activeTabId = 2;
+    ctx.layout.toggle(true);
+    ctx.layout.closeAll();
+    assert.equal(ctx.layout.open, false);
+    assert.equal(ctx.layout.progress, 0);
+    ctx.tabs.activeTabId = 1;
+    assert.equal(ctx.layout.open, false);
+    assert.equal(ctx.shell.sentOn('dev-panel-state').at(-1), false);
+  });
+
+  it('a site tab opened from one with the panel open keeps it open; a start page stays shut', () => {
+    ctx.tabs.activeTabId = 1;
+    ctx.layout.toggle(true);
+    ctx.layout.inherit(2, 'https://a.test/');
+    ctx.layout.inherit(3, 'oya:home');
+    ctx.tabs.activeTabId = 2;
+    assert.equal(ctx.layout.open, true);
+    ctx.tabs.activeTabId = 3;
+    assert.equal(ctx.layout.open, false);
+  });
+
   it('keeps the panel open or shut per tab, so closing it on one tab leaves the others', () => {
     ctx.tabs.activeTabId = 1;
     ctx.layout.toggle(true);

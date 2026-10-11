@@ -121,6 +121,32 @@ describe('Persona', () => {
     assert.equal(ctx.shell.sentOn('fingerprint-changed')[0].id, 'p1');
   });
 
+  it('a switch that fails reopens the closed pages under the previous persona instead of leaving no tab', async () => {
+    ctx.cookies.applyCookieSync = async () => {
+      throw Error('Cookie sync incomplete: {"EXCLUDE_FAILURE_TO_STORE":1}');
+    };
+    await assert.rejects(ctx.persona.applyServerFingerprint(PROFILE, [{}], 9000), /Cookie sync incomplete/);
+    assert.deepEqual(
+      order.filter((step) => Array.isArray(step) && step[0] === 'open'),
+      [
+        ['open', 'https://a.test/'],
+        ['open', 'about:blank'],
+        ['open', 'oya:home'],
+      ],
+    );
+    assert.equal(ctx.persona.active, null);
+    assert.notEqual(ctx.config.values.activeProfileId, 'p1');
+  });
+
+  it('a failed switch with no tabs open opens the start page', async () => {
+    ctx.tabs.list.length = 0;
+    ctx.cookies.applyCookieSync = async () => {
+      throw Error('Cookie sync incomplete');
+    };
+    await assert.rejects(ctx.persona.applyServerFingerprint(PROFILE, [], 9000));
+    assert.deepEqual(order.at(-1), ['open', 'oya:home']);
+  });
+
   it("runs as a persona mirrored from the person's real browser, whose device has no font list and no noise", async () => {
     const mirrored = {
       ...PROFILE,

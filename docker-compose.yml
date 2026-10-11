@@ -21,6 +21,8 @@ services:
         required: false
     environment:
       - PORT=3100
+      # The port a browser on the host reaches this server on; Sign in with ChatGPT returns there.
+      - OYA_PUBLIC_PORT=${PORT:-3100}
     volumes:
       # Personas, key settings, cookies and the generated secret. Without
       # Supabase this is the only durable state there is.

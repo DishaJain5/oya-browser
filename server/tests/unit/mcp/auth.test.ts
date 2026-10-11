@@ -1,13 +1,16 @@
 /**
  * Unit tests for MCP authorization: only an operator credential gets through;
  * a viewer is refused 403, a bad or missing key 401, and an unavailable
- * credential store 503. A share link reaches only its own browser.
+ * credential store 503. A share link reaches only its own browser. With OAuth
+ * on, a 401 names where an OAuth client signs in.
  */
 import { describe, it, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { authorize } from '../../../src/mcp/auth.ts';
 import { HttpError } from '../../../src/platform/errors.ts';
 import { FakeResponse, fakeRequest, stubControl } from '../support/browsers.ts';
+import { restoreEnv } from '../support/data-dir.ts';
+import { oauthRouter } from '../../../src/mcp/oauth/index.ts';
 
 /** Authorizes a request carrying `key`; returns the outcome and the response. */
 async function check(key: string, params = {}) {
@@ -44,6 +47,15 @@ describe('authorize', () => {
     const { caller, res } = await check('');
     assert.equal(caller, null);
     assert.deepEqual([res.statusCode, res.body], [401, { error: 'Missing or invalid API key' }]);
+  });
+
+  it('tells an OAuth client where to sign in when OAuth is on', async () => {
+    const saved = process.env.OYA_CONSOLE_URL;
+    process.env.OYA_CONSOLE_URL = 'https://oya.example';
+    oauthRouter();
+    restoreEnv('OYA_CONSOLE_URL', saved);
+    const { res } = await check('');
+    assert.match(res.headers['WWW-Authenticate'], /resource_metadata=".*\/oauth-protected-resource\/mcp\/pool"/);
   });
 
   it('answers 503, not 401, when credentials cannot be checked', async () => {

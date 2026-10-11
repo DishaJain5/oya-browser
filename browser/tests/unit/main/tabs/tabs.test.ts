@@ -79,6 +79,22 @@ describe('TabManager', () => {
     ]);
   });
 
+  it("a new start page takes every page off the window, even an agent's stacked beneath (Electron's setBrowserView skips some)", () => {
+    const page = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
+    const agent = ctx.tabs.find(ctx.tabs.createTab('https://b.test/', false));
+    ctx.shell.window.views = [agent.view, page.view];
+    ctx.tabs.createTab(HOME_URL);
+    assert.deepEqual(ctx.shell.window.views, []);
+  });
+
+  it('a site opened from a tab keeps that tab’s panel, a new start page does not', () => {
+    const inherited: Array<[number, string]> = [];
+    ctx.layout.inherit = (id, url) => inherited.push([id, url]);
+    const site = ctx.tabs.createTab('https://a.test/');
+    ctx.tabs.createTab('https://b.test/', false);
+    assert.deepEqual(inherited, [[site, 'https://a.test/']], 'only a tab that shows asks for the panel');
+  });
+
   it('shows no web page on the start page, and brings the tab back with its first real page', () => {
     const tab = ctx.tabs.find(ctx.tabs.createTab(HOME_URL));
     assert.equal(tab.url, '', 'the address bar is empty on the start page');
@@ -220,12 +236,15 @@ describe('TabManager', () => {
     assert.equal(revealed, 1);
   });
 
-  it('leaves browsing mode with every tab closed and none reopened', () => {
+  it('leaves browsing mode with every tab closed, none reopened, and the panel shut', () => {
+    let shut = 0;
+    ctx.layout.closeAll = () => shut++;
     ctx.shell.browsingMode = false;
     ctx.tabs.enterBrowsingMode();
     ctx.tabs.createTab('https://x.test/', true);
     ctx.tabs.leaveBrowsingMode();
     assert.equal(ctx.tabs.list.length, 0);
+    assert.equal(shut, 1);
     assert.equal(ctx.shell.browsingMode, false);
     assert.deepEqual(ctx.shell.sentOn('mode-changed'), ['browsing', 'setup']);
   });

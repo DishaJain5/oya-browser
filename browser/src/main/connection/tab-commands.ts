@@ -135,7 +135,8 @@ export const TAB_COMMANDS: Record<string, TabHandler> = {
   switch_tab: (runner, id, params) => {
     const refused = tabRefusal(runner.deps, params?.tab_id);
     if (refused) return runner.sendResult(id, false, null, refused);
-    const { tabs, agentTab } = runner.deps;
+    const { tabs, agentTab, layout } = runner.deps;
+    if (layout.open) layout.openFor(params!.tab_id!); // the panel the person had open follows the agent
     if (agentTab.following()) tabs.activateTab(params!.tab_id!); // found by tabRefusal
     agentTab.claim(params?.tab_id);
     runner.sendResult(id, true, { tab_id: params?.tab_id });

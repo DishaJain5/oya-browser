@@ -6,10 +6,10 @@ import { Router } from 'express';
 import { userAuthMiddleware } from '../auth/service.ts';
 import { control, fault } from './service.ts';
 import { Status } from '../../platform/http-status.ts';
-import { AUTO_NAME, listProjects, joinProject, consoleAccess } from './http/projects.ts';
+import { AUTO_NAME, listProjects, joinProject, consoleAccess, projectAccess, roleIn } from './http/projects.ts';
 import { inviteMember, removeMember } from './http/members.ts';
 
-export { AUTO_NAME, inviteMember, removeMember };
+export { AUTO_NAME, inviteMember, removeMember, projectAccess, roleIn };
 
 /** Routes for a signed-in user's projects, keyed by user rather than API key. */
 export const projectAccountRouter = Router();
