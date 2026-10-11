@@ -1,7 +1,7 @@
 /** Bind native storage to authenticated persona sessions, including popup discovery and reconnect flushing. */
 import type { App, Session, WebContents } from 'electron';
 import type { Origins } from '../../page/login-state.ts';
-import { NativeStorageSync, type NativeStoragePort } from './native-storage.ts';
+import { NativeStorageSync, hasNativeStorage, type NativeStoragePort } from './native-storage.ts';
 import { storageImport } from './native-storage-values.ts';
 import { STORAGE_FLUSH_MS, STORAGE_ORIGINS_MAX } from './constants.ts';
 /** Application-owned seams: no renderer evaluation or debugging connection. */
@@ -66,16 +66,24 @@ export class PersonaStorage {
     this.timer = setInterval(() => this.deliverPending(), STORAGE_FLUSH_MS);
     this.timer.unref();
   }
-  /** Validate before retiring the previous persona; reconnect never replays imports over local logout. */
+  /**
+   * Validate before retiring the previous persona; reconnect never replays imports over local logout.
+   * Stock Electron (desktop) skips localStorage sync: cookies still sync, storage needs the patched engine.
+   */
   async activate(session: Session, origins: Origins): Promise<void> {
     if (this.closed) throw Error('Native persona storage is disposed');
     storageImport(origins);
     if (this.active?.session === session) return this.active.ready;
-    this.active?.sync.dispose();
+    this.retire();
+    if (!hasNativeStorage(session)) return;
     const binding = this.bind(session);
     this.active = binding;
-    binding.ready = this.initialize(binding, origins);
-    await binding.ready;
+    return (binding.ready = this.initialize(binding, origins));
+  }
+  /** Stop the previous persona's observers so none of its replies publish after a switch. */
+  private retire(): void {
+    this.active?.sync.dispose();
+    this.active = null;
   }
   /** A send is permitted only while the immutable binding is still the selected authenticated persona. */
   private bind(session: Session): Binding {

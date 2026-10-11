@@ -194,3 +194,15 @@ it('even an empty cold import refuses readiness after premature surface exposure
   assert.equal(f.errors.length, 1);
   f.service.dispose();
 });
+it('skips storage sync on stock Electron instead of failing authentication', async () => {
+  const f = fixture(),
+    session: any = new EventEmitter();
+  try {
+    await f.service.activate(session, { [origin]: { account: 'Alice' } });
+    f.link.online = true;
+    assert.equal(await f.service.flush(), true);
+    assert.deepEqual(f.sent, []);
+  } finally {
+    f.service.dispose();
+  }
+});

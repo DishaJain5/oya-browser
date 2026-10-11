@@ -5,16 +5,20 @@ import type { NativeStoragePort, StorageListener, StorageSyncDeps } from './nati
 import { storageImport, storageOrigin, storageValues } from './native-storage-values.ts';
 import { STORAGE_CAPTURE_TIMEOUT_MS, STORAGE_ORIGINS_MAX } from './constants.ts';
 export type { NativeStoragePort, StorageSyncDeps } from './native-storage-types.ts';
+/** The engine methods native storage sync needs; only the patched (Linux cloud) engine has them. */
+const NATIVE_STORAGE = [
+  '_readOyaLocalStorage',
+  '_restoreOyaLocalStorage',
+  '_watchOyaLocalStorage',
+  '_unwatchOyaLocalStorage',
+];
+/** Stock Electron (desktop) has no native storage; callers skip sync there rather than fall back to CDP. */
+export function hasNativeStorage(session: object): boolean {
+  return NATIVE_STORAGE.every((name) => typeof (session as Record<string, unknown>)[name] === 'function');
+}
 /** Fail explicitly on older engines rather than falling back to CDP or late page-script injection. */
 function requireNative(session: NativeStoragePort): void {
-  for (const name of [
-    '_readOyaLocalStorage',
-    '_restoreOyaLocalStorage',
-    '_watchOyaLocalStorage',
-    '_unwatchOyaLocalStorage',
-  ])
-    if (typeof session[name as keyof NativeStoragePort] !== 'function')
-      throw Error('Native storage capability unavailable');
+  if (!hasNativeStorage(session)) throw Error('Native storage capability unavailable');
 }
 /** Exclusive ownership: exactly one instance watches storage for a persona's session. */
 export class NativeStorageSync {
