@@ -89,7 +89,7 @@ describe('context menu', () => {
     await flush();
     assert.equal(evaluated, false);
     assert.equal(revealed, 1);
-    assert.match(ctx.shell.sentOn('inspect-result')[0].error, /Take control/);
+    assert.match(ctx.shell.sentOn('inspect-result')[0].error, /Switch to Human Mode/);
   });
 
   it('inspects without leaving labels drawn on the page', () => {

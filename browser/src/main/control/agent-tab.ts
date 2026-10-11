@@ -140,7 +140,7 @@ export class AgentTab {
 
   /** Throws unless the person may use tab `tabId` (null: something new, such as a new tab). */
   requireFor(tabId: number | null | undefined): void {
-    if (!this.humanMay(tabId)) throw new Error('Take control before interacting with this page');
+    if (!this.humanMay(tabId)) throw new Error('Switch to Human Mode before using this page');
   }
 
   /** A link the agent's tab `from` opened in tab `to`: whichever lane drives `from` drives `to` now, as with open_tab. */

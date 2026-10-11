@@ -141,7 +141,7 @@ export function ChecklistView({ vm, onAccount, onSkip }: ChecklistProps) {
         </button>
       )}
       <nav className="stepper-links" aria-label="Other ways in">
-        <button type="button" onClick={onAccount}>
+        <button type="button" id="btn-have-account" onClick={onAccount}>
           {TEXT.haveAccount}
         </button>
         <button type="button" onClick={onSkip}>

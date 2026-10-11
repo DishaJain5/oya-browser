@@ -6,6 +6,15 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Changed
+
+- Who drives the browser is now one switch in the toolbar: **OyaAI Mode** while the agent works, **Human Mode** while you do. Click the other side to hand over; after a pause, OyaAI Mode picks up where the agent stopped.
+- The Oya button is now **Oya Assistant**.
+
+### Fixed
+
+- While control was being handed back, the agent's next step could find the page still yours and leave it uncovered.
+
 ## [1.0.176](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.176) · 2026-10-11
 
 ### Fixed

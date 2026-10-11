@@ -8,7 +8,7 @@
 import { ViewModel } from '../../../core/view-model.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
 import type { ControlChange } from '../../../../shared/ipc.ts';
-import { CONTROL_LABELS, OFFLINE_MODE, TEXT } from '../model/constants.ts';
+import { CONTROL_LABELS, OFFLINE_MODE, RESUME_TITLE, TEXT } from '../model/constants.ts';
 
 /** Who drives, as control-state.cjs `snapshot()` reports it (the fields the bar reads). */
 export interface ControlSnapshot {
@@ -134,6 +134,55 @@ export function controlLook({ control: c, error, pending }: ControlState): Contr
   const title = error || (c.interactive ? TEXT.interactive : TEXT.watchOnly);
   const resume = { hidden: c.mode !== 'paused' || !!c.taking || !!c.busy, disabled: !!c.busy || pending === 'resume' };
   return { mode, label: error || controlLabel(c, mode), title, action: actionLook(c, pending), resume };
+}
+
+/** One side of the OyaAI Mode / Human Mode switch. */
+export interface SwitchSide {
+  /** This side is the one in effect. */
+  on: boolean;
+  /** It cannot be chosen now (in effect already, or a change is under way). */
+  disabled: boolean;
+  /** What choosing it does, as a tooltip. */
+  title: string;
+}
+
+/** The OyaAI Mode / Human Mode switch: its sides, and a status for the moments neither side says it all. */
+export interface ModeSwitch {
+  /** No handoff is possible here (another operator, or no agent to hand to): only the status shows. */
+  hidden: boolean;
+  /** OyaAI Mode: the agent drives. Choosing it hands back, or resumes after a pause. */
+  agent: SwitchSide;
+  /** Human Mode: you drive. Choosing it takes control. */
+  human: SwitchSide;
+  /** Said beside the switch while it is changing, paused, failed or out of reach; '' when a side says it. */
+  status: string;
+}
+
+/** The switch for this state, built on the control bar's look so the two never disagree. */
+export function modeSwitch(state: ControlState): ModeSwitch {
+  const look = controlLook(state);
+  const mine = !!state.control && isMine(state.control);
+  const human = { on: mine, disabled: mine || look.action.hidden || look.action.disabled, title: TEXT.take };
+  const hidden = look.action.hidden && look.resume.hidden;
+  return { hidden, agent: agentSide(look, mine), human, status: statusOf(state, look, mine) };
+}
+
+/**
+ * OyaAI Mode: in effect while the agent drives; never while control is still yours,
+ * as during a hand-back (the agent's next command must find it returned). Chosen, it
+ * hands back (yours) or resumes (paused).
+ */
+function agentSide(look: ControlBarLook, mine: boolean): SwitchSide {
+  const paused = look.mode === 'paused';
+  const on = !mine && (look.mode === 'agent' || look.mode === 'taking');
+  const back = paused ? look.resume : { ...look.action, hidden: look.action.hidden || !mine };
+  return { on, disabled: on || back.hidden || back.disabled, title: paused ? RESUME_TITLE : TEXT.release };
+}
+
+/** The status beside the switch: none once a side says it, else the bar's own label. */
+function statusOf(state: ControlState, look: ControlBarLook, mine: boolean): string {
+  const settled = (look.mode === 'agent' || mine) && !state.error && !state.control?.busy;
+  return settled ? '' : look.label;
 }
 
 /** Whether Take control is on offer right now. */

@@ -123,3 +123,79 @@
   background: var(--glass-strong);
   box-shadow: inset 0 0 0 0.5px var(--hairline);
 }
+/* ── The OyaAI Mode / Human Mode switch: one capsule, the side in effect raised ── */
+.control-status {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.control-status[data-mode='agent'] {
+  background: none;
+  box-shadow: none;
+}
+.control-switch {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--hover);
+  box-shadow: inset 0 0 0 0.5px var(--hairline);
+}
+.control-switch[hidden] {
+  display: none;
+}
+.control-status .control-switch button,
+.control-status[data-mode='agent'] .control-switch button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 560;
+  transition:
+    background-color var(--t-base) var(--ease),
+    color var(--t-base) var(--ease),
+    box-shadow var(--t-base) var(--ease);
+}
+.control-status .control-switch button:not([aria-pressed='true']):not(:disabled):hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+}
+.control-status .control-switch button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+/* OyaAI Mode in effect wears Oya's accent. */
+.control-status .control-switch #control-agent[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+/* The side in effect is not a button to press again, yet it reads at full strength. */
+.control-status .control-switch button[aria-pressed='true']:disabled {
+  opacity: 1;
+  color: var(--text);
+}
+/* A side out of reach is quiet. */
+.control-status .control-switch button:disabled {
+  cursor: default;
+}
+.control-status .control-switch button:disabled:not([aria-pressed='true']) {
+  opacity: 0.55;
+}
+#control-label[hidden] {
+  display: none;
+}
+@media (max-width: 1050px) {
+  .control-status .control-switch button {
+    padding: 0 9px;
+  }
+}

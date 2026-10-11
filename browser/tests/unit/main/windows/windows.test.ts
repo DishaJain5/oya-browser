@@ -169,7 +169,7 @@ it('refuses transfer under agent control or while an overlay owns the page', asy
   await assert.rejects(() => root.windows.detach(id), /Close the open menu/);
   primary.overlays.names.clear();
   root.control.snapshot = () => ({ interactive: false });
-  await assert.rejects(() => root.windows.detach(id), /Take control/);
+  await assert.rejects(() => root.windows.detach(id), /Switch to Human Mode/);
   assert.equal(root.windows.owner(id), primary);
 });
 it('shared mutable task fields cannot become shadow copies on a secondary window', async (t) => {

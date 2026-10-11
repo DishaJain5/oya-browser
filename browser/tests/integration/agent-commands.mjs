@@ -80,10 +80,12 @@ try {
   });
   const page = await app.firstWindow();
   page.setDefaultTimeout(10000);
+  // First run opens on the checklist; an Oya key is under "Have an Oya account?".
+  await page.locator('#btn-have-account').click();
   await page.locator('#btn-manual').click();
   await page.locator('#cfg-key').fill('test');
   await page.locator('#btn-connect').click();
-  await page.getByText('Agent control', { exact: true }).waitFor();
+  await page.locator('#control-agent[aria-pressed="true"]').waitFor();
 
   assert.equal((await command('navigate', { url: `${origin}/a` })).ok, true);
   assert.equal((await command('navigate', { url: `${origin}/b` })).ok, true);

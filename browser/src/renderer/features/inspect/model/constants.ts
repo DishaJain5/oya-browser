@@ -72,7 +72,7 @@ export const ACTION_TITLES: Readonly<Record<string, string>> = {
 
 /** The words the Actions pane shows. */
 export const ACTIONS_TEXT = {
-  takeControl: 'Take control to use this',
+  takeControl: 'Switch to Human Mode to use this',
   done: 'done',
   failed: 'failed',
   unknownError: 'Unknown error',

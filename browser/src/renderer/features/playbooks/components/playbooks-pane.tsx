@@ -131,7 +131,7 @@ function Run({ vm }: Props) {
       {run.attention && (
         <>
           <p>{run.attention.message}</p>
-          <p className="quiet">Use Take control in the toolbar to help on the page.</p>
+          <p className="quiet">Switch to Human Mode in the toolbar to help on the page.</p>
           <label className="pb-field">
             Reply
             <input value={response} onChange={(e) => setResponse(e.target.value)} />

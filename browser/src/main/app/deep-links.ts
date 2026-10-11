@@ -58,8 +58,8 @@ export class DeepLinks {
   /** An OS link must not interrupt an agent-owned tab or bypass the control gate. */
   private async blockedWebLink(): Promise<false> {
     await this.ask({
-      message: 'Take control of Oya before opening this link',
-      detail: 'An agent is using the browser. Return to human control, then open the link again.',
+      message: 'Switch to Human Mode before opening this link',
+      detail: 'OyaAI is using the browser. Switch to Human Mode, then open the link again.',
       buttons: ['OK'],
     });
     return false;

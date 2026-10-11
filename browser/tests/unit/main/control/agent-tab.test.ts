@@ -83,10 +83,10 @@ it('taking control ends the claim, and a run that ends lets the tab go', () => {
   assert.equal(agentTab.humanMay(1), true);
 });
 
-it("refuses the person on the agent's tab with the take-control message", () => {
+it("refuses the person on the agent's tab with the switch-to-Human-Mode message", () => {
   const { agentTab } = setup();
   agentTab.drive();
-  assert.throws(() => agentTab.requireFor(1), /Take control/);
+  assert.throws(() => agentTab.requireFor(1), /Switch to Human Mode/);
   assert.doesNotThrow(() => agentTab.requireFor(2));
 });
 

@@ -174,7 +174,7 @@ export function agentDriving(ctx: Pick<AppServices, 'control' | 'agentTab' | 'ta
 const ACT_TARGET_TYPES: Record<string, string> = { type: 'input', select: 'select' };
 
 /** What a read of the page answers while an agent holds it. */
-export const AGENT_HOLDS_PAGE = 'The agent is using this page. Take control to read it.';
+export const AGENT_HOLDS_PAGE = 'OyaAI is using this page. Switch to Human Mode to read it.';
 
 /** The shield view and the popups it disables. */
 export class ControlShield {
@@ -199,7 +199,7 @@ export class ControlShield {
 
   /** Throws unless a person holds control; every page-touching IPC call checks this. */
   requireHumanControl(): void {
-    if (!this.deps.control.snapshot().interactive) throw new Error('Take control before interacting with this page');
+    if (!this.deps.control.snapshot().interactive) throw new Error('Switch to Human Mode before using this page');
   }
 
   /** A tab that takes focus while an agent drives hands it back to the shell. */

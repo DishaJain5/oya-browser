@@ -34,8 +34,8 @@ export const TEXT = {
   app: 'Oya Browser',
   titleJoin: ', ',
   /** The Ask button's label and titles. */
-  ask: 'Oya',
-  askTitle: 'Ask Oya (⌘/Ctrl Shift D)',
+  ask: 'Oya Assistant',
+  askTitle: 'Open Oya Assistant (⌘/Ctrl Shift D)',
   askRecordingTitle: 'Oya Agent · recording',
 } as const;
 

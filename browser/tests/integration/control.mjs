@@ -84,10 +84,12 @@ try {
   page.setDefaultTimeout(6000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // First run opens on the checklist; an Oya key is under "Have an Oya account?".
+  await page.locator('#btn-have-account').click();
   await page.locator('#btn-manual').click();
   await page.locator('#cfg-key').fill('test');
   await page.locator('#btn-connect').click();
-  await page.getByText('Agent control', { exact: true }).waitFor();
+  await page.locator('#control-agent[aria-pressed="true"]').waitFor();
   const views = () =>
     app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()[0]
@@ -114,7 +116,7 @@ try {
   );
   assert(rejected, 'IPC enforces navigation ownership');
   await personBesideAgent(page, views);
-  // Taking control from a working agent asks first; the person answers "Take control".
+  // Switching to Human Mode from a working agent asks first; the person answers "Human Mode".
   await app.evaluate(({ dialog }) => {
     globalThis.shownDialogs = [];
     dialog.showMessageBox = async (_window, options) => {
@@ -123,9 +125,9 @@ try {
     };
   });
   await page.locator('#control-action').click();
-  await page.getByText('You’re in control', { exact: true }).waitFor();
+  await page.locator('#control-action[aria-pressed="true"]').waitFor();
   assert.equal((await views()).length, 1, 'taking control removes the native shield');
-  assert.equal(await page.locator('#control-action').innerText(), 'Release to agent');
+  assert.equal(await page.locator('#control-agent').isEnabled(), true, 'OyaAI Mode is on offer to hand back');
   await app.evaluate(async ({ app, BrowserWindow }) => {
     app.focus({ steal: true });
     const window = BrowserWindow.getAllWindows()[0];
@@ -159,8 +161,8 @@ try {
     (await app.evaluate(() => globalThis.controlInputEvents)).every((event) => !event.prevented),
     'human native input is not intercepted',
   );
-  await page.locator('#control-action').click();
-  await page.getByText('Agent control', { exact: true }).waitFor();
+  await page.locator('#control-agent').click();
+  await page.locator('#control-agent[aria-pressed="true"]').waitFor();
   // Released to the agent, its next command takes the page back.
   assert.equal((await command('run_script', { script: 'return 1' })).ok, true);
   await app.evaluate(async ({ BrowserWindow }) => {
@@ -214,7 +216,7 @@ try {
   assert.equal((await views()).length, 2, 'failed takeover stays watch-only');
   state = { mode: 'human', mine: false, expiresAt: Date.now() + 300000, revision: state.revision + 1 };
   socket.send(JSON.stringify({ type: 'control_mode', mode: state.mode, state }));
-  await page.waitForFunction(() => document.getElementById('control-action').hidden);
+  await page.waitForFunction(() => document.querySelector('.control-switch').hidden);
   socket.send(
     JSON.stringify({
       type: 'control_mode',
@@ -303,7 +305,7 @@ async function personBesideAgent(page, views) {
       ),
     agentTab.id,
   );
-  assert.match(closeAgentTab, /Take control/, "the person cannot close the agent's tab");
+  assert.match(closeAgentTab, /Switch to Human Mode/, "the person cannot close the agent's tab");
   await page.evaluate((id) => window.oyaBrowser.activateTab(id), agentTab.id);
   await waitFor(async () => (await shownPage(app)).top?.includes('control-shield'));
   await page.waitForFunction(() => document.getElementById('url-bar').hasAttribute('readonly'));

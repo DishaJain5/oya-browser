@@ -83,7 +83,7 @@ async function beforeStep(run: Run, id: string, p: Page): Promise<void> {
 async function checkpoint(run: Run): Promise<void> {
   const { state } = run;
   state.paused = true;
-  const message = 'Complete the checkpoint using Take control, then resume.';
+  const message = 'Complete the checkpoint in Human Mode, then switch back to OyaAI Mode.';
   run.emit({ kind: 'attention', stepId: state.current, status: 'paused', message });
   await state.waitForWake();
   if (state.stopped) throw new Error('Run stopped');

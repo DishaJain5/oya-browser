@@ -64,7 +64,7 @@ describe('SourceViewModel', () => {
   });
 
   it('shows the agent notice when the page cannot be read while it drives', async () => {
-    const notice = 'The agent is using this page. Take control to read it.';
+    const notice = 'OyaAI is using this page. Switch to Human Mode to read it.';
     const { vm, look } = await pane({ getPageSource: { html: '<p>', markdown: '', notice, url: 'https://a.test/' } });
     await vm.refresh();
     assert.equal(look().page.text, notice);

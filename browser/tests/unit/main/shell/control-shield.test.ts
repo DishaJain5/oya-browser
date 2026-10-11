@@ -93,7 +93,7 @@ describe('ControlShield', () => {
   it('refuses page actions unless a person has control', () => {
     ctx.shield.requireHumanControl();
     ctx.control.state.interactive = false;
-    assert.throws(() => ctx.shield.requireHumanControl(), /Take control before interacting with this page/);
+    assert.throws(() => ctx.shield.requireHumanControl(), /Switch to Human Mode before using this page/);
   });
 
   it('fences popups and page menu items when control changes', () => {

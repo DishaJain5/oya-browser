@@ -213,7 +213,7 @@ describe('TabManager', () => {
 
   it('refuses a reload while an agent has control', () => {
     ctx.control.state = { interactive: false, mode: 'agent', mine: false };
-    assert.throws(() => ctx.tabs.reloadActivePage(), /Take control/);
+    assert.throws(() => ctx.tabs.reloadActivePage(), /Switch to Human Mode/);
   });
 
   it('enters browsing mode once, with one tab', () => {

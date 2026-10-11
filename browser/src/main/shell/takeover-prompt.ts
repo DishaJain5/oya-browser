@@ -6,9 +6,9 @@ import { TAKEOVER_CHOICE } from './constants.ts';
 /** Default keeps automation running until takeover is explicitly chosen. */
 const TAKEOVER_OPTIONS: MessageBoxOptions = {
   type: 'question',
-  message: 'Take control of this page?',
-  detail: 'Oya is working here. Take control to interact, then use Return to agent when you are finished.',
-  buttons: ['Keep agent working', 'Take control'],
+  message: 'Switch to Human Mode?',
+  detail: 'OyaAI is working here. Switch to Human Mode to use the page, then back to OyaAI Mode when you are finished.',
+  buttons: ['Keep OyaAI working', 'Human Mode'],
   defaultId: 0,
   cancelId: 0,
   noLink: true,
@@ -20,7 +20,7 @@ export const SIGN_IN_TAKEOVER: MessageBoxOptions = {
   message: 'This sign-in needs you',
   defaultId: 1,
   detail:
-    'A passkey, a code or your phone cannot be answered by the agent. Take control to sign in, then use Return to agent.',
+    'A passkey, a code or your phone cannot be answered by the agent. Switch to Human Mode to sign in, then back to OyaAI Mode.',
 };
 
 /** Main-process services used for a native, window-parented confirmation. */
@@ -61,7 +61,7 @@ export class TakeoverPrompt {
     if (!window || window.isDestroyed()) return;
     await this.deps.electron.dialog.showMessageBox(window, {
       type: 'error',
-      message: 'Could not take control',
+      message: 'Could not switch to Human Mode',
       detail: error.message,
     });
   }

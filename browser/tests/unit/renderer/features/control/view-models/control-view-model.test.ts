@@ -10,6 +10,7 @@ import {
   ControlViewModel,
   blockedActions,
   controlLook,
+  modeSwitch,
 } from '../../../../../../src/renderer/features/control/view-models/control-view-model.ts';
 import { fakeBridge } from '../../../support/bridge.ts';
 
@@ -40,10 +41,16 @@ describe('the control status', () => {
 
   it('names who drives: the agent, you, or another operator', async () => {
     const { fake, look } = await bar();
-    assert.deepEqual([look().mode, look().label, look().action.text], ['agent', 'Agent control', 'Take control']);
-    assert.equal(look().title, 'Page is watch-only. Take control to interact.');
+    assert.deepEqual(
+      [look().mode, look().label, look().action.text],
+      ['agent', 'OyaAI Mode', 'Switch to Human Mode: you drive this page'],
+    );
+    assert.equal(look().title, 'OyaAI is driving this page. Switch to Human Mode to use it.');
     fake.emit('onControlState', MINE);
-    assert.deepEqual([look().label, look().action.text], ['You’re in control', 'Release to agent']);
+    assert.deepEqual(
+      [look().label, look().action.text],
+      ['Human Mode', 'Switch to OyaAI Mode: hand the page back to the agent'],
+    );
     fake.emit('onControlState', { ...MINE, mine: false, interactive: false });
     assert.deepEqual([look().label, look().action.hidden], ['Another operator', true]);
   });
@@ -97,7 +104,7 @@ describe('taking and handing back control', () => {
     fake.emit('onControlState', AGENT);
     assert.equal(look().label, 'Another operator has control', 'the same state keeps the error');
     fake.emit('onControlState', { ...AGENT, revision: 2 });
-    assert.equal(look().label, 'Agent control');
+    assert.equal(look().label, 'OyaAI Mode');
   });
 
   it('says so when the change could not be asked for', async () => {
@@ -175,5 +182,46 @@ describe('the control guard', () => {
   it('refuses page actions before any control state has come', () => {
     const vm = new ControlViewModel(fakeBridge({ getControlState: new Promise(() => {}) }).bridge);
     assert.equal(vm.guard(false), 'refuse');
+  });
+});
+
+describe('the OyaAI Mode / Human Mode switch', () => {
+  const switchFor = (control: object, extra = {}) => modeSwitch({ control, error: '', pending: '', ...extra } as any);
+
+  it('lights OyaAI Mode while the agent drives, with Human Mode the one to choose', () => {
+    const s = switchFor({ mode: 'agent', supported: true });
+    assert.deepEqual(
+      [s.hidden, s.agent.on, s.agent.disabled, s.human.on, s.human.disabled, s.status],
+      [false, true, true, false, false, ''],
+    );
+  });
+
+  it('lights Human Mode while you drive, with OyaAI Mode the one to hand back to', () => {
+    const s = switchFor({ mode: 'human', mine: true, interactive: true, supported: true });
+    assert.deepEqual(
+      [s.agent.on, s.agent.disabled, s.human.on, s.human.disabled, s.status],
+      [false, false, true, true, ''],
+    );
+  });
+
+  it('after a pause, OyaAI Mode resumes the agent and the status says it is paused', () => {
+    const s = switchFor({ mode: 'paused', supported: true });
+    assert.deepEqual([s.agent.on, s.agent.disabled, s.human.on, s.status], [false, false, false, 'Automation paused']);
+    assert.match(s.agent.title, /picks up where it paused/);
+  });
+
+  it('with no handoff possible, hides the switch and only says who drives', () => {
+    const s = switchFor({ mode: 'human', mine: false, supported: true });
+    assert.deepEqual([s.hidden, s.status], [true, 'Another operator']);
+  });
+
+  it('does not light OyaAI Mode until a hand-back has finished', () => {
+    const s = switchFor({ mode: 'human', mine: true, supported: true, busy: true, busyAction: 'return' });
+    assert.deepEqual([s.agent.on, s.human.on, s.status], [false, true, 'Returning control…']);
+  });
+
+  it('while control changes hands, neither side can be chosen and the status says so', () => {
+    const s = switchFor({ mode: 'agent', supported: true, taking: true });
+    assert.deepEqual([s.human.disabled, s.agent.disabled, s.status], [true, true, 'Taking control…']);
   });
 });

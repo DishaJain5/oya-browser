@@ -31,7 +31,7 @@ describe('page source', () => {
     ctx.control.state.interactive = false;
     const source = await new PageSource(ctx).active();
     assert.equal(source.html, '<p>');
-    assert.match(source.notice, /Take control/);
+    assert.match(source.notice, /Switch to Human Mode/);
     assert.equal(
       evaluated.some((e) => e.includes('analyzePage')),
       false,

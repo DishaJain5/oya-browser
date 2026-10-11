@@ -98,7 +98,7 @@ describe('IPC handlers', () => {
   it('refuses page actions while an agent has control', async () => {
     ctx.control.state = { interactive: false, mode: 'agent', mine: false };
     ctx.shield.requireHumanControl = () => {
-      throw new Error('Take control');
+      throw new Error('Switch to Human Mode');
     };
     for (const channel of [
       'navigate',
@@ -110,7 +110,7 @@ describe('IPC handlers', () => {
       'tab-menu',
       'start-recording',
     ]) {
-      await assert.rejects(async () => call(channel, 'x'), /Take control/, channel);
+      await assert.rejects(async () => call(channel, 'x'), /Switch to Human Mode/, channel);
     }
   });
 

@@ -136,6 +136,8 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.waitForFunction(() => document.documentElement.dataset.ready === 'true');
+  // First run opens on the checklist; an Oya key is under "Have an Oya account?".
+  await page.locator('#btn-have-account').click();
   await page.locator('#btn-manual').click();
   // CDP clicks bypass native draggable regions: check those separately so a
   // passing automation test cannot conceal a shell that swallows human clicks.

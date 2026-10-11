@@ -34,7 +34,7 @@ app.on('web-contents-created', (_event, contents) => {
 let prompts = 0,
   answerPrompt;
 dialog.showMessageBox = async (_window, options) => {
-  assert.equal(options.message, 'Take control of this page?');
+  assert.equal(options.message, 'Switch to Human Mode?');
   prompts++;
   return new Promise((resolve) => {
     answerPrompt = resolve;

@@ -71,7 +71,7 @@ describe('ActionsViewModel', () => {
   it('turns off page actions while the agent has control, but not a screenshot', async () => {
     const { fake, vm } = await pane();
     fake.emit('onControlState', { interactive: false, mode: 'agent' });
-    assert.deepEqual(actionLook(vm.state, 'click'), { disabled: true, title: 'Take control to use this' });
+    assert.deepEqual(actionLook(vm.state, 'click'), { disabled: true, title: 'Switch to Human Mode to use this' });
     assert.equal(actionLook(vm.state, 'analyze').disabled, true);
     assert.equal(actionLook(vm.state, 'screenshot').disabled, false);
     await vm.run('reload');
