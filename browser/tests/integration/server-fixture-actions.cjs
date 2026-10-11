@@ -5,6 +5,7 @@ const { app } = require('electron');
 const { World } = require('../../src/main/native/index.ts');
 const { NativeDialogs } = require('../../src/main/dialogs/index.ts');
 const { CommandRunner } = require('../../src/main/connection/commands.ts');
+const { AgentTab } = require('../../src/main/control/agent-tab.ts');
 const { PageDriver } = require('../../src/main/actions/driver.ts');
 const { Keyboard } = require('../../src/main/input/keyboard.ts');
 const { Mouse } = require('../../src/main/input/mouse.ts');
@@ -37,11 +38,20 @@ module.exports = function fixtureActions(window) {
     analysisStarted() {},
     analysisFinished() {},
   });
+  const tabs = {
+    getActiveView: () => view,
+    list: [tab],
+    activeTabId: tab.id,
+    find: (id) => (id === tab.id ? tab : undefined),
+  };
+  const control = { snapshot: () => ({ mode: 'agent', mine: false, revision: 0 }) };
   runner = new CommandRunner({
     actions,
     dialogs,
-    tabs: { getActiveView: () => view, list: [tab] },
-    control: { snapshot: () => ({ mode: 'agent', mine: false, revision: 0 }) },
+    tabs,
+    control,
+    // The production claim: unconnected here, so it drives the one tab, as the desktop's single agent does.
+    agentTab: new AgentTab({ control, tabs }),
     shell: { browsingMode: true, devLog() {} },
     socket: {
       isOpen: () => true,

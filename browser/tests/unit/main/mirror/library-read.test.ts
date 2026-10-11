@@ -64,7 +64,7 @@ it("reads Firefox's bookmarks and visits from places.sqlite, through profiles.in
   assert.deepEqual(library.history, [{ url: 'https://fx.test/', title: 'Fx', time: AT }]);
 });
 
-it("reads Safari's bookmarks without the reading list, and its visits from History.db", () => {
+it("reads Safari's bookmarks without the reading list, and its visits from History.db", (t) => {
   const dir = profileWith(
     '.',
     'History.db',
@@ -85,7 +85,11 @@ it("reads Safari's bookmarks without the reading list, and its visits from Histo
   };
   const json = path.join(dir, 'Bookmarks.json');
   fs.writeFileSync(json, JSON.stringify(tree));
-  execFileSync('plutil', ['-convert', 'binary1', '-o', path.join(dir, 'Bookmarks.plist'), json]);
+  try {
+    execFileSync('plutil', ['-convert', 'binary1', '-o', path.join(dir, 'Bookmarks.plist'), json], { stdio: 'ignore' });
+  } catch {
+    return t.skip('Safari is read on macOS only: no plutil here');
+  }
   const library = readLibrary('safari', dir, 'default');
   assert.deepEqual(
     library.bookmarks.map((e) => [e.url, e.title]),
