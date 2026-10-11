@@ -20,7 +20,7 @@ git -C depot_tools remote get-url origin >/dev/null 2>&1 ||
 git -C depot_tools fetch -q --depth 1 origin "$(pin depotToolsRevision)"
 git -C depot_tools checkout -q --detach FETCH_HEAD
 
-# Pinned Electron and the Chromium it selects; gclient's hooks apply Electron's own patches.
+# Pinned Electron and the Chromium it selects; gclient's hooks apply Electron's own patches and fetch PGO profiles.
 cat > .gclient <<EOF
 solutions = [{
   'name': 'src/electron',
@@ -28,7 +28,7 @@ solutions = [{
   'deps_file': 'DEPS',
   'managed': False,
   'custom_deps': {'src': 'https://github.com/chromium/chromium.git@$(pin chromiumRevision)'},
-  'custom_vars': {},
+  'custom_vars': {'checkout_pgo_profiles': True},
 }]
 EOF
 # Hooks build native test addons, so the toolchain from install-build-deps must exist first.
@@ -45,20 +45,21 @@ if [ ! -f overlay/.applied ]; then
   touch overlay/.applied
 fi
 
-# Electron's official release configuration, as the Windows engine used.
+# Electron's official release configuration, PGO and ThinLTO included, like the npm Electron binary.
 mkdir -p src/out/OyaRelease
 cat > src/out/OyaRelease/args.gn <<EOF
 import("//electron/build/args/release.gn")
 override_electron_version = "$version"
 target_cpu = "x64"
 symbol_level = 0
-use_thin_lto = false
-chrome_pgo_phase = 0
 generate_about_credits = true
 EOF
+# The checkout's own gn and ninja: depot_tools' wrappers need a bootstrap DEPOT_TOOLS_UPDATE=0 skips.
+# Node's configuration generator calls gn by name, so its directory stays on PATH for ninja.
 cd src
-gn gen out/OyaRelease
-ninja -C out/OyaRelease -j "$jobs" electron:electron_dist_zip
+export PATH="$PWD/buildtools/linux64:$PATH"
+buildtools/linux64/gn gen out/OyaRelease
+third_party/ninja/ninja -C out/OyaRelease -j "$jobs" electron:electron_dist_zip
 
 # The archive holds the complete unpacked runtime at its root, as setup-native-engine expects.
 cd "$root"
