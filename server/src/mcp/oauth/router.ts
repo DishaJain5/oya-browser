@@ -12,6 +12,7 @@ import { consoleUrl } from '../../modules/slack/service.ts';
 import { Status } from '../../platform/http-status.ts';
 import {
   AUTHORIZE_REQUIRED,
+  CONNECT_PAGE,
   REGISTRATIONS_PER_HOUR,
   REGISTRATION_WINDOW_MS,
   RESOURCE_NAME,
@@ -39,11 +40,28 @@ const registrations = rateLimit({
  * which would let anyone registered turn this origin into a redirector.
  */
 function wellFormedAuthorize(req, res, next) {
+  onlyToConsole(res);
   const missing = Object.entries(AUTHORIZE_REQUIRED).find(([name, value]) => req.query[name] !== value);
   if (!missing && req.query.code_challenge) return next();
   res
     .status(Status.BAD_REQUEST)
     .json({ error: 'invalid_request', error_description: 'response_type=code with S256 PKCE is required' });
+}
+
+/**
+ * /authorize may only send the browser to this server's own connect page. The SDK
+ * answers some refusals (a scope, a resource) with a redirect to the client's
+ * registered address, and anyone can register a client, so those become a plain
+ * 400 here instead: this origin never forwards a browser to an address it did not choose.
+ */
+function onlyToConsole(res) {
+  const redirect = res.redirect.bind(res);
+  res.redirect = (status: number, url: string) => {
+    if (typeof url === 'string' && url.startsWith(`${consoleUrl()}${CONNECT_PAGE}?`)) return redirect(status, url);
+    res
+      .status(Status.BAD_REQUEST)
+      .json({ error: 'invalid_request', error_description: 'This sign-in request was refused' });
+  };
 }
 
 /** A body the SDK's JSON parser refused answers as OAuth does, not as Express's HTML page. */

@@ -113,6 +113,24 @@ describe('OAuth router', () => {
     });
   });
 
+  it('never sends the browser to a client address, even for a refusal the SDK would redirect', async () => {
+    process.env.OYA_CONSOLE_URL = 'https://oya.example';
+    await withServer(async (base) => {
+      const client = await register(base);
+      const query = new URLSearchParams({
+        response_type: 'code',
+        client_id: client.client_id,
+        redirect_uri: REDIRECT,
+        code_challenge: 'c',
+        code_challenge_method: 'S256',
+        resource: 'not a url',
+      });
+      const res = await fetch(`${base}/authorize?${query}`, { redirect: 'manual' });
+      assert.equal(res.status, 400);
+      assert.equal(res.headers.get('location'), null);
+    });
+  });
+
   it('answers a body that is not JSON as OAuth does, not with an HTML stack trace', async () => {
     process.env.OYA_CONSOLE_URL = 'https://oya.example';
     await withServer(async (base) => {
