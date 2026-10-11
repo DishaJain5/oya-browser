@@ -9,6 +9,7 @@ test('text insertion prefers the native engine, refuses destroyed pages and awai
   const page = {
     webContents: {
       isDestroyed: () => destroyed,
+      isLoadingMainFrame: () => false,
       insertText: async () => {
         throw Error('stock insertion must not run on a native engine');
       },
@@ -37,14 +38,24 @@ test('text insertion prefers the native engine, refuses destroyed pages and awai
 });
 test('a stock engine types through Electron insertText', async () => {
   const typed: string[] = [];
-  const page = { webContents: { isDestroyed: () => false, insertText: async (text: string) => void typed.push(text) } };
+  let navigating = false;
+  const page = {
+    webContents: {
+      isDestroyed: () => false,
+      isLoadingMainFrame: () => navigating,
+      insertText: async (text: string) => void typed.push(text),
+    },
+  };
   await insertNativeText(page, 'desktop');
+  navigating = true;
+  await assert.rejects(insertNativeText(page, 'next site'), /navigating/);
   assert.deepEqual(typed, ['desktop']);
 });
 test('native cancellation is an error, never a successful empty insertion', async () => {
   const page = {
     webContents: {
       isDestroyed: () => false,
+      isLoadingMainFrame: () => false,
       insertText: async () => {},
       _insertTextOya: async () => {
         throw Error('Text input document was replaced');
