@@ -16,7 +16,12 @@ export interface WindowHost extends TabStrip {
   nextTabId: number;
   /** Follows a tab's title. */
   titleChanged(tab: Tab, title: string): void;
+  /** Shows a tab, mounting its page on the shell. */
+  activateTab?(id: number): void;
 }
+
+/** The tab each popup was opened over, which the person returns to when it closes. */
+const openedOver = new WeakMap<BrowserWindow, number | null>();
 
 /** A window the page opened, as the tab list sees it: only the webContents a command needs. */
 export function windowTab(id: number, win: BrowserWindow): Tab {
@@ -36,18 +41,25 @@ export function adoptWindow(manager: WindowHost, win: BrowserWindow | null | und
   manager.list.push(tab);
   win.webContents.on('page-title-updated', (_e, title) => manager.titleChanged(tab, title));
   win.on('closed', () => forgetWindow(manager, win));
+  openedOver.set(win, manager.activeTabId);
   manager.activeTabId = tab.id;
-  manager.sendTabList();
-  return tab.id;
+  return (manager.sendTabList(), tab.id);
 }
 
-/** Drops a popup's tab when the window itself goes. */
-export function forgetWindow(manager: TabStrip, win: BrowserWindow): void {
+/** Drops a popup's tab when the window itself goes; if it was active, the tab it opened over shows again, not the first tab. */
+export function forgetWindow(manager: WindowHost, win: BrowserWindow): void {
   const idx = manager.list.findIndex((t) => t.window === win);
   if (idx === -1) return;
-  if (manager.list[idx].id === manager.activeTabId) manager.activeTabId = null;
-  manager.list.splice(idx, 1);
-  manager.activeTabId = manager.activeTabId ?? manager.list[0]?.id ?? null;
+  const [popup] = manager.list.splice(idx, 1);
+  if (popup.id !== manager.activeTabId) return manager.sendTabList();
+  manager.activeTabId = null;
+  returnTo(manager, manager.list.find((t) => t.id === openedOver.get(win)) ?? manager.list[0]);
+}
+
+/** Shows `back` again after a popup closed: mounted through the manager when it can, else just marked active. */
+function returnTo(manager: WindowHost, back: Tab | undefined): void {
+  if (back && manager.activateTab) return manager.activateTab(back.id);
+  manager.activeTabId = back?.id ?? null;
   manager.sendTabList();
 }
 

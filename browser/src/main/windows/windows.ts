@@ -32,12 +32,18 @@ export class BrowserWindows {
   /** Build the first local scope, then expose stable application-level routers. */
   constructor(root: AppServices) {
     this.root = root;
-    root.electron.app.on('before-quit', () => {
-      this.quitting = true;
-    });
+    this.watchQuit();
     this.current = this.addScope();
     this.opening = new WindowOpening(this);
     new WindowServiceRouter(root, this).install();
+  }
+  /** Lets windows close once the app quits, including an update restart, which closes every window before 'before-quit' fires. */
+  private watchQuit(): void {
+    const quitting = (): void => {
+      this.quitting = true;
+    };
+    this.root.electron.app.on('before-quit', quitting);
+    this.root.electron.autoUpdater.on('before-quit-for-update', quitting);
   }
   /** A fresh globally unique tab id. */
   allocateTabId(): number {
@@ -88,12 +94,13 @@ export class BrowserWindows {
   }
   /** A native close button cannot destroy an agent's page while its task is in flight. */
   private beforeClose(scope: AppServices, event: Event): void {
-    if (!this.quitting && !this.root.control.snapshot().interactive) return event.preventDefault();
+    if (!this.quitting && scope.tabs.list.some((tab) => !this.root.agentTab.humanMay(tab.id)))
+      return event.preventDefault();
     closeWindowTabs(scope);
   }
   /** Open a full browser shell; never create a second profile or duplicate the server connection. */
   create(point?: Point): AppServices {
-    this.root.shield.requireHumanControl();
+    this.root.agentTab.requireFor(null);
     const scope = this.addScope();
     scope.shell.browsingMode = true;
     scope.shell.create(true);
@@ -110,14 +117,14 @@ export class BrowserWindows {
   }
   /** Reveal an already-painted window as one complete surface. */
   present(scope: AppServices): void {
-    this.root.shield.requireHumanControl();
+    this.root.agentTab.requireFor(null);
     this.select(scope);
     scope.shell.window?.show();
     scope.shell.window?.focus();
   }
   /** Overlays retain captured page state; moving their underlying view would violate that ownership. */
-  assertMovable(source: AppServices): void {
-    this.root.shield.requireHumanControl();
+  assertMovable(source: AppServices, id: number): void {
+    this.root.agentTab.requireFor(id);
     if (source.overlays.names.size) throw new Error('Close the open menu or dialog before moving this tab');
   }
   /** A drop over another shell's tab strip joins that window, otherwise it creates a new one. */
@@ -133,8 +140,8 @@ export class BrowserWindows {
   }
   /** The original tab object, webContents, history and renderer survive the transfer. */
   transfer(source: AppServices, target: AppServices, tab: Tab): void {
-    this.assertMovable(source);
-    this.assertMovable(target);
+    this.assertMovable(source, tab.id);
+    this.assertMovable(target, tab.id);
     this.assertSource(source, tab);
     source.tabs.releaseTab(tab.id);
     target.tabs.receiveTab(tab);

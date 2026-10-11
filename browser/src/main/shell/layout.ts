@@ -1,7 +1,7 @@
 /**
  * Where the page sits in the window: below the toolbar, beside (or, when the
- * window is narrow, above) the dev panel. The panel slides open and shut, and
- * its width is remembered.
+ * window is narrow, above) the dev panel. The panel slides open and shut, each
+ * tab keeps its own open or shut, and its width is remembered.
  */
 import { chromeHeight } from './bookmarks-bar.ts';
 import type { BrowserView } from 'electron';
@@ -22,8 +22,8 @@ type Deps = Pick<AppServices, 'tabs' | 'shell' | 'shield' | 'config'>;
 
 /** The dev panel's state and the active tab's bounds. */
 export class PanelLayout {
-  /** Whether the dev panel is open (or opening). */
-  open = false;
+  /** The tabs whose panel is open: each tab keeps its own, so closing it on one leaves the others. */
+  private readonly openTabs = new Set<number | null>();
   /** The panel's width, as the person last dragged it. */
   width: number = PANEL_WIDTH;
   /** How far open the panel is drawn, 0 to 1. */
@@ -38,6 +38,18 @@ export class PanelLayout {
   /** `deps` is the main-process context (see src/main/main.ts). */
   constructor(deps: Deps) {
     this.deps = deps;
+  }
+
+  /** Whether the shown tab's panel is open (or opening). */
+  get open(): boolean {
+    return this.openTabs.has(this.deps.tabs.activeTabId ?? null);
+  }
+
+  /** Opens or closes the shown tab's panel. */
+  set open(value: boolean) {
+    const id = this.deps.tabs.activeTabId ?? null;
+    if (value) this.openTabs.add(id);
+    else this.openTabs.delete(id);
   }
 
   /** Lays out the shell at `progress` (a number mid-slide; anything else means settled). */

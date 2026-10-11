@@ -133,6 +133,44 @@ describe('forgetWindow', () => {
   });
 });
 
+describe('forgetWindow, back where the person was', () => {
+  it('shows the tab the popup opened over, not the first tab, when it closes', () => {
+    const m = manager();
+    m.list.push({ id: 1, title: 'first' }, { id: 2, title: 'second' });
+    m.activeTabId = 2;
+    const shown = [];
+    m.activateTab = (id) => shown.push((m.activeTabId = id));
+    const win = fakeWindow();
+    popups.adoptWindow(m, win);
+    win.emit('closed');
+    assert.deepEqual(shown, [2]);
+    assert.equal(m.activeTabId, 2);
+  });
+
+  it('falls back to the first tab when the one it opened over has closed', () => {
+    const m = manager();
+    m.list.push({ id: 1, title: 'first' }, { id: 2, title: 'second' });
+    m.activeTabId = 2;
+    m.activateTab = (id) => (m.activeTabId = id);
+    const win = fakeWindow();
+    popups.adoptWindow(m, win);
+    m.list.splice(1, 1);
+    win.emit('closed');
+    assert.equal(m.activeTabId, 1);
+  });
+
+  it('leaves the active tab alone when a background popup closes', () => {
+    const m = manager();
+    m.list.push({ id: 1, title: 'first' });
+    const win = fakeWindow();
+    popups.adoptWindow(m, win);
+    m.activeTabId = 1;
+    m.activateTab = () => assert.fail('nothing to switch');
+    win.emit('closed');
+    assert.equal(m.activeTabId, 1);
+  });
+});
+
 describe('raiseWindow and closeWindowTab', () => {
   it('raises the window rather than mounting anything', () => {
     const m = manager();

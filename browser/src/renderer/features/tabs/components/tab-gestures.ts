@@ -38,7 +38,8 @@ function press(ctx: TabContext, event: PointerEvent<HTMLElement>): void {
 function startDrag(ctx: TabContext, event: PointerEvent<HTMLElement>): void {
   const list = ctx.list.current;
   if (!list) return;
-  const press = { id: ctx.tab.id, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+  const { id, agent } = ctx.tab;
+  const press = { id, agent: !!agent, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
   ctx.drag.start({ ...press, ...measureSlots(list, event.currentTarget) }, stripPort(list));
   event.currentTarget.setPointerCapture?.(event.pointerId);
 }

@@ -70,9 +70,9 @@ export class NavigationHandlers {
     },
     'activate-tab': (_e, id) => this.deps.tabs.activateTab(id),
     // A drag on the strip: the main process owns the order, and the strip redraws from it.
-    'move-tab': (_e, id, toIndex) => (this.requireHuman(), moveTabTo(this.deps.tabs, id, toIndex)),
+    'move-tab': (_e, id, toIndex) => (this.deps.agentTab.requireFor(id), moveTabTo(this.deps.tabs, id, toIndex)),
     'tab-menu': (_e, id) => {
-      this.requireHuman();
+      this.deps.agentTab.requireFor(id);
       new TabMenu(this.deps).show(id);
     },
   };
@@ -86,18 +86,13 @@ export class NavigationHandlers {
 
   /** The sender can only transfer a tab that still belongs to its own window. */
   private async detach(id: number): Promise<void> {
-    this.requireHuman();
+    this.deps.agentTab.requireFor(id);
     if (!Number.isSafeInteger(id) || !this.deps.tabs.find(id)) throw new Error('Tab is not in this window');
     try {
       await this.deps.windows?.detach(id, this.deps.electron.screen.getCursorScreenPoint());
     } finally {
       this.deps.windows?.drag.stop(this.deps as AppServices);
     }
-  }
-
-  /** Throws unless a person holds control. */
-  private requireHuman(): void {
-    this.deps.shield.requireHumanControl();
   }
 
   /** Throws unless the person may use the tab their window shows: under the agent, any tab but the agent's. */

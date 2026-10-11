@@ -227,6 +227,7 @@ function fakeElectron() {
       items: menuItems,
     },
     nativeTheme: Object.assign(new EventEmitter(), { shouldUseDarkColors: false }),
+    autoUpdater: new EventEmitter(),
     shell: {
       opened: [],
       /** Records the link instead of handing it to the operating system. */

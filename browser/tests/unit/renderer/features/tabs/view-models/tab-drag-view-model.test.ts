@@ -30,13 +30,13 @@ function port() {
 }
 
 /** A drag over a fake bridge and frames, with tab 1 (index 0) pressed at x=50. */
-function pressed(gate?: { movable(): boolean; refuse(): void }) {
+function pressed(gate?: { movable(agent: boolean): boolean; refuse(): void }, agent = false) {
   const fake = fakeBridge();
   const frames = manualFrames();
   const card = new TabCardViewModel();
   const vm = new TabDragViewModel({ bridge: fake.bridge, frames, card, gate });
   const { strip, port: p } = port();
-  vm.start({ id: 1, pointerId: 7, x: 50, slots: SLOTS, index: 0 }, p);
+  vm.start({ id: 1, agent, pointerId: 7, x: 50, slots: SLOTS, index: 0 }, p);
   return { fake, frames, card, vm, strip };
 }
 
@@ -74,6 +74,14 @@ describe('TabDragViewModel', () => {
     const { vm } = pressed({ movable: () => true, refuse: () => assert.fail('refused') });
     vm.move(7, 120);
     assert.equal(vm.state.lifted, true);
+  });
+
+  it('asks the gate about the pressed tab, so only a tab an agent drives is held in place', () => {
+    const asked: boolean[] = [];
+    const gate = { movable: (agent: boolean) => (asked.push(agent), !agent), refuse: () => {} };
+    pressed(gate, true).vm.move(7, 120);
+    pressed(gate, false).vm.move(7, 120);
+    assert.deepEqual(asked, [true, false]);
   });
 
   it('hides the hover card when it lifts', () => {

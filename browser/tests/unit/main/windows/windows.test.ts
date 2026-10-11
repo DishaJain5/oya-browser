@@ -207,6 +207,23 @@ it('a native window close cannot destroy an agent target, but application quit c
   assert.equal(primary.shell.window.isDestroyed(), true);
 });
 
+it('a window without an agent tab closes while agents work in their own tabs', async (t) => {
+  const { root, primary } = setup(t);
+  primary.tabs.createTab('https://one.test/');
+  root.control.snapshot = () => ({ connected: true, mode: 'agent', interactive: false });
+  primary.shell.window.close();
+  assert.equal(primary.shell.window.isDestroyed(), true);
+});
+
+it('an update restart can close a window the agent holds', async (t) => {
+  const { root, primary } = setup(t);
+  primary.tabs.createTab('https://one.test/');
+  root.control.snapshot = () => ({ interactive: false });
+  root.electron.autoUpdater.emit('before-quit-for-update');
+  primary.shell.window.close();
+  assert.equal(primary.shell.window.isDestroyed(), true);
+});
+
 it('keeps the source page visible until destination chrome has painted', async (t) => {
   const { root, primary } = setup(t);
   const id = primary.tabs.createTab('https://one.test/');

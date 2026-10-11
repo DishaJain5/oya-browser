@@ -33,7 +33,7 @@ export class TabDragPreview {
   private readonly closed = () => this.stop();
   /** Creates a local surface without stealing focus or pointer capture. */
   begin(source: AppServices, id: number): void {
-    source.shield.requireHumanControl();
+    source.agentTab.requireFor(id);
     const tab = source.tabs.find(id);
     if (!tab || tab.window) throw new Error('Tab is not in this window');
     const win = this.start(source);

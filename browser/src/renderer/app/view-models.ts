@@ -60,11 +60,13 @@ function recordingGate(control: ControlViewModel): RecordingGate {
   };
 }
 
-/** Tabs move only while a person holds control; a refused drag focuses Take control, as a refused button does. */
+/** Any tab but an agent's moves while agents work in their own tabs; a refused drag focuses Take control, as a refused button does. */
 function tabDragGate(control: ControlViewModel, frames: FrameClock): TabDragGate {
   return {
-    // Moving tabs between windows stays the person's only with control, even beside the agent's tab.
-    movable: () => !control.state.control || !!control.state.control.interactive,
+    movable: (agent) =>
+      !control.state.control ||
+      !!control.state.control.interactive ||
+      (!agent && !blockedActions(control.state).newTabBlocked),
     refuse: focusById(frames, CONTROL_ACTION_ID),
   };
 }

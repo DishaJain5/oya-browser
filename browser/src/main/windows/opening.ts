@@ -41,7 +41,7 @@ export class WindowOpening {
     const source = this.windows.owner(id);
     const tab = source?.tabs.find(id);
     if (!source || !tab || tab.window) return;
-    this.windows.assertMovable(source);
+    this.windows.assertMovable(source, id);
     const existing = point ? this.windows.dropTarget(source, point) : undefined;
     const target = existing ?? (await this.prepare(tab, point));
     this.commit(source, target, tab, !existing);

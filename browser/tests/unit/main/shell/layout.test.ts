@@ -104,4 +104,15 @@ describe('PanelLayout', () => {
     assert.equal(ctx.layout.open, true);
     assert.deepEqual(ctx.shell.sentOn('dev-panel-state'), [true]);
   });
+
+  it('keeps the panel open or shut per tab, so closing it on one tab leaves the others', () => {
+    ctx.tabs.activeTabId = 1;
+    ctx.layout.toggle(true);
+    ctx.tabs.activeTabId = 2;
+    ctx.layout.toggle(true);
+    ctx.layout.toggle(true);
+    assert.equal(ctx.layout.open, false);
+    ctx.tabs.activeTabId = 1;
+    assert.equal(ctx.layout.open, true);
+  });
 });

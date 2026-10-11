@@ -38,6 +38,8 @@ export interface Press {
   slots: Slot[];
   /** The pressed tab's index among them. */
   index: number;
+  /** An agent drives the pressed tab. */
+  agent?: boolean;
 }
 
 /** A finished drag: the tab, where it lands, and how far off its new place it was let go (for the glide home). */
@@ -70,14 +72,14 @@ export interface TabDragDeps extends Pick<RendererServices, 'frames'> {
   bridge: Pick<OyaBrowser, 'activateTab'> & Partial<Pick<OyaBrowser, 'beginTabDrag' | 'endTabDrag'>>;
   /** Hidden when a drag lifts. */
   card: Pick<TabCardViewModel, 'hide'>;
-  /** Moving a tab needs a person in control; while an agent drives, a drag is refused and points at Take control. */
+  /** A tab an agent drives cannot be moved; a drag on it is refused and points at Take control. */
   gate?: TabDragGate;
 }
 
 /** Who may move tabs right now. */
 export interface TabDragGate {
-  /** A person holds control, so a tab may be reordered or torn off. */
-  movable(): boolean;
+  /** The person may move this tab: any tab but one an agent drives, or every tab once they hold control. */
+  movable(agent: boolean): boolean;
   /** Says why the drag did nothing (points at Take control). */
   refuse(): void;
 }
@@ -126,7 +128,7 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
     this.x = x;
     this.y = y ?? this.y;
     if (!this.state.lifted && Math.hypot(x - this.press.x, this.y - (this.press.y ?? 0)) < C.TAB_DRAG_THRESHOLD) return;
-    if (!this.state.lifted && this.deps.gate?.movable() === false) return this.refuse();
+    if (!this.state.lifted && this.deps.gate?.movable(!!this.press.agent) === false) return this.refuse();
     if (!this.state.lifted) this.lift();
     this.follow();
   }
