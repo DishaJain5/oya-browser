@@ -27,6 +27,22 @@ const ISOLATED_WORLD = 'test-recording-world';
 let server, win, channel;
 // The last step started, so a CI timeout names where it hung.
 let lastStep = 'startup';
+
+/**
+ * A frame of `view`, once its compositor has one. Under Xvfb the first capture after
+ * a navigation can fail with UnknownVizError while the GPU process catches up; that is
+ * the display, not the recorder, so it is tried again a few times before it counts.
+ */
+async function painted(view, tries = 5) {
+  for (let i = 1; ; i++) {
+    try {
+      return await view.webContents.capturePage();
+    } catch (err) {
+      if (i >= tries || !/UnknownVizError/.test(String(err))) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 250 * i));
+    }
+  }
+}
 /** Await observable native readiness with a bounded fixture deadline. */
 async function until(read) {
   for (let attempt = 0; attempt < 150; attempt++) {
@@ -98,7 +114,7 @@ async function until(read) {
     const point = await view.webContents.executeJavaScript(
       `(() => { const r = document.getElementById(${JSON.stringify(id)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`,
     );
-    await view.webContents.capturePage();
+    await painted(view);
     await view.webContents.executeJavaScript(`window.__fixtureMouseUp = new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>{document.removeEventListener('mouseup',done,true);reject(Error('Native mouse release did not arrive'));},3000);
       function done(event){if(!event.isTrusted)return;clearTimeout(timer);document.removeEventListener('mouseup',done,true);resolve(true);}
@@ -138,7 +154,7 @@ async function until(read) {
   await view.webContents.executeJavaScript(
     'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))',
   );
-  assert.equal((await view.webContents.capturePage()).isEmpty(), false);
+  assert.equal((await painted(view)).isEmpty(), false);
   await until(() => evaluateFrame(view.webContents.mainFrame, 'globalThis.__oyaDocumentRecorder?.armed === true'));
   // Stop while the next page's field is still focused (no change/blur event).
   await click('message');
