@@ -85,6 +85,7 @@ server, CLI and package suites.
 ## Native agent-control boundary (required)
 
 - Oya's internal browser and agent operations must use browser-owned native APIs, not CDP.
+- The patched engine is the Linux cloud runtime only. Desktop apps (macOS, Windows) ship stock Electron: use stock non-CDP Electron APIs there, and return the unsupported-capability error where only the patched engine has one.
 - CDP is permitted only as an external front-door compatibility protocol for agents connecting to Oya.
 - The front door must translate supported requests into native Oya operations. It must not proxy requests to a Chromium debugging endpoint or use Electron's debugger as its backend.
 - Do not rename or wrap CDP helpers and describe them as native. Do not fall back to CDP when a native capability is unavailable; return an explicit unsupported-capability error.

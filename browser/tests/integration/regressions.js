@@ -262,7 +262,7 @@ assert.match(
   /if \(NATIVE_SIGNIN_TEST\) \{\s*app.whenReady\(\).then\(\(\) => startNativeSigninTest\(electron\)\);\s*app.on\('window-all-closed', \(\) => app.quit\(\)\);\s*\} else \{/,
 );
 assert.doesNotMatch(src, /app\.commandLine\.appendSwitch\(['"]remote-debugging-port/);
-assert.match(src, /deps\.protection\.assertSession\(session \|\| deps\.persona\.session\(\)\)/);
+assert.match(src, /const owner = session \|\| deps\.persona\.session\(\);\s*deps\.protection\.assertSession\(owner\)/);
 assert.strictEqual(
   pageLoads.length,
   1,

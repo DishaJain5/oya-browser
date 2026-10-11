@@ -2,8 +2,9 @@
 
 Oya's production browser control uses browser-owned APIs. External CDP clients
 connect to an authenticated compatibility adapter that translates supported
-commands; unsupported commands fail explicitly. The browser package cannot use a
-stock Electron distribution as a fallback.
+commands; unsupported commands fail explicitly. The Linux cloud runtime cannot
+use stock Electron as a fallback. Desktop apps ship stock Electron, where
+native-only capabilities fail explicitly too.
 
 Run the production dependency checks and ordinary browser checks first:
 
@@ -34,11 +35,7 @@ drag, native choosers/dialogs, recording, workflow parity, analyzer and recorder
 Workflow select/file assignments expose synthetic events; they are not native
 file chooser interactions. Chooser behavior has its own native fixture.
 
-Packaging requires `OYA_NATIVE_DISTRIBUTIONS` containing target-specific unpacked
-engines, for example `darwin-arm64/Electron.app`. The packaging hook executes
-native API and first-script probes against that exact engine before unpacking.
-A target must be built and tested on its own OS. A successful macOS arm64 run does
-not establish macOS x64 or Windows support.
+Desktop packages ship stock Electron; the patched engine is the Linux cloud runtime only.
 
 After signing and notarizing, test the actual packaged executable independently:
 

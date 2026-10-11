@@ -6,6 +6,7 @@ import { buildInjectionScript, buildWorkerScript } from '../../../anonymity/inje
 import { normalizeProxy, type ProxyConfig } from '../../anonymity/proxy.ts';
 import { personaIdentity } from '../identity/identity.ts';
 import {
+  isNativeEngine,
   NativeSessionProtection,
   nativePolicyForPersona,
   nativePolicyForHost,
@@ -16,7 +17,7 @@ import type { TabView } from './types.ts';
 /** Services needed to derive one complete immutable session policy. */
 type Deps = Pick<
   AppServices,
-  'persona' | 'config' | 'world' | 'shield' | 'tabs' | 'dialogs' | 'governance' | 'nativeBrowsing'
+  'persona' | 'config' | 'world' | 'shield' | 'tabs' | 'dialogs' | 'governance' | 'nativeBrowsing' | 'electron'
 >;
 /** A persona's optional outbound proxy. */
 interface ProxyProfile {
@@ -75,6 +76,8 @@ export class Protection {
   private readonly sessions = new NativeSessionProtection();
   /** Reuse exact randomized mask sources for identical session policy on reconnect. */
   private readonly sources = new WeakMap<Session, ProtectionSources>();
+  /** Stock-engine (desktop) sessions and the page source their tab preload runs; workers stay uncovered. */
+  private readonly stock = new WeakMap<Session, string>();
   /** Share one owner across all application surfaces. */
   constructor(deps: Deps) {
     this.deps = deps;
@@ -95,11 +98,26 @@ export class Protection {
     const profile = this.profileForSession(session);
     const builder = this.deps.persona.active ? nativePolicyForPersona : nativePolicyForHost;
     const policy = builder(profile, session.getUserAgent());
+    const input = { profile: this.deps.persona.active ? profile : null, injection: this.injection() };
+    const sources = this.sessionSources(session, { ...input, userAgent: policy.userAgent });
+    if (isNativeEngine(session)) this.sessions.configure(session as ProtectedSession, policy, sources);
+    else this.configureStock(session, policy.userAgent, policy.languages, sources.page);
+  }
+  /** Unmanaged, unproxied browsers keep native WebRTC; anything with an egress rule masks it. */
+  private injection(): typeof NATIVE_INJECTION {
     const nativeWebRTC = !this.deps.governance.configuration && !exitProxy(this.deps.persona.active, null);
-    const injection = { ...NATIVE_INJECTION, nativeWebRTC };
-    const active = this.deps.persona.active ? profile : null;
-    const sources = this.sessionSources(session, { profile: active, injection, userAgent: policy.userAgent });
-    this.sessions.configure(session as ProtectedSession, policy, sources);
+    return { ...NATIVE_INJECTION, nativeWebRTC };
+  }
+  /** Stock Electron: the user agent through its own API, the page source through the tab preload. */
+  private configureStock(session: Session, userAgent: string, languages: readonly string[], page: string): void {
+    session.setUserAgent(userAgent, languages.join(','));
+    // Cross-origin iframe renderers read the app-wide fallback, not the session's; one persona per process.
+    this.deps.electron.app.userAgentFallback = userAgent;
+    this.stock.set(session, page);
+  }
+  /** What the tab preload runs in the main world; empty when the engine installs it natively. */
+  stockSource(session: Session): string {
+    return this.stock.get(session) ?? '';
   }
   /** Build once per semantic identity; randomized masking must not resemble a policy change. */
   private sessionSources(session: Session, input: NativeSourceInput): PreScriptPolicy {
@@ -114,6 +132,7 @@ export class Protection {
 
   /** Require a completely protected exact partition before creating or exposing a surface. */
   assertSession(session: Session): void {
+    if (this.stock.has(session)) return;
     this.sessions.assertConfigured(session as ProtectedSession);
   }
   /** Retain the public method name while all protection is now session-native. */

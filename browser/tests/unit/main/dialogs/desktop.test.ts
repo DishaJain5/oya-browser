@@ -177,3 +177,9 @@ test('synchronous UI cancellation releases a presentation returned after its cal
   f.open();
   assert.equal(closed, 1);
 });
+test('a stock engine page is left to its own dialogs instead of failing the tab', () => {
+  const { dialogs } = fixture();
+  const page = Object.assign(new EventEmitter(), { isDestroyed: () => false });
+  assert.doesNotThrow(() => dialogs.watch(page as any));
+  assert.equal(page.listenerCount('did-start-navigation'), 0);
+});

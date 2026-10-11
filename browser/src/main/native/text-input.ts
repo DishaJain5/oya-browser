@@ -3,7 +3,7 @@ import type { WebContents } from 'electron';
 /** Explicit engine capability prevents older runtimes silently dropping hidden-widget text. */
 export interface NativeTextPage {
   /** Exact native page, never whichever browser window happens to be focused. */
-  webContents: Pick<WebContents, 'isDestroyed'> & {
+  webContents: Pick<WebContents, 'isDestroyed' | 'insertText'> & {
     /** Document-scoped native IME acknowledgement with deadline and focus restoration. */
     _insertTextOya?: (text: string) => Promise<void>;
   };
@@ -12,7 +12,8 @@ export interface NativeTextPage {
 export async function insertNativeText(page: NativeTextPage, text: string): Promise<object> {
   const contents = page.webContents;
   if (contents.isDestroyed()) throw Error('View is destroyed');
-  if (!contents._insertTextOya) throw Error('This Oya engine lacks acknowledged native text insertion');
-  await contents._insertTextOya(text);
+  // Stock Electron (desktop): its own native insertion, without the patched engine's acknowledgement.
+  if (!contents._insertTextOya) await contents.insertText(text);
+  else await contents._insertTextOya(text);
   return {};
 }

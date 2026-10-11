@@ -1,8 +1,8 @@
-/** Composed text requires the exact acknowledged engine capability; no legacy or page-script fallback. */
+/** Composed text uses the acknowledged engine capability, or stock Electron's own insertion on desktop. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { insertNativeText } from '../../../../src/main/native/text-input.ts';
-test('text insertion refuses unsupported and destroyed engines and awaits native acknowledgement', async () => {
+test('text insertion prefers the native engine, refuses destroyed pages and awaits acknowledgement', async () => {
   const sent: string[] = [];
   let destroyed = false,
     acknowledge: () => void = () => {};
@@ -10,12 +10,11 @@ test('text insertion refuses unsupported and destroyed engines and awaits native
     webContents: {
       isDestroyed: () => destroyed,
       insertText: async () => {
-        throw Error('legacy text fallback forbidden');
+        throw Error('stock insertion must not run on a native engine');
       },
       _insertTextOya: undefined as undefined | ((text: string) => Promise<void>),
     },
   };
-  await assert.rejects(insertNativeText(page, 'hidden'), /lacks acknowledged/);
   page.webContents._insertTextOya = async (text) => {
     sent.push(text);
     await new Promise<void>((resolve) => {
@@ -36,10 +35,17 @@ test('text insertion refuses unsupported and destroyed engines and awaits native
   await assert.rejects(insertNativeText(page, 'gone'), /destroyed/);
   assert.deepEqual(sent, ['日本語 🙂']);
 });
+test('a stock engine types through Electron insertText', async () => {
+  const typed: string[] = [];
+  const page = { webContents: { isDestroyed: () => false, insertText: async (text: string) => void typed.push(text) } };
+  await insertNativeText(page, 'desktop');
+  assert.deepEqual(typed, ['desktop']);
+});
 test('native cancellation is an error, never a successful empty insertion', async () => {
   const page = {
     webContents: {
       isDestroyed: () => false,
+      insertText: async () => {},
       _insertTextOya: async () => {
         throw Error('Text input document was replaced');
       },

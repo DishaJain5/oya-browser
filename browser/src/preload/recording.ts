@@ -3,6 +3,11 @@ import { contextBridge, ipcRenderer, webFrame } from 'electron';
 import { NATIVE_RECORDING } from '../shared/native-recording.ts';
 import { frameOwnerToken, type FrameOwnerLookup } from './frame-owner.ts';
 import { sendRecording } from './recording-bridge.ts';
+import { STOCK_PERSONA } from '../shared/stock-persona.ts';
+/** Stock Electron (desktop): run the persona source in the main world before the page's own scripts. */
+const personaSource: unknown =
+  process.argv.includes(STOCK_PERSONA.ARGUMENT) && ipcRenderer.sendSync(STOCK_PERSONA.CHANNEL);
+if (typeof personaSource === 'string' && personaSource) void webFrame.executeJavaScript(personaSource);
 /** The sandbox owns this identity; website scripts cannot choose or read it. */
 const documentId = Array.from(crypto.getRandomValues(new Uint32Array(NATIVE_RECORDING.DOCUMENT_TOKEN_WORDS))).join('-');
 contextBridge.exposeInIsolatedWorld(NATIVE_RECORDING.WORLD_ID, NATIVE_RECORDING.BINDING, {

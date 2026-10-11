@@ -49,6 +49,8 @@ export class RecordingFrames {
     this.started = true;
     this.page.on('frame-created', this.created);
     this.page.on('oya-frame-tree-changed' as 'dom-ready', this.changed);
+    // Stock Electron (desktop) has no removal event: a removed frame is pruned at the next frame navigation.
+    this.page.on('did-frame-navigate', this.changed);
     this.page.once('destroyed', this.stop);
   }
   /** Exact native graph membership, not URL matching, determines which wrappers are live. */
@@ -104,18 +106,15 @@ export class RecordingFrames {
     this.closed = true;
     this.page.off('frame-created', this.created);
     this.page.off('oya-frame-tree-changed' as 'dom-ready', this.changed);
+    this.page.off('did-frame-navigate', this.changed);
     this.page.off('destroyed', this.stop);
     for (const [frame, listener] of this.frames) frame.off('dom-ready', listener);
     this.frames.clear();
   };
 }
-/** Older engines cannot approximate native removal notifications using a debugger or a timer. */
+/** A destroyed page cannot be recorded. */
 function requireRecordingFrames(page: WebContents): void {
-  const native = page as WebContents & {
-    /** Explicit native lifecycle capability. */ _supportsOyaFrameLifecycle?: () => boolean;
-  };
   if (page.isDestroyed()) throw Error('View is destroyed');
-  if (!native._supportsOyaFrameLifecycle?.()) throw Error('Oya engine lacks native recording frame lifecycle');
 }
 
 /** Native frame-created event carries a revocable browser-owned wrapper. */

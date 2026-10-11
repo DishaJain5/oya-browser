@@ -29,6 +29,10 @@ function protectionState(session: ProtectedSession): Record<string, unknown> {
     throw Error('Unsupported native pre-script protection; a complete patched Oya engine is required');
   return state;
 }
+/** The cloud runs the patched engine; desktop runs stock Electron and gets the stock subset instead. */
+export function isNativeEngine(session: object | undefined): boolean {
+  return typeof (session as ProtectedSession | undefined)?._setOyaPreScriptPolicy === 'function';
+}
 /** Verify exact installed sources; native setters must not silently discard them. */
 function verifyProtectionSources(session: ProtectedSession, sources: PreScriptPolicy): void {
   const state = protectionState(session);

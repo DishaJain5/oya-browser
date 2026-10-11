@@ -1,11 +1,10 @@
-/** Packaging must select and verify the patched engine, with no stock-runtime fallback. */
+/** The cloud engine check must verify the patched engine it is given, with no stock-runtime fallback. */
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Arch } from 'builder-util';
-import { distribution, executable, verify, electronDist, beforePack } from '../../../build/native-distribution.cjs';
+import { distribution, executable, verify } from '../../../build/native-distribution.cjs';
 
 it('refuses an unspecified native distribution root', () => {
   assert.throws(() => distribution('darwin', 'arm64', ''), /OYA_NATIVE_DISTRIBUTIONS/);
@@ -45,17 +44,6 @@ it('requires the exact native success marker and architecture from the selected 
     assert.throws(() => verify(process.platform, process.arch, directory, () => { throw Error('timeout'); }), /timeout/);
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
-it('before-pack fails before the builder can swallow a distribution-hook error', async () => {
-  const previous = process.env.OYA_NATIVE_DISTRIBUTIONS;
-  delete process.env.OYA_NATIVE_DISTRIBUTIONS;
-  try {
-    await assert.rejects(beforePack({ electronPlatformName: 'darwin', arch: Arch.arm64 }), /OYA_NATIVE_DISTRIBUTIONS/);
-    assert.throws(() => electronDist({ platformName: process.platform, arch: process.arch }), /OYA_NATIVE_DISTRIBUTIONS/);
-  } finally {
-    if (previous !== undefined) process.env.OYA_NATIVE_DISTRIBUTIONS = previous;
-  }
-});
-it('refuses Linux desktop packaging while retaining the Linux cloud engine probe', async () => {
-  await assert.rejects(beforePack({ electronPlatformName: 'linux', arch: Arch.x64 }), /only macOS and Windows/);
+it('resolves the Linux cloud engine executable', () => {
   assert.equal(executable('linux', '/native'), path.join('/native', 'electron'));
 });

@@ -145,6 +145,7 @@ describe('tab events', () => {
         nodeIntegration: false,
         nodeIntegrationInSubFrames: true,
         preload: path.join(ctx.appDir, 'out', 'preload', 'recording.js'),
+        additionalArguments: ['--oya-stock-persona'],
         session: tab.view.webContents.session,
       },
     });

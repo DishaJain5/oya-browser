@@ -1,7 +1,7 @@
 /** Native browser operations shared by internal callers and external protocol adapters. */
 export { evaluatePage, capturePage, screenshotOptions, type NativePage } from './page.ts';
 export { World, type WorldDeps, type EnsureOptions, type EvalOptions } from './world.ts';
-export { evaluateFrame, type NativeAgentFrame } from './frames.ts';
+export { evaluateFrame, useFramePages, type NativeAgentFrame } from './frames.ts';
 export { watchNativeDialogs, type NativeDialogInfo, type NativeDialogReply, type NativeDialogPage } from './dialogs.ts';
 export { NativeRecordingInbox, type NativeRecordingMessage } from './recording.ts';
 export { nativeFramePath } from './frame-path.ts';

@@ -111,25 +111,10 @@ and deploys. The macOS job signs and notarizes from five repository secrets:
 Until they are set, `make release-local-mac` builds and notarizes the macOS app on your own Mac,
 as releases used to.
 
-Desktop builds also require release-ready patched native engine archives. Configure
-repository variables `OYA_NATIVE_MACOS_ARM64_URL` / `OYA_NATIVE_MACOS_ARM64_SHA256`,
-`OYA_NATIVE_MACOS_X64_URL` / `OYA_NATIVE_MACOS_X64_SHA256`, and
-`OYA_NATIVE_WINDOWS_X64_URL` / `OYA_NATIVE_WINDOWS_X64_SHA256`.
-Each HTTPS tar.gz must contain a complete unpacked distribution at its root:
-`Electron.app` for macOS, or `electron.exe` plus its libraries/resources for Windows.
-The installer verifies the checksum and native capability probe for every required
-architecture before exporting `OYA_NATIVE_DISTRIBUTIONS`. Packaging rechecks it.
-The universal Mac runner must execute both arm64 and x64 engines (ARM64 with
-Rosetta). Linux cloud pins and an arm64-only testing build cannot satisfy this gate.
-Missing desktop artifacts block desktop releases; never substitute stock Electron.
-
-To regenerate the Windows archive, dispatch **Build native Windows engine**
-(`.github/workflows/build-native-windows.yaml`). It uses the revisions and source
-overlay in `browser/engine/desktop-source.json`, checks every patched baseline file,
-and compiles Electron's official release configuration. The native capability probe
-and complete acceptance matrix must pass before it uploads `native-windows-x64`.
-Publish that verified archive as a native-engine prerelease and set the repository
-URL and SHA-256 variables above. The source overlay is not a runnable distribution.
+Desktop apps (macOS, Windows) ship stock Electron from npm. Native-only capabilities
+(agent dialogs, cross-process frames, drag, the external Runtime methods) return an
+unsupported-capability error there. Only the Linux cloud runtime uses the patched
+engine, pinned in `.github/actions/setup-native-engine` and `browser/engine/`.
 
 ## Project layout
 

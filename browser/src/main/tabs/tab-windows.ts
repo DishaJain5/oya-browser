@@ -7,6 +7,7 @@ import type { BrowserWindow, HandlerDetails, LoadURLOptions, WindowOpenHandlerRe
 import type { AppServices } from '../app/services.ts';
 import { isAuthPopup, opensNamedWindow } from './auth-popup.ts';
 import { recordingPreferences } from '../recording/preload.ts';
+import { isNativeEngine } from '../native-policy/index.ts';
 import { GmailPopup } from './gmail-popup.ts';
 import { ContextMenu } from './context-menu.ts';
 import { AUTH_POPUP_SIZE, LOCAL_FILE } from './constants.ts';
@@ -97,7 +98,8 @@ export class TabWindows {
   }
   /** Preserve sign-in and named windows with the opener's persona partition. */
   private popupOptions(details: HandlerDetails, opener: Tab): WindowOpenHandlerResponse | null {
-    const webPreferences = { ...recordingPreferences(this.deps.appDir), session: opener.view.webContents.session };
+    const session = opener.view.webContents.session;
+    const webPreferences = { ...recordingPreferences(this.deps.appDir, !isNativeEngine(session)), session };
     if (isAuthPopup(details.url, details.features))
       return { action: 'allow', overrideBrowserWindowOptions: { ...AUTH_POPUP_SIZE, webPreferences } };
     if (opensNamedWindow(details.frameName))

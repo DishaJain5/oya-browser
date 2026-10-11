@@ -41,6 +41,8 @@ export class DesktopDialogs extends DialogService {
   /** Unsupported engines fail before the page is marked as subscribed. */
   watch(page: WebContents): void {
     if (this.watched.has(page)) return;
+    // Stock Electron (desktop) has no dialog hook: the person answers its own dialogs, agents get none.
+    if (!(page as unknown as NativeDialogPage)._setOyaDialogHandler) return;
     const open = (info: NativeDialogInfo, reply: NativeDialogReply) => this.open(page, info, reply);
     const cancel = (reply: NativeDialogReply) => this.remove(reply);
     const stop = watchNativeDialogs(page as unknown as NativeDialogPage, open, cancel);

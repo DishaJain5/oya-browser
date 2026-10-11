@@ -28,11 +28,23 @@ test('native configuration protects tabs once without touching any debugger', as
   ctx.protection.resetTabCDP(view);
   assert.equal(await ctx.protection.setupTabCDP(view), true);
 });
-test('missing engine hooks fail before any scalar mutation', () => {
-  const { ctx, session, calls } = fixture();
+test('a stock engine gets the user agent and the tab-preload source, never a native setter', async () => {
+  const { ctx, session, calls, view } = fixture();
   delete session._setOyaPreScriptPolicy;
-  assert.throws(() => ctx.protection.configureSession(session), /Unsupported native/);
+  const agents: string[][] = [];
+  session.setUserAgent = (agent: string, languages: string) => agents.push([agent, languages]);
+  ctx.protection.configureSession(session);
   assert.deepEqual(calls, []);
+  assert.equal(agents.length, 1);
+  assert.equal(ctx.electron.app.userAgentFallback, agents[0][0], 'cross-origin iframes get the same agent');
+  assert.match(ctx.protection.stockSource(session), /\S/);
+  assert.equal(await ctx.protection.setupTabCDP(view), true);
+  assert.deepEqual(view.webContents.debugger.methods(), []);
+});
+test('a native engine leaves nothing for the tab preload to run', () => {
+  const { ctx, session } = fixture();
+  ctx.protection.configureSession(session);
+  assert.equal(ctx.protection.stockSource(session), '');
 });
 test('failed source installation permanently quarantines the exact session', async () => {
   const { ctx, session, view } = fixture('scripts');

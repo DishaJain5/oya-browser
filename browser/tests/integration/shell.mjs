@@ -327,9 +327,9 @@ try {
   await application.evaluate(async ({ BrowserWindow }) => {
     const wc = BrowserWindow.getAllWindows()[0].getBrowserView().webContents;
     await wc.executeJavaScript("document.getElementById('member').focus()");
-    await wc.debugger.sendCommand('Input.insertText', { text: 'M-10482' });
+    await wc.insertText('M-10482');
     await wc.executeJavaScript("document.getElementById('dob').focus()");
-    await wc.debugger.sendCommand('Input.insertText', { text: '06/12/1988' });
+    await wc.insertText('06/12/1988');
   });
   await page
     .locator('#record-count')

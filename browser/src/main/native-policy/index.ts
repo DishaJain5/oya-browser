@@ -2,5 +2,5 @@
 export { NativeSessionPolicies } from './install.ts';
 export type { NativePolicy, PolicySession } from './types.ts';
 export { nativePolicyForPersona, nativePolicyForHost } from './persona.ts';
-export { NativeSessionProtection } from './protection.ts';
+export { NativeSessionProtection, isNativeEngine } from './protection.ts';
 export type { PreScriptPolicy, ProtectedSession } from './protection.ts';

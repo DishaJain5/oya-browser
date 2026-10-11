@@ -93,11 +93,13 @@ test('stop cancels DOM-ready waiting without waiting for a timeout or resurrecti
   assert.equal(f.context.starts, 0);
   assert.equal(f.context.__oyaDocumentRecorder, undefined);
 });
-test('unsupported native lifecycle refuses startup and removes inbox listeners', async () => {
+test('a stock engine records and re-syncs frames on frame navigation', async () => {
   const f = fixture();
   f.page._supportsOyaFrameLifecycle = () => false;
-  await assert.rejects(f.channel.start(), /native recording frame lifecycle/);
-  assert.equal(f.page.listenerCount('ipc-message'), 0);
+  await f.channel.start();
+  assert.equal(f.page.listenerCount('did-frame-navigate'), 1);
+  await f.channel.stop();
+  assert.equal(f.page.listenerCount('did-frame-navigate'), 0);
 });
 test('a replaced document is never stopped through a stale frame wrapper', async () => {
   const f = fixture();
