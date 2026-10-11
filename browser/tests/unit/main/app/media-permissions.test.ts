@@ -33,8 +33,8 @@ function fixture(platform = 'darwin') {
       },
     },
     shell: { window: null },
-    tabs: { getActiveView: () => ({ webContents: contents }) },
-    control: { snapshot: () => ({ interactive: state.interactive }) },
+    tabs: { activeTabId: 1, getActiveView: () => ({ webContents: contents }) },
+    agentTab: { humanMay: (id) => id === 1 && state.interactive },
     governance: { configuration: null },
   };
   const service = new MediaPermissions(deps as any, platform);
@@ -98,15 +98,32 @@ it('rejects cross-origin frames and unknown device requests', async () => {
     assert.equal(await f.service.request(f.contents as any, { ...details, ...change } as any), false);
   assert.deepEqual(f.prompts, []);
 });
+/** A new top-level document, as Electron describes a reload. */
+const reload = { isMainFrame: true, isSameDocument: false };
+it('keeps a grant across pushState and iframe loads, which leave the document in place', async () => {
+  const f = fixture();
+  await f.service.request(f.contents as any, details as any);
+  f.state.url = 'https://call.test/room?joined=1';
+  f.contents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: true });
+  f.contents.emit('did-start-navigation', { isMainFrame: false, isSameDocument: false });
+  assert.equal(f.check(), true);
+});
+it('works in a tab the person owns while agents drive other tabs', async () => {
+  const f = fixture();
+  f.deps.agentTab.humanMay = (id) => id === 1;
+  assert.equal(await f.service.request(f.contents as any, details as any), true);
+  f.deps.agentTab.humanMay = () => false;
+  assert.equal(f.check(), false);
+});
 it('revokes checks on same-URL reload and rejects an approval racing navigation', async () => {
   const f = fixture();
   await f.service.request(f.contents as any, details as any);
-  f.contents.emit('did-start-navigation');
+  f.contents.emit('did-start-navigation', reload);
   assert.equal(f.check(), false);
   const pending = Promise.withResolvers();
   f.deps.electron.dialog.showMessageBox = () => pending.promise;
   const request = f.service.request(f.contents as any, details as any);
-  f.contents.emit('did-start-navigation');
+  f.contents.emit('did-start-navigation', reload);
   pending.resolve({ response: 1 });
   assert.equal(await request, false);
   assert.equal(f.contents.listenerCount('did-start-navigation'), 1);

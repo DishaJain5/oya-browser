@@ -8,16 +8,9 @@ import type {
 import type { AppServices } from './services.ts';
 import { ALLOW_MEDIA_CHOICE } from './constants.ts';
 /** Sensitive access uses native dialogs and the normal control boundary. */
-type Deps = Pick<AppServices, 'electron' | 'shell' | 'tabs' | 'control' | 'governance'>;
+type Deps = Pick<AppServices, 'electron' | 'shell' | 'tabs' | 'agentTab' | 'governance'>;
 /** Only these two media kinds may be requested. */
 type MediaKind = 'audio' | 'video';
-/** Approval belongs to one document, not an entire browser profile. */
-interface Grant {
-  /** Full page address fences navigation while a native prompt is open. */
-  url: string;
-  /** Device types explicitly approved by the person and operating system. */
-  types: Set<MediaKind>;
-}
 /** HTTPS origins are displayed rather than private paths and query strings. */
 function mediaOrigin(raw: string): string | null {
   const url = URL.parse(raw);
@@ -34,8 +27,8 @@ export class MediaPermissions {
   private readonly deps: Deps;
   /** Testable platform branch for macOS privacy consent. */
   private readonly platform: string;
-  /** Approvals never reach disk or another profile's webContents. */
-  private readonly grants = new WeakMap<WebContents, Grant>();
+  /** Device types approved for each tab's current document; never on disk or in another profile. */
+  private readonly grants = new WeakMap<WebContents, Set<MediaKind>>();
   /** Navigation generations fence reloads even when the URL does not change. */
   private readonly generations = new WeakMap<WebContents, number>();
   /** Prevent a page from stacking permission dialogs. */
@@ -45,13 +38,13 @@ export class MediaPermissions {
     this.deps = deps;
     this.platform = platform;
   }
-  /** Refuse background tabs, remote agents and managed runtimes. */
+  /** Refuse background tabs, a tab an agent drives, and managed runtimes. Per tab: with agents connected, the person still owns the tabs no agent claimed. */
   private allowed(contents: WebContents | null): contents is WebContents {
     return (
       !!contents &&
       !contents.isDestroyed() &&
       !this.deps.governance.configuration &&
-      this.deps.control.snapshot().interactive &&
+      this.deps.agentTab.humanMay(this.deps.tabs.activeTabId) &&
       this.deps.tabs.getActiveView()?.webContents === contents
     );
   }
@@ -78,11 +71,8 @@ export class MediaPermissions {
   /** Permission checks cannot grant devices that have not been explicitly approved. */
   check(contents: WebContents | null, origin: string, details: PermissionCheckHandlerHandlerDetails): boolean {
     if (!this.allowed(contents) || !details || !this.origin(contents, details.securityOrigin || origin)) return false;
-    const grant = this.grants.get(contents),
-      type = details.mediaType;
-    return (
-      !!grant && grant.url === contents.getURL() && (type === 'audio' || type === 'video') && grant.types.has(type)
-    );
+    const type = details.mediaType;
+    return (type === 'audio' || type === 'video') && !!this.grants.get(contents)?.has(type);
   }
   /** Recheck source and control after every OS prompt before granting capture. */
   private async approve(contents: WebContents, origin: string, types: MediaKind[]): Promise<boolean> {
@@ -93,11 +83,11 @@ export class MediaPermissions {
     this.remember(contents, types);
     return true;
   }
-  /** Keep a single navigation listener per tab, not one per repeated request. */
+  /** Keep a single navigation listener per tab, not one per repeated request. Only a new top document revokes: a pushState or an iframe loading keeps it. */
   private watch(contents: WebContents): number {
     if (!this.generations.has(contents)) {
       this.generations.set(contents, 0);
-      contents.on('did-start-navigation', () => this.revoke(contents));
+      contents.on('did-start-navigation', (e) => e.isMainFrame && !e.isSameDocument && this.revoke(contents));
     }
     return this.generations.get(contents)!;
   }
@@ -112,8 +102,7 @@ export class MediaPermissions {
   }
   /** Separate microphone and camera approvals accumulate only for this document. */
   private remember(contents: WebContents, types: MediaKind[]): void {
-    const granted = this.grants.get(contents)?.types || [];
-    this.grants.set(contents, { url: contents.getURL(), types: new Set([...granted, ...types]) });
+    this.grants.set(contents, new Set([...(this.grants.get(contents) || []), ...types]));
   }
   /** Tell the person exactly which devices the website requested. */
   private options(origin: string, types: MediaKind[]): MessageBoxOptions {

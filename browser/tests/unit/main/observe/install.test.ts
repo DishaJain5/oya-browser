@@ -6,7 +6,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { Observer } from '../../../../src/main/observe/observer.ts';
-import { watchContents } from '../../../../src/main/observe/install.ts';
+import { watchContents, watchSession } from '../../../../src/main/observe/install.ts';
 
 describe('watchContents', () => {
   it("keeps a tab's console messages from Electron's event object", () => {
@@ -21,5 +21,15 @@ describe('watchContents', () => {
     });
     const [entry] = observer.readConsole();
     assert.deepEqual([entry.level, entry.message, entry.line], ['error', 'boom', 7]);
+  });
+});
+
+describe('watchSession', () => {
+  it('never listens to onSendHeaders, which crashes Electron 44 on Service Worker blob uploads', () => {
+    const hooked: string[] = [];
+    const webRequest = new Proxy({}, { get: (_, name) => () => void hooked.push(String(name)) });
+    watchSession(new Observer(), { webRequest } as any);
+    assert.ok(hooked.length > 0);
+    assert.ok(!hooked.includes('onSendHeaders'));
   });
 });

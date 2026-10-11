@@ -6,6 +6,11 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- The desktop app no longer crashes on sites whose service worker uploads files, such as claude.ai.
+- Websites can use your camera and microphone again after you allow them, also while agents work in other tabs, and the approval lasts until the page reloads or you leave it.
+
 ## [1.0.174](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.174) · 2026-10-11
 
 ### Changed

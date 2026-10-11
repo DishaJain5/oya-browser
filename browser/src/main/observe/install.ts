@@ -10,11 +10,14 @@ import type { Session, WebContents } from 'electron';
 import type { Observer } from './observer.ts';
 import { NetworkTrace } from './network.ts';
 
-/** Watches every request the persona's session finishes or fails. */
+/**
+ * Watches every request the persona's session finishes or fails. No onSendHeaders:
+ * Electron 44 segfaults building its details for a blob POST a Service Worker
+ * forwards (claude.ai does), so a trace starts at its response and has no elapsed time.
+ */
 export function watchSession(observer: Observer, session: Pick<Session, 'webRequest'>): void {
   const trace = new NetworkTrace(observer),
     requests = session.webRequest;
-  requests.onSendHeaders((details) => trace.event('request', details));
   requests.onResponseStarted((details) => trace.event('response', details));
   requests.onBeforeRedirect((details) => trace.event('redirect', details));
   watchFinished(observer, trace, requests);
