@@ -30,11 +30,11 @@ function port() {
 }
 
 /** A drag over a fake bridge and frames, with tab 1 (index 0) pressed at x=50. */
-function pressed() {
+function pressed(gate?: { movable(): boolean; refuse(): void }) {
   const fake = fakeBridge();
   const frames = manualFrames();
   const card = new TabCardViewModel();
-  const vm = new TabDragViewModel({ bridge: fake.bridge, frames, card });
+  const vm = new TabDragViewModel({ bridge: fake.bridge, frames, card, gate });
   const { strip, port: p } = port();
   vm.start({ id: 1, pointerId: 7, x: 50, slots: SLOTS, index: 0 }, p);
   return { fake, frames, card, vm, strip };
@@ -56,6 +56,23 @@ describe('TabDragViewModel', () => {
     vm.move(7, 50 + C.TAB_DRAG_THRESHOLD - 1);
     assert.equal(vm.state.lifted, false);
     vm.move(7, 50 + C.TAB_DRAG_THRESHOLD);
+    assert.equal(vm.state.lifted, true);
+  });
+
+  it('refuses to lift while an agent holds control, and points at Take control', () => {
+    let refused = 0;
+    const { fake, vm } = pressed({ movable: () => false, refuse: () => void refused++ });
+    vm.move(7, 50, 200);
+    assert.equal(vm.state.lifted, false);
+    assert.equal(vm.state.id, null);
+    assert.equal(refused, 1);
+    assert.deepEqual(fake.called('beginTabDrag'), []);
+    assert.equal(vm.release(7), null);
+  });
+
+  it('lifts as usual while a person holds control', () => {
+    const { vm } = pressed({ movable: () => true, refuse: () => assert.fail('refused') });
+    vm.move(7, 120);
     assert.equal(vm.state.lifted, true);
   });
 

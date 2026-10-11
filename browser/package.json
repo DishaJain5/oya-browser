@@ -33,6 +33,8 @@
     "test:control": "npm run build && node tests/integration/control.mjs",
     "test:agent": "npm run build && node tests/integration/agent-commands.mjs",
     "test:workflow": "node tests/integration/native-workflow.mjs",
+    "test:workflow-locator": "electron tests/integration/workflow-locator-electron.cjs",
+    "test:recorder-combobox": "electron tests/integration/recorder-combobox-electron.cjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

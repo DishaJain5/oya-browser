@@ -2,7 +2,7 @@
  * The page side of CAPTCHA handling: scripts that run in the browser to find a
  * challenge and to hand a solved token back to it.
  */
-import { MIN_CHALLENGE_HEIGHT_PX, MIN_CHALLENGE_WIDTH_PX } from './constants.ts';
+import { MIN_CHALLENGE_HEIGHT_PX, MIN_CHALLENGE_WIDTH_PX, STILL_LOADING_JS } from './constants.ts';
 
 /**
  * Find a challenge and read what a solver needs from it. Runs in the page.
@@ -15,7 +15,7 @@ import { MIN_CHALLENGE_HEIGHT_PX, MIN_CHALLENGE_WIDTH_PX } from './constants.ts'
  * carries one, and it stopped four replays of a page with nothing to solve.
  */
 export const DETECT_JS = `(() => {
-  if (document.readyState !== 'complete') return { present: false, loading: true };
+  if (${STILL_LOADING_JS}) return { present: false, loading: true };
   const out = { present: false, type: null, sitekey: null, url: location.href, invisible: false };
 
   const frameKey = (src, param) => {

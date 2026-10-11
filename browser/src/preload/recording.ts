@@ -10,6 +10,25 @@ const personaSource: unknown =
 // Synchronous, unlike webFrame.executeJavaScript: the page's first script cannot run before the persona.
 if (typeof personaSource === 'string' && personaSource)
   contextBridge.executeInMainWorld({ func: new Function(personaSource) as () => void });
+/** One isolated-world run main asked for (stock Electron); only main can send on this channel. */
+interface WorldRun {
+  /** Pairs the reply with its request. */
+  id: number;
+  /** The isolated world to run in, never the page's main world. */
+  world: number;
+  /** Trusted browser code. */
+  code: string;
+}
+/** Runs in the page's own process, so a document still loading a slow resource does not hold the read. */
+function runInWorld({ id, world, code }: WorldRun): void {
+  ipcRenderer.send(STOCK_PERSONA.ACK, id);
+  webFrame.executeJavaScriptInIsolatedWorld(world, [{ code }]).then(
+    (value) => ipcRenderer.send(STOCK_PERSONA.RESULT, { id, value }),
+    (error) => ipcRenderer.send(STOCK_PERSONA.RESULT, { id, error: String(error?.message ?? error) }),
+  );
+}
+if (process.argv.includes(STOCK_PERSONA.ARGUMENT))
+  ipcRenderer.on(STOCK_PERSONA.RUN, (_event, request: WorldRun) => runInWorld(request));
 /** The sandbox owns this identity; website scripts cannot choose or read it. */
 const documentId = Array.from(crypto.getRandomValues(new Uint32Array(NATIVE_RECORDING.DOCUMENT_TOKEN_WORDS))).join('-');
 contextBridge.exposeInIsolatedWorld(NATIVE_RECORDING.WORLD_ID, NATIVE_RECORDING.BINDING, {

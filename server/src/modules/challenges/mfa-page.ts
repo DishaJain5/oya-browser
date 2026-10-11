@@ -2,10 +2,11 @@
  * The page side of MFA: scripts that run in the browser to find a code prompt,
  * type the code in and submit it.
  */
+import { STILL_LOADING_JS } from './constants.ts';
 
 /** Is the page asking for a second factor, and where does the code go? */
 export const DETECT_JS = `(() => {
-  if (document.readyState !== 'complete') return { present: false, loading: true };
+  if (${STILL_LOADING_JS}) return { present: false, loading: true };
   const fields = [...document.querySelectorAll('input')].filter((el) => {
     if (el.type === 'hidden' || el.disabled || el.readOnly || !el.getClientRects().length || getComputedStyle(el).visibility === 'hidden') return false;
     const hay = [el.name, el.id, el.autocomplete, el.placeholder, el.getAttribute('aria-label')]

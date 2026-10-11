@@ -11,6 +11,11 @@ export {
   type TabStripDeps,
   type TabStripState,
 } from './view-models/tab-strip-view-model.ts';
-export { TabDragViewModel, type TabDragDeps, type TabDragState } from './view-models/tab-drag-view-model.ts';
+export {
+  TabDragViewModel,
+  type TabDragDeps,
+  type TabDragGate,
+  type TabDragState,
+} from './view-models/tab-drag-view-model.ts';
 export { TabCardViewModel, type TabCardState } from './view-models/tab-card-view-model.ts';
 export type { Tab } from './model/tab-model.ts';

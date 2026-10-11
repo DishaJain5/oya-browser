@@ -46,6 +46,14 @@ export const ERROR_DETAIL_CHARS = 200;
 
 /** How long a detector waits for a page that is still loading to answer. */
 export const PAGE_READY_MS = 10_000;
+/**
+ * A page that has been parsed (interactive) this long counts as ready even if it never
+ * reaches complete: one request that never ends (an ad, a tracker, a long poll) held
+ * each of the three detectors for the whole PAGE_READY_MS on every page-changing step.
+ */
+export const PARSED_SETTLE_MS = 2000;
+/** Page-side test: still loading, or parsed too recently for script-built forms to be there. */
+export const STILL_LOADING_JS = `(document.readyState === 'loading' || (document.readyState === 'interactive' && !(performance.now() - (performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd ?? Infinity) >= ${PARSED_SETTLE_MS})))`;
 /** Pause between attempts to read a page that is still loading. */
 export const PAGE_READY_POLL_MS = 200;
 

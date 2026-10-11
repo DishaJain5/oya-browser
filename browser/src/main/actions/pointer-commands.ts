@@ -8,6 +8,7 @@ import type { TabView } from '../tabs/types.ts';
 import type { Mouse } from '../input/mouse.ts';
 import { sleep, jitter } from '../input/timing.ts';
 import { VIEWPORT_JS, scrollResultJs } from './scripts.ts';
+import { evaluatePage } from '../native/index.ts';
 import { renderedAnalysis } from './page-format.ts';
 import * as c from './constants.ts';
 import type { PageDriver } from './driver.ts';
@@ -54,7 +55,7 @@ const isLiveScroll = (params: CommandParams | undefined): params is LiveScroll =
 /** Loads the analyzer and reads the viewport's size. */
 async function viewportOf(driver: PageDriver, view: PageView): Promise<Viewport | null> {
   await driver.deps.injectScripts(view);
-  return view.webContents.executeJavaScript(VIEWPORT_JS);
+  return evaluatePage(view, VIEWPORT_JS);
 }
 
 /** Two native clicks at (x, y), the second counted as a double click. */

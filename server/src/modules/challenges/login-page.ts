@@ -2,6 +2,7 @@
  * The page side of signing in: scripts that run in the browser to find a login
  * form, fill it, and ask the site for a code.
  */
+import { STILL_LOADING_JS } from './constants.ts';
 
 /**
  * Find the sign-in form and read what filling it needs. Runs in the page.
@@ -10,7 +11,7 @@
 export const DETECT_JS = `(() => {
   // Mid-navigation this document is empty, and "no form here" would read as a
   // verdict. Saying so instead is what lets the caller wait.
-  if (document.readyState !== 'complete') return { present: false, loading: true };
+  if (${STILL_LOADING_JS}) return { present: false, loading: true };
   const visible = (el) => !(el.type === 'hidden' || el.disabled || el.readOnly || !el.getClientRects().length || getComputedStyle(el).visibility === 'hidden');
   const text = (document.body && document.body.innerText || '');
 

@@ -2,6 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import type { NativePage } from './page.ts';
 import { evaluateFrame, type NativeAgentFrame } from './frames.ts';
+import { runInWorld } from './stock-world.ts';
 import { ANALYZER_WORLD_ID, ANALYZER_ATTRIBUTE_BYTES } from './constants.ts';
 /** Source configuration contains no CDP sender or other protocol capability. */
 export interface WorldDeps {
@@ -58,11 +59,11 @@ export class World {
     const attr = 'data-' + randomBytes(ANALYZER_ATTRIBUTE_BYTES).toString('hex');
     return this.deps.analyzerScript.replace('__OYA_ATTR__', attr).replace('__OYA_RECORD__', 'false');
   }
-  /** The engine frame API avoids Electron’s load-completion wait; older engines retain their native public API. */
+  /** The engine frame API avoids Electron’s load-completion wait; stock Electron goes through the tab preload for the same reason. */
   private async run<T>(view: NativePage, code: string): Promise<T> {
     if (view.webContents.isDestroyed()) throw new Error('View is destroyed');
     const frame = view.webContents.mainFrame as NativeAgentFrame | undefined;
     if (frame?._executeJavaScriptInOyaWorld) return evaluateFrame(frame, code) as Promise<T>;
-    return view.webContents.executeJavaScriptInIsolatedWorld(ANALYZER_WORLD_ID, [{ code }]);
+    return runInWorld<T>(view.webContents, ANALYZER_WORLD_ID, code);
   }
 }

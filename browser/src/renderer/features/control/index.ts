@@ -5,3 +5,4 @@
  */
 export { ControlBar } from './components/control-bar.tsx';
 export { ControlViewModel, blockedActions } from './view-models/control-view-model.ts';
+export { ACTION_ID as CONTROL_ACTION_ID } from './model/constants.ts';

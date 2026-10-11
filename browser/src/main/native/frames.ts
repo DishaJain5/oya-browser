@@ -1,6 +1,7 @@
 /** Native isolated execution targets an exact frame, including cross-process frames on the patched engine. */
 import type { WebContents, WebFrameMain } from 'electron';
 import { ANALYZER_WORLD_ID } from './constants.ts';
+import { runInWorld } from './stock-world.ts';
 /** Capability supplied by Oya's engine, never emulated through a debugger. */
 export interface NativeAgentFrame extends Pick<WebFrameMain, 'detached'> {
   /** Execute in the fixed browser-owned agent world, not the page or preload world. */
@@ -27,5 +28,5 @@ function evaluateStock(frame: NativeAgentFrame, code: string): Promise<unknown> 
   const page = pageOf(frame);
   if (!page || (page.mainFrame as unknown) !== frame)
     throw new Error('This Oya engine does not support native isolated frame execution');
-  return page.executeJavaScriptInIsolatedWorld(ANALYZER_WORLD_ID, [{ code }]);
+  return runInWorld(page as WebContents, ANALYZER_WORLD_ID, code);
 }

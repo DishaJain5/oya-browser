@@ -13,6 +13,11 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { _electron as electron } from '../../../ui/node_modules/playwright/index.mjs';
+/** The persona a real server sends in auth_ok; the desktop refuses sign-in without one. */
+const PERSONA = createRequire(import.meta.url)('../../anonymity/fingerprint.js').generateProfile({
+  seed: 'control-ui',
+  platform: 'MacIntel',
+});
 const profile = await mkdtemp(join(tmpdir(), 'oya-control-ui-'));
 await writeFile(join(profile, 'config.json'), JSON.stringify({ ui: { importOffered: true } }));
 const fixture = createServer((_req, res) => res.end('<!doctype html><input id="field" autofocus>'));
@@ -28,7 +33,8 @@ wss.on('connection', (ws) => {
   socket = ws;
   ws.on('message', (raw) => {
     const message = JSON.parse(raw);
-    if (message.type === 'auth') ws.send(JSON.stringify({ type: 'auth_ok', browser_id: 'control-ui', control: state }));
+    if (message.type === 'auth')
+      ws.send(JSON.stringify({ type: 'auth_ok', browser_id: 'control-ui', control: state, fingerprint: PERSONA }));
     if (message.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
     if (message.type !== 'desktop_control') return;
     if (rejectNext) {
@@ -105,6 +111,14 @@ try {
     ),
   );
   assert(rejected, 'IPC enforces navigation ownership');
+  // Taking control from a working agent asks first; the person answers "Take control".
+  await app.evaluate(({ dialog }) => {
+    globalThis.shownDialogs = [];
+    dialog.showMessageBox = async (_window, options) => {
+      globalThis.shownDialogs.push(options);
+      return { response: 1, checkboxChecked: false };
+    };
+  });
   await page.locator('#control-action').click();
   await page.getByText('You’re in control', { exact: true }).waitFor();
   assert.equal((await views()).length, 1, 'taking control removes the native shield');
@@ -190,7 +204,8 @@ try {
   }
   rejectNext = true;
   await page.locator('#control-action').click();
-  await page.getByText('Another operator has control', { exact: true }).waitFor();
+  // A refused takeover is explained in a native error dialog, with the server's reason.
+  await expectDialog(app, 'Another operator has control');
   assert.equal((await views()).length, 2, 'failed takeover stays watch-only');
   state = { mode: 'human', mine: false, expiresAt: Date.now() + 300000, revision: state.revision + 1 };
   socket.send(JSON.stringify({ type: 'control_mode', mode: state.mode, state }));
@@ -217,4 +232,14 @@ try {
   await new Promise((resolve) => wss.close(resolve));
   await new Promise((resolve) => fixture.close(resolve));
   await rm(profile, { recursive: true, force: true });
+}
+
+/** Waits until the app showed a native dialog whose detail carries `text`. */
+async function expectDialog(application, text) {
+  for (let i = 0; i < 100; i++) {
+    const shown = await application.evaluate(() => globalThis.shownDialogs.map((d) => d.detail || ''));
+    if (shown.some((detail) => detail.includes(text))) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`No dialog said "${text}"`);
 }

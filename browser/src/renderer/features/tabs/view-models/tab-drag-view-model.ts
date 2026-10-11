@@ -70,6 +70,16 @@ export interface TabDragDeps extends Pick<RendererServices, 'frames'> {
   bridge: Pick<OyaBrowser, 'activateTab'> & Partial<Pick<OyaBrowser, 'beginTabDrag' | 'endTabDrag'>>;
   /** Hidden when a drag lifts. */
   card: Pick<TabCardViewModel, 'hide'>;
+  /** Moving a tab needs a person in control; while an agent drives, a drag is refused and points at Take control. */
+  gate?: TabDragGate;
+}
+
+/** Who may move tabs right now. */
+export interface TabDragGate {
+  /** A person holds control, so a tab may be reordered or torn off. */
+  movable(): boolean;
+  /** Says why the drag did nothing (points at Take control). */
+  refuse(): void;
 }
 
 /** The state at rest. */
@@ -116,6 +126,7 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
     this.x = x;
     this.y = y ?? this.y;
     if (!this.state.lifted && Math.hypot(x - this.press.x, this.y - (this.press.y ?? 0)) < C.TAB_DRAG_THRESHOLD) return;
+    if (!this.state.lifted && this.deps.gate?.movable() === false) return this.refuse();
     if (!this.state.lifted) this.lift();
     this.follow();
   }
@@ -149,6 +160,12 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
     this.strip = null;
     this.stopFrames();
     this.set(REST);
+  }
+
+  /** An agent holds control: the press ends at once, so the page is not left mid-drag. */
+  private refuse(): void {
+    this.end();
+    this.deps.gate!.refuse();
   }
 
   /** The press becomes a drag: the card goes and the strip starts following the pointer near its edges. */

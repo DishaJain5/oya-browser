@@ -1,6 +1,10 @@
 /** Trusted locator algorithms run in a native isolated world, never through page-controlled helpers. */
 import { ACCESSIBILITY_SOURCE } from './native-accessibility-source.ts';
-/** Normalized text and open-shadow traversal match the workflow locator vocabulary. */
+/**
+ * Normalized text and open-shadow traversal match the workflow locator vocabulary.
+ * `named`: a fallback locator (position, generated id) must still land on an element that
+ * carries the recorded name, or a reordered list replays a click on whoever now sits in that slot.
+ */
 const HELPERS = `
  const norm=value=>String(value??'').replace(/\\s+/g,' ').trim();
  const roots=[document];for(let i=0;i<roots.length;i++)for(const n of roots[i].querySelectorAll('*'))if(n.shadowRoot)roots.push(n.shadowRoot);
@@ -8,6 +12,8 @@ const HELPERS = `
  const text=n=>/^(SCRIPT|STYLE|NOSCRIPT|HEAD)$/.test(n.tagName)?'':norm(n.matches('input[type=button],input[type=submit]')?n.value:n.textContent);
  const visible=n=>{const r=n.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(n).visibility!=='hidden';};
  const labels=n=>{const by=n.getAttribute('aria-labelledby');if(by)return by.split(/\\s+/).map(id=>n.getRootNode().getElementById?.(id)?.textContent||'');const label=n.getAttribute('aria-label');return label!==null?[label]:[...(n.labels||[])].map(l=>l.textContent);};
+ const said=norm(p.el.stableText||p.el.text).replace(/(\\.\\.\\.|…)$/,'').toLowerCase();
+ const named=n=>!said||n.matches('input,textarea,select')||n.isContentEditable||[text(n),n.getAttribute('aria-label'),n.getAttribute('title'),n.value,oyaAccessibility.computeAccessibleName(n)].some(v=>norm(v).toLowerCase().includes(said));
  const name=new RegExp('^\\\\W*'+p.candidate.value.replace(/[.*+?^\u0024{}()|[\\]\\\\]/g,'\\\\\u0024&')+'\\\\W*$');
 `;
 /** Fixed strategy dispatch; candidate text is encoded as data, never evaluated as code. */
@@ -25,7 +31,7 @@ const MATCH = `
  const nodes=[...new Set(strategies[c.kind]())].filter(n=>p.hidden||visible(n));
  if(nodes.length!==1)return {count:nodes.length};
  const node=nodes[0], link=node.closest('a');
- const recorded=(!p.el.tag||!!node.closest(p.el.tag))&&(!p.el.href||(!!link?.href&&new URL(link.href).origin===new URL(p.el.href,location.href).origin&&new URL(link.href).pathname===new URL(p.el.href,location.href).pathname));
+ const recorded=(!p.el.tag||!!node.closest(p.el.tag))&&(!p.el.href||(!!link?.href&&new URL(link.href).origin===new URL(p.el.href,location.href).origin&&new URL(link.href).pathname===new URL(p.el.href,location.href).pathname))&&named(node);
  globalThis[p.key]={node,token:p.token};
  return {count:1,text:norm(node.textContent),value:node.value,recorded,editable:node.isContentEditable||node instanceof HTMLTextAreaElement||node instanceof HTMLInputElement};
 `;

@@ -118,10 +118,10 @@ class NativeValidation {
         await this.open(name);
     });
   }
-  /** Never drive a partially initialized tab. */
+  /** Never drive a partially initialized tab; plain about:blank (stock Electron rejects `about:blank#name`). */
   private async open(name: string): Promise<void> {
     if (this.stopped) throw new Error('Run stopped');
-    const id = this.deps.createTab('about:blank#oya-native-run-' + encodeURIComponent(name));
+    const id = this.deps.createTab('about:blank');
     const tab = this.deps.tabs().find((t) => t.id === id);
     if (!tab) throw new Error('Validation tab is unavailable');
     this.tabs.set(name, tab);

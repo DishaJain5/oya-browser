@@ -36,7 +36,7 @@ import { Lifecycle } from './app/lifecycle.ts';
 import { Updater } from './app/updater.ts';
 import { KEEP_RENDERING_SWITCHES, RELAY_TOKEN_BYTES, WORLD_NAME_BYTES } from './app/constants.ts';
 import { DesktopDialogs, dialogPresenter } from './dialogs/index.ts';
-import { World, useFramePages } from './native/index.ts';
+import { World, useFramePages, useStockWorld } from './native/index.ts';
 import { Observer } from './observe/observer.ts';
 import { DesktopControl } from './control/control-state.ts';
 import { CookieSync, cookieSyncMark } from './sync/cookie-sync.ts';
@@ -152,6 +152,7 @@ electron.ipcMain.on(STOCK_PERSONA.CHANNEL, (event) => {
   event.returnValue = ctx.protection.stockSource(event.sender.session);
 });
 useFramePages((frame) => electron.webContents.fromFrame(frame as Electron.WebFrameMain) ?? undefined);
+useStockWorld(electron.ipcMain);
 ctx.workers = new WorkerCoverage(ctx, () => app.getPath('userData'));
 ctx.persona = new Persona(ctx);
 app.once('will-quit', () => ctx.persona.disposeStorage());

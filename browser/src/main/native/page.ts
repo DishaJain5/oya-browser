@@ -33,10 +33,14 @@ export interface NativePage {
   /** The actual renderer, not a remote debugging target. */
   webContents: WebContents;
 }
-/** Evaluate in the page's main world only when the calling command explicitly requests that world. */
+/**
+ * Evaluate in the page's main world only when the calling command explicitly requests that world.
+ * Through the main frame: `webContents.executeJavaScript` waits until the page stops loading, so
+ * one request that never ends held every read (and the server's sign-in checks) for a full timeout.
+ */
 export async function evaluatePage<T = unknown>(view: NativePage, expression: string): Promise<T> {
   if (view.webContents.isDestroyed()) throw new Error('View is destroyed');
-  return view.webContents.executeJavaScript(expression);
+  return (view.webContents.mainFrame ?? view.webContents).executeJavaScript(expression) as Promise<T>;
 }
 /** Capture rendered page pixels, preserving the existing PNG/JPEG data-URL response contract. */
 export async function capturePage(view: NativePage | null, jpegQuality?: number): Promise<string> {

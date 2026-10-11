@@ -19,13 +19,13 @@ import {
   systemDarkAtStart,
 } from '../features/chrome/index.ts';
 import { reducedMotion } from '../hooks/index.ts';
-import { TabStripViewModel, TabDragViewModel, TabCardViewModel } from '../features/tabs/index.ts';
+import { TabStripViewModel, TabDragViewModel, TabCardViewModel, type TabDragGate } from '../features/tabs/index.ts';
 import { ToolbarViewModel } from '../features/toolbar/index.ts';
 import { StartViewModel } from '../features/start/index.ts';
 import { ActionsViewModel, NetLogViewModel, SourceViewModel } from '../features/inspect/index.ts';
 import { RoutinesViewModel } from '../features/routines/index.ts';
 import { StudioViewModel, type RecordingGate } from '../features/studio/index.ts';
-import { ControlViewModel, blockedActions } from '../features/control/index.ts';
+import { ControlViewModel, blockedActions, CONTROL_ACTION_ID } from '../features/control/index.ts';
 import {
   AccountViewModel,
   SyncViewModel,
@@ -56,6 +56,14 @@ function recordingGate(control: ControlViewModel): RecordingGate {
   return {
     blocked: () => !!control.state.control && blockedActions(control.state).recordBlocked,
     admit: async () => control.guard(true) === 'allow' || (control.guard(true) === 'take' && control.acquire()),
+  };
+}
+
+/** Tabs move only while a person holds control; a refused drag focuses Take control, as a refused button does. */
+function tabDragGate(control: ControlViewModel, frames: FrameClock): TabDragGate {
+  return {
+    movable: () => !control.state.control || control.guard(false) === 'allow',
+    refuse: focusById(frames, CONTROL_ACTION_ID),
   };
 }
 
@@ -140,10 +148,11 @@ function toolModels(root: ShellViewModels): Pick<ShellViewModels, 'ask' | 'studi
 
 /** Every feature but the connection, over the core ViewModels. */
 function featureModels(root: ShellViewModels): Pick<ShellViewModels, FeatureKeys> {
-  const { env, panel } = root;
+  const { env, panel, control } = root;
   const chrome = chromeModels(env);
   const toolbar = new ToolbarViewModel(env.bridge);
-  return { ...toolModels(root), chrome, toolbar, tabs: tabModels(env), inspect: inspectModels(env, panel) };
+  const tabs = tabModels(env, tabDragGate(control, env.frames));
+  return { ...toolModels(root), chrome, toolbar, tabs, inspect: inspectModels(env, panel) };
 }
 
 /** Theme, the agent's activity, the page backdrop and the launch. */
@@ -179,9 +188,9 @@ export interface TabModels {
 }
 
 /** The tab strip, in the order its parts need each other. */
-function tabModels({ bridge, frames }: PageEnvironment): TabModels {
+function tabModels({ bridge, frames }: PageEnvironment, gate: TabDragGate): TabModels {
   const card = new TabCardViewModel();
-  const drag = new TabDragViewModel({ bridge, frames, card });
+  const drag = new TabDragViewModel({ bridge, frames, card, gate });
   return { card, drag, strip: new TabStripViewModel({ bridge, card, drag, reducedMotion }) };
 }
 

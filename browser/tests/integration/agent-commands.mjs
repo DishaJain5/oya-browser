@@ -15,6 +15,11 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 import { _electron as electron } from '../../../ui/node_modules/playwright/index.mjs';
+/** The persona a real server sends in auth_ok; the desktop refuses sign-in without one. */
+const PERSONA = createRequire(import.meta.url)('../../anonymity/fingerprint.js').generateProfile({
+  seed: 'agent-cmds',
+  platform: 'MacIntel',
+});
 
 /** A page per path: its title names it, a global the isolated world must not see, and a hover target. */
 const pageFor = (path) =>
@@ -36,7 +41,8 @@ wss.on('connection', (ws) => {
   ws.on('message', (raw) => {
     const message = JSON.parse(raw);
     const control = { mode: 'agent', mine: false, revision: 1 };
-    if (message.type === 'auth') ws.send(JSON.stringify({ type: 'auth_ok', browser_id: 'agent-cmds', control }));
+    if (message.type === 'auth')
+      ws.send(JSON.stringify({ type: 'auth_ok', browser_id: 'agent-cmds', control, fingerprint: PERSONA }));
     if (message.type === 'ping') ws.send(JSON.stringify({ type: 'pong' }));
     if (message.type === 'cmd_result') waiting.get(message.id)?.(message);
   });

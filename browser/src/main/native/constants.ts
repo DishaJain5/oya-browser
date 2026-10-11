@@ -4,6 +4,8 @@ import { NATIVE_RECORDING } from '../../shared/native-recording.ts';
 export const JPEG_MAX_QUALITY = 100;
 /** Keep preload delivery and browser evaluation in the same reserved world. */
 export const ANALYZER_WORLD_ID = NATIVE_RECORDING.WORLD_ID;
+/** How long a tab preload has to acknowledge an isolated-world run before the stock API is used instead. */
+export const STOCK_WORLD_ACK_MS = 1000;
 /** Random bytes in an analyzer's per-document DOM marker. */
 export const ANALYZER_ATTRIBUTE_BYTES = 4;
 /** A hung renderer must not indefinitely block recording readiness, drains or stop. */

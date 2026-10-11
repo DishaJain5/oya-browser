@@ -2180,9 +2180,27 @@
     return e.key !== ' ' || !['button', 'link', 'checkbox'].includes(type);
   }
 
+  /**
+   * The suggestion a combobox field has highlighted (aria-activedescendant), when it shows.
+   * Enter there picks that suggestion, and the arrows that moved to it are caret keys the
+   * recorder skips, so a replayed Enter would pick whichever suggestion comes first.
+   */
+  function activeOption(target) {
+    const id = TEXTUAL.has(getInteractiveType(target)) && target.getAttribute?.('aria-activedescendant');
+    const option = id && target.getRootNode().getElementById?.(id);
+    return option && recordVisible(option) ? option : null;
+  }
+
   function onRecordKey(e) {
     if (!recording || !e.isTrusted) return;
     const target = e.composedPath?.()[0] || e.target;
+    const option = e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.altKey && activeOption(target);
+    if (option) {
+      flushTyping();
+      lastKey = { key: e.key, t: Date.now() };
+      pushStep({ action: 'click', el: recordedEl(option, getInteractiveType(option) || 'button') });
+      return;
+    }
     const nav = NAV_KEYS.has(e.key);
     if (!RECORD_KEYS.has(e.key) && !(nav && navKeyCounts(e, target))) return;
     // Tab with nothing focused only starts moving through the page: nothing to replay.

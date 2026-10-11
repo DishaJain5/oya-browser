@@ -56,3 +56,52 @@ export function showUnprotected(tabs: TabListSink, tab: Tab): void {
   tab.loadError = TAB_UNPROTECTED_DESKTOP;
   tabs.sendTabList();
 }
+
+/**
+ * An agent's navigate: done once the new document is parsed, like a person seeing the
+ * page, not when its last image or tracker finishes. A request that never ends held the
+ * command for its whole 90s timeout. A failed main-frame load still rejects.
+ */
+export async function loadUntilReady(tab: LoadableTab, url: string): Promise<void> {
+  const ready = documentReady(tab.view.webContents);
+  const load = loadInTab(tab, url).finally(ready.cancel);
+  load.catch(() => {});
+  await Promise.race([load, ready.promise]);
+}
+
+/** The webContents a tab loads in. */
+type Contents = LoadableTab['view']['webContents'];
+
+/** Chromium's ERR_ABORTED: the previous, still-loading document giving way to this navigation. */
+const ABORTED = -3;
+
+/** What one agent navigation has seen so far. */
+interface LoadState {
+  /** The new document committed, so its dom-ready is this navigation's. */
+  committed: boolean;
+  /** The main frame failed: the load's own rejection reports it. */
+  failed: boolean;
+}
+
+/** Resolves on the new document's dom-ready, unless its main frame failed first; `cancel` drops the listeners. */
+function documentReady(contents: Contents) {
+  const state: LoadState = { committed: false, failed: false };
+  let resolve = (): void => {};
+  const promise = new Promise<void>((done) => (resolve = done));
+  const events = readyEvents(state, () => state.committed && !state.failed && resolve());
+  for (const [name, listener] of events) contents.on(name as 'dom-ready', listener);
+  const cancel = () => events.forEach(([name, listener]) => contents.off(name as 'dom-ready', listener));
+  return { promise, cancel };
+}
+
+/** Commit, failure and readiness listeners: a dom-ready counts only after this navigation committed. */
+function readyEvents(state: LoadState, ready: () => void) {
+  const commit = () => void (state.committed = true);
+  const fail = (_e: unknown, code: number, _text: string, _url: string, main: boolean) =>
+    void (state.failed ||= main && code !== ABORTED);
+  return [
+    ['did-navigate', commit],
+    ['did-fail-load', fail],
+    ['dom-ready', ready],
+  ] as [string, (...a: never[]) => void][];
+}

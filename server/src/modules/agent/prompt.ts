@@ -27,7 +27,7 @@ HOW TO ACT
 3. Use element tools (click, type, select_option, upload_file). Replays find the elements you touched; click_coordinates, double_click, drag, mouse_move and keyboard_type cannot be replayed reliably, so use them only when no element id works.
 4. Start at the site the task names by navigating to its address (its home page, or the page the task gives), never by looking it up in a search engine: search engines answer automated browsers with a robot check, and the replay would depend on their results. Use a web search only when the task names no site. From there, reach pages the way a person would: through the site's own search box, menus and forms. Never write the task's data into an address (a search url you built, an id you guessed): the playbook would replay that one search forever. Move the page with scroll, and open things by clicking them. Keep press_key for keys that are the interaction itself: Enter in a box you have just typed in, Escape to close a dialog, arrows inside a list. A PageDown or an End is aimed at whatever happens to have focus, which on the replay is rarely what it was here, and it records nothing about what you were trying to reach.
 5. If a tool says "Element not found", analyze again and retry with the new id.
-6. For a task of more than a few steps, call update_plan first with every step, and update it as each one is done. Before you finish, every step should be done or you should say which one is not.
+6. For a task of more than a few steps, call update_plan with every step in the same turn as your first action, and send each update together with your next action, never in a turn of its own. Before you finish, every step should be done or you should say which one is not.
 7. Every action says what it changed on the page ("Changed: ..."), or that nothing changed. When a click changes nothing, it did not work: try another way instead of clicking again.
 8. You may call several tools in one turn when they do not depend on each other (filling a form's fields, then submitting). Ids stay valid across one turn's calls.
 9. After an action that loads results in the background (a search, a filter, a sort), call wait_for rather than analyzing again and again. Use go_back to return to a list rather than navigating to it afresh, and hover for menus that open on hover.
@@ -59,7 +59,7 @@ FINDING THINGS
 - Judge from the page, not from what you expect: check the value you are about to report is the one the page shows, in the row you think it is in.
 
 FORMS
-- Fill each field the task gives you, in page order, one at a time. Never invent a value the task does not provide; leave optional fields empty.
+- Fill each field the task gives you, in page order, all of one form's fields in a single turn. Never invent a value the task does not provide; leave optional fields empty.
 - Upload fields: use upload_file with a name from FILES. Clicking one opens the operating system's file picker, which you cannot use, so never click it.
 - Native dropdowns (select elements): use select_option with the option's text. Custom dropdowns, radio groups and autocompletes: open or type, analyze, then click the option that matches.
 - A field a widget draws over reads as covered, and typing into it does nothing. Click the name or value shown on top of it, type enough to narrow the list, and click the option. A list that says it is loading has not answered yet: analyze again before deciding nothing matched.
@@ -120,7 +120,7 @@ export const UPDATE_PLAN = {
   function: {
     name: 'update_plan',
     description:
-      'Write or update your plan: the steps this task needs, each marked done or not. Call it first for any task of more than a few steps, and again as you finish each one. It does not touch the page.',
+      'Write or update your plan: the steps this task needs, each marked done or not. Call it for any task of more than a few steps, always in the same turn as a page action, never alone: it does not touch the page.',
     parameters: {
       type: 'object',
       properties: {

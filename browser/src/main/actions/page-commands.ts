@@ -15,7 +15,7 @@ import { HISTORY_COMMANDS } from './history-commands.ts';
 import * as queries from '../../page/queries.ts';
 import { isDateInput, dateInputValue, unreadableDate } from '../../page/date-value.ts';
 import { isWebAddress, NOT_A_WEB_ADDRESS } from '../tabs/navigation.ts';
-import { loadInTab, isUnprotected } from '../tabs/load.ts';
+import { loadUntilReady, isUnprotected } from '../tabs/load.ts';
 import type { PageDriver, TabView } from './driver.ts';
 import type { CommandId, CommandParams, ElementSpot, Landed, Located, ScriptResult } from './types.ts';
 
@@ -82,7 +82,7 @@ async function readyTab(driver: PageDriver, view: PageView): Promise<TabView> {
 /** One load of `url`: null when it loaded, otherwise the error. A tab that is not protected is never retried: it throws. */
 async function attemptLoad(tab: TabView, url: string): Promise<Error | null> {
   try {
-    await loadInTab(tab, url);
+    await loadUntilReady(tab, url);
     return null;
   } catch (navErr) {
     if (isUnprotected(navErr)) throw navErr;

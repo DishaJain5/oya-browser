@@ -577,15 +577,13 @@ the complete unpacked patched distribution at its root, including executable
 cannot replace this distribution.
 
 The pinned Linux cloud runtime is
-[`native-engine-44.5.1-linux-x64-20261010`](https://github.com/OyadotAI/oya-browser/releases/tag/native-engine-44.5.1-linux-x64-20261010).
+[`native-engine-44.5.1-linux-x64-20261011`](https://github.com/OyadotAI/oya-browser/releases/tag/native-engine-44.5.1-linux-x64-20261011).
 Use its `oya-native-linux-x64-44.5.1.tar.gz` asset with SHA-256
-`8495b67c0f6dc1b09e479ce69bfe3b43ce6c8af50e9bd0d05c2080b849a122eb`.
-The release includes build provenance and the native acceptance report. Validation
-runs in a Linux amd64 container under Docker Desktop/Rosetta on macOS arm64,
-with no network and a non-root, sandboxed renderer. This is a cloud/CI testing
-distribution; it does not add Linux desktop support or certify Windows/macOS
-release signing and physical authenticators. Desktop download workflows exclude
-runtime prereleases when selecting the latest desktop assets.
+`c988c5dfdeb1e120215025907748d3d9c21eed1f8217b91c96f78f0cc43093da`.
+`build-linux.sh` built it natively on EC2 with Electron's release configuration,
+PGO and ThinLTO included, so it matches the npm Electron binary's speed. It does
+not add Linux desktop support. Desktop download workflows exclude runtime
+prereleases when selecting the latest desktop assets.
 
 Installation checks the checksum before extraction, runs the existing native
 packaging capability probe under Xvfb, then exports `OYA_NATIVE_ENGINE` for the
