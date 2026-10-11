@@ -608,76 +608,17 @@ keeps Linux cloud support separate from macOS/Windows desktop packaging.
 For Compose, `make docker-browser`, the CLI installer and `update.sh`, export
 `OYA_NATIVE_LINUX_DIRECTORY` with the absolute path to that same verified directory.
 
-### Building the Linux cloud distribution on macOS
+### Building the Linux cloud distribution
 
-Start with the pinned, fully native-patched checkout above. Fetch its Linux
-dependencies at the revisions in Chromium's `DEPS`, and install Electron's amd64
-sysroot:
-
-```sh
-python3 build/linux/sysroot_scripts/install-sysroot.py \
-  --sysroots-json-path=electron/script/sysroots.json --arch=x64
-```
-
-Chromium's default sysroot lacks Electron's libnotify headers. Do not resync
-or reset an existing patched checkout to fetch missing dependencies. Cross-linking
-also needs the Linux compiler-rt libraries from the **same pinned LLVM version**;
-keep the macOS compiler executables and add only the Linux target libraries.
-
-Apply `patches/linux-cross-build.patch` in `src/electron`, and
-`patches/linux-cross-pkgconfig.patch` in `src`, checking each with
-`git apply --check` first. The first generates the checksum from the shipped base
-V8 snapshot when the optional Blink context snapshot is disabled, preserving
-runtime integrity validation. The second makes an explicit Linux sysroot
-produce real pkg-config flags on macOS; upstream's graph-emulation shortcut
-otherwise silently drops required headers and libraries. Install `pkgconf` on
-the build host. The Electron patch also resolves its Node filesystem sources
-relative to the generator rather than assuming an output directory under `src/out`.
-Its X11/Wayland detection respects the compiled Ozone platform flags, so the
-cloud build does not reference an unavailable Wayland platform constant.
-
-Apply `patches/linux-cross-v8-host.patch` in `src/v8` as well (the pinned V8
-revision is `77c65af5f4b7145cec663580054251968657fdf5`). It selects WebAssembly
-memory-mapping syscalls by the OS of the V8 binary, rather than the OS of its
-generated code. This keeps the macOS snapshot helper from compiling Linux-only
-syscalls while leaving the Linux runtime's implementation unchanged.
-
-Apply `patches/linux-cross-node-config.patch` in `src/third_party/electron_node`
-(revision `20de6b1149b04b60e6453adcd11e3a7d04eb2ec0`). It passes the GN source
-root explicitly to Node's configuration generator and chooses the shared-library
-suffix from the target OS. A macOS host must not embed `dylib` in Linux's config.
-
-Use a separate output directory and this testing configuration:
-
-```gn
-import("//electron/build/args/testing.gn")
-target_os = "linux"
-target_cpu = "x64"
-symbol_level = 0
-use_thin_lto = false
-chrome_pgo_phase = 0
-use_mold = false
-ozone_platform_wayland = false
-use_v8_context_snapshot = false
-generate_about_credits = true
-pkg_config = "/opt/homebrew/bin/pkg-config"
-mac_sdk_path = "/absolute/output/sdk/MacOSX26.5.sdk"
-```
-
-The SDK path must be inside this output directory; a symlink to the installed
-26.5 SDK works. The pinned linker cannot read the default 27 SDK's TAPI format.
-Disabling the optional Blink context snapshot avoids compiling Blink a second
-time for the host; normal V8 startup data remains enabled. X11 stays enabled for
-the cloud image's Xvfb display.
-
-Build `electron:electron_dist_zip` with at most four Ninja jobs and monitor free
-disk space. Put the checkout's `buildtools/mac` directory on `PATH` for the
-entire Ninja invocation: Node's configuration generator invokes `gn` by name.
-Its `dist.zip` contains the complete runtime. Unpack it, verify the
-native capabilities and integration suites **on Linux x64**, then archive that
-directory's contents as the CI `tar.gz` and compute its SHA-256. A successful
-cross-compile alone is not runtime validation, and this testing configuration
-does not produce a supported Linux desktop release.
+Build natively on a Linux x64 host, such as one EC2 Ubuntu 24.04 c7a.16xlarge with
+a 400 GB disk: `browser/engine/build-linux.sh [work-dir]`. It syncs the pinned
+revisions in `desktop-source.json`, applies the checksum-pinned overlay, builds
+Electron's release configuration and writes `oya-native-linux-x64-<version>.tar.gz`
+with its SHA-256. A native build needs none of the `linux-cross-*` patches.
+Validate the unpacked runtime on that host under Xvfb (the native distribution
+probe and the browser's native suites), publish the archive as a native-engine
+prerelease, then set `OYA_NATIVE_LINUX_URL` and `OYA_NATIVE_LINUX_SHA256`.
+macOS and Windows desktop apps ship stock Electron and need no engine build.
 
 Provisioning alone does not complete platform validation. The server gateway
 fixture now provisions cold native Oya workers and tests profile restoration,
