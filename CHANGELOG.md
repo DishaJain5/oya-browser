@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.177](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.177) · 2026-10-11
+
 ### Changed
 
 - Who drives the browser is now one switch in the toolbar: **OyaAI Mode** while the agent works, **Human Mode** while you do. Click the other side to hand over; after a pause, OyaAI Mode picks up where the agent stopped.
