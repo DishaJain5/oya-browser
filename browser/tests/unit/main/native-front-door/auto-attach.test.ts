@@ -86,14 +86,18 @@ test('unsupported automatic attachment contracts fail without subscribing', asyn
   const f = fixture();
   for (const params of [
     {},
-    { ...enabled, filter: undefined },
     { ...enabled, flatten: false },
-    { ...enabled, waitForDebuggerOnStart: true },
+    { ...enabled, waitForDebuggerOnStart: 'yes' },
     { ...enabled, filter: [{ type: 'worker' }] },
     { ...enabled, filter: [{ type: 'page', exclude: true }] },
   ])
     await assert.rejects(f.run('Target.setAutoAttach', params));
   assert.equal(f.listeners.size, 0);
+});
+test("accepts Playwright's form: no filter, and waitForDebuggerOnStart:true, since nothing is ever paused", async () => {
+  const f = fixture();
+  await f.run('Target.setAutoAttach', { autoAttach: true, flatten: true, waitForDebuggerOnStart: true });
+  assert.equal(f.listeners.size, 1);
 });
 test('capacity preflight rolls back initial setup and future overflow explicitly fails the transport', async () => {
   const f = fixture();

@@ -84,8 +84,16 @@ describe('native CdpRelay', () => {
   it('rejects unsupported methods and remote filesystem destinations', async () => {
     const f = fixture();
     await f.relay.openCdpRelay('a');
-    for (const method of ['Browser.close', 'Target.exposeDevToolsProtocol', 'Browser.setDownloadBehavior'])
+    for (const method of ['Browser.close', 'Target.exposeDevToolsProtocol'])
       assert.ok((await call(f, 'a', { id: 1, method })).error);
+    assert.equal(f.executed.length, 0);
+    f.relay.closeCdpRelays();
+  });
+  it('answers download settings as a no-op, never choosing a folder on this machine', async () => {
+    const f = fixture();
+    await f.relay.openCdpRelay('a');
+    const params = { behavior: 'allowAndName', downloadPath: '/tmp/x', browserContextId: 'c' };
+    assert.deepEqual((await call(f, 'a', { id: 1, method: 'Browser.setDownloadBehavior', params })).result, {});
     assert.equal(f.executed.length, 0);
     f.relay.closeCdpRelays();
   });

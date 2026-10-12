@@ -74,9 +74,8 @@ export class NativeRelayConnection {
   private async execute(message: NativeCommand): Promise<void> {
     if (!this.active) return;
     if (!this.options.allowed()) throw new ProtocolError('Remote native control is unavailable');
-    if (message.method === 'Browser.setDownloadBehavior')
-      throw new ProtocolError('Remote callers cannot select local download destinations', NATIVE_DOOR.unsupported);
-    const result = await this.protocol.dispatch(message);
+    // Remote callers never pick a folder on this machine; downloads keep the browser's own policy.
+    const result = message.method === 'Browser.setDownloadBehavior' ? {} : await this.protocol.dispatch(message);
     if (!this.options.allowed()) throw new ProtocolError('Remote native control was revoked');
     this.emit({ id: message.id, ...(message.sessionId ? { sessionId: message.sessionId } : {}), result });
   }

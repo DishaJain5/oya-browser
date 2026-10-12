@@ -8,14 +8,17 @@ export function validateTargets(command: NativeCommand): void {
   if (command.method !== 'Target.setAutoAttach') return;
   validateAutomatic(command.params);
 }
-/** Automatic sessions never promise unsupported paused renderers or worker discovery. */
+/**
+ * Automatic sessions attach pages only, with or without a page filter. Nothing is ever paused, so
+ * waitForDebuggerOnStart:true is satisfied as it stands and attachments report waitingForDebugger:false.
+ */
 function validateAutomatic(params: Record<string, unknown>): void {
   const { autoAttach, flatten, waitForDebuggerOnStart, filter } = params;
-  if (typeof autoAttach !== 'boolean' || flatten !== true || waitForDebuggerOnStart !== false)
+  if (typeof autoAttach !== 'boolean' || flatten !== true || typeof waitForDebuggerOnStart !== 'boolean')
     throw Error(
-      'Native automatic attachment requires autoAttach boolean, flatten:true and waitForDebuggerOnStart:false',
+      'Native automatic attachment requires autoAttach boolean, flatten:true and waitForDebuggerOnStart boolean',
     );
-  if (autoAttach || filter !== undefined) requirePageFilter(filter);
+  if (filter !== undefined) requirePageFilter(filter);
 }
 /** Requiring an explicit page-only filter prevents clients from assuming workers or iframe targets were attached. */
 function requirePageFilter(filter: unknown): void {

@@ -3,6 +3,8 @@ import type { Session, WebContents } from 'electron';
 import type { AppServices } from './services.ts';
 import { appNativeContexts } from './native-contexts.ts';
 import { nativeCookies } from '../native-cookies/index.ts';
+import { DEFAULT_BROWSER_CONTEXT } from './constants.ts';
+import { clientCompatibility } from './cdp-passthrough.ts';
 import { NativeDownloads } from '../native-downloads/index.ts';
 import { NativeNetworkSession, type NetworkDependencies, type NetworkSink } from '../native-network/index.ts';
 /** Resource lifetime is shared only within one authenticated front-door connection. */
@@ -15,11 +17,13 @@ export class AppNativeBrowser {
   private readonly downloads: NativeDownloads;
   /** Current human-control check also guards context-wide operations without a page. */
   private readonly cookieAllowed: () => boolean;
+  /** The browser's own profile: the persona's session, used when no private context is named. */
+  private readonly profile: () => Session;
   /** Compose native services with current control/target policy. */
   constructor(deps: AppServices, policy: NetworkDependencies) {
-    this.cookieAllowed = () =>
-      !deps.control.busy && !deps.control.localHeld && (!deps.control.connected || deps.control.state.mode === 'agent');
+    this.cookieAllowed = () => controlAllows(deps.control);
     this.downloads = new NativeDownloads(policy);
+    this.profile = () => deps.persona.session();
     const lifecycle = {
       install: (session: Session) => this.networks.set(session, new NativeNetworkSession(session, policy)),
       remove: (session: Session) => this.removeNetwork(session),
@@ -53,6 +57,10 @@ export class AppNativeBrowser {
   /** Revocation during a native await prevents export or later batch writes. */
   private cookieSession(params: Record<string, unknown>): Session {
     if (!this.cookieAllowed()) throw Error('Native cookie access is no longer authorized');
+    const id = params.browserContextId;
+    const own = id === undefined || id === DEFAULT_BROWSER_CONTEXT;
+    if (own && !clientCompatibility()) throw Error('An owned browserContextId is required');
+    if (own) return this.profile();
     return this.contexts.get(params.browserContextId as string);
   }
   /** Destination changes and cancellation can address only a live owned private context. */
@@ -63,4 +71,9 @@ export class AppNativeBrowser {
     else throw Error('Unsupported native download operation');
     return {};
   }
+}
+
+/** Whether the current control owner lets an agent act: no human holds the browser. */
+function controlAllows(control: AppServices['control']): boolean {
+  return !control.busy && !control.localHeld && (!control.connected || control.state.mode === 'agent');
 }

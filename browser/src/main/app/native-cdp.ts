@@ -12,6 +12,8 @@ import {
   type NativeEventSink,
 } from '../native/index.ts';
 import { AppNativeBrowser } from './native-browser.ts';
+import { DEFAULT_BROWSER_CONTEXT } from './constants.ts';
+import { CdpPassthrough, passesThrough, type PassthroughSink } from './cdp-passthrough.ts';
 import type { NetworkDependencies } from '../native-network/index.ts';
 import type { BrowserWindow } from 'electron';
 import { randomUUID } from 'node:crypto';
@@ -47,6 +49,11 @@ export class AppNativeBackend implements NativeBackend {
   private readonly frameTree = new NativeFrameTree();
   /** Device overrides are restored when this external connection leaves. */
   private readonly metrics = new NativeDeviceMetrics();
+  /** Page methods with no native answer go to the exact tab; OYA_CDP_PASSTHROUGH=0 turns this off. */
+  private readonly through = new CdpPassthrough({
+    view: (target) => this.tab(target).view,
+    allowedURL: (url) => this.deps.governance.allowed(url),
+  });
   /** Capture services without changing their authorization or protection rules. */
   constructor(deps: AppServices, ids = new WeakMap<Tab, string>()) {
     this.deps = deps;
@@ -65,7 +72,22 @@ export class AppNativeBackend implements NativeBackend {
     this.runtime.dispose();
     this.frameTree.dispose();
     this.metrics.dispose();
+    this.through.dispose();
     void this.browser.contexts.dispose().catch(() => console.error('[native-context] cleanup failed'));
+  }
+  /** Whether `method` passes through to a tab; never when OYA_CDP_PASSTHROUGH=0. */
+  readonly passesThrough = passesThrough;
+  /** Passes one page method through to the exact tab, after the same ownership and protection checks. */
+  async passthrough(target: string, method: string, params: Record<string, unknown>, child = ''): Promise<unknown> {
+    await whenProtected(this.tab(target));
+    return this.through.send(target, method, params, child);
+  }
+  /** Forwards the exact tab's events while this browser's control rules let it be observed. */
+  passthroughEvents(target: string, emit: PassthroughSink): () => void {
+    const tab = this.tab(target);
+    return this.through.watch(target, (method, params, child) => {
+      if (this.observable(tab)) emit(method, params, child);
+    });
   }
   /** Discovery subscribes to native tab ownership, rechecking human control before each signal. */
   watchTargets(changed: () => void): () => void {
@@ -125,7 +147,7 @@ export class AppNativeBackend implements NativeBackend {
     return this.tabs().map((tab) => ({
       targetId: this.id(tab),
       type: 'page',
-      browserContextId: this.browser.contexts.id(tab.view.webContents.session),
+      browserContextId: this.browser.contexts.id(tab.view.webContents.session) ?? DEFAULT_BROWSER_CONTEXT,
       title: tab.view.webContents.getTitle(),
       url: tab.view.webContents.getURL(),
     }));
@@ -141,9 +163,10 @@ export class AppNativeBackend implements NativeBackend {
   async open(url: string, context?: string): Promise<string> {
     requireNativeControl(this.deps);
     if (!isWebAddress(url)) throw Error(NOT_A_WEB_ADDRESS);
-    const id = context
-      ? this.deps.tabs.createTab(url, true, undefined, this.browser.contexts.get(context))
-      : this.deps.tabs.openForAutomation(url);
+    const id =
+      context && context !== DEFAULT_BROWSER_CONTEXT
+        ? this.deps.tabs.createTab(url, true, undefined, this.browser.contexts.get(context))
+        : this.deps.tabs.openForAutomation(url);
     return this.readyOpened(this.opened(id));
   }
   /** Resolve the newly created tab through global window ownership. */
@@ -200,33 +223,12 @@ export class AppNativeBackend implements NativeBackend {
     if (action === 'metrics:clear') return this.metrics.clear(tab.view);
     if (action === 'frameTree') return this.frameTree.snapshot(tab.view, target);
     if (action.startsWith('dom:')) return this.inspection.read(tab.view, action.slice('dom:'.length), params);
-    return this.perform(tab, action, params);
+    return perform(this.deps, tab, action, params);
   }
   /** History destinations retain the same explicit web and egress restrictions as navigation. */
   private historyCommand(tab: Tab, action: string, params: Record<string, unknown>): object {
     if (action === 'history:read') return this.history.read(tab.view);
     return this.history.navigate(tab.view, params, (url) => isWebAddress(url) && this.deps.governance.allowed(url));
-  }
-  /** Capture only this command’s result without replacing the global result sink. */
-  private async perform(tab: Tab, action: string, params: Record<string, unknown>): Promise<unknown> {
-    let result: unknown;
-    const sendResult: PageDriver['deps']['sendResult'] = (_id, ok, data, error) => {
-      if (!ok) throw Error(error || 'Native command failed');
-      result = data;
-    };
-    await this.driver(tab, sendResult).runPageAction(randomUUID(), action, params as CommandParams, tab.view);
-    return result;
-  }
-  /** Reuse production tools but replace every active-tab lookup and result sink with exact command ownership. */
-  private driver(tab: Tab, sendResult: PageDriver['deps']['sendResult']): PageDriver {
-    const current = this.deps.actions;
-    return new PageDriver({
-      ...current.deps,
-      keyboard: current.keyboard,
-      mouse: current.mouse,
-      sendResult,
-      ...pinnedTab(tab),
-    });
   }
 }
 /** The external protocol always terminates in native operations; tab protection remains mandatory. */
@@ -295,4 +297,25 @@ function networkPolicy(...[deps, tabs, tree, identify]: NetworkPolicyInputs): Ne
     frameId: (wc, frame) => (frame === wc.mainFrame ? target(wc) : tree.id(frame)),
     target,
   };
+}
+/** Capture only this command’s result without replacing the global result sink. */
+async function perform(deps: AppServices, tab: Tab, action: string, params: Record<string, unknown>): Promise<unknown> {
+  let result: unknown;
+  const sendResult: PageDriver['deps']['sendResult'] = (_id, ok, data, error) => {
+    if (!ok) throw Error(error || 'Native command failed');
+    result = data;
+  };
+  await driver(deps, tab, sendResult).runPageAction(randomUUID(), action, params as CommandParams, tab.view);
+  return result;
+}
+/** Reuse production tools but replace every active-tab lookup and result sink with exact command ownership. */
+function driver(deps: AppServices, tab: Tab, sendResult: PageDriver['deps']['sendResult']): PageDriver {
+  const current = deps.actions;
+  return new PageDriver({
+    ...current.deps,
+    keyboard: current.keyboard,
+    mouse: current.mouse,
+    sendResult,
+    ...pinnedTab(tab),
+  });
 }

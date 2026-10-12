@@ -8,15 +8,21 @@ export const BROWSER_PARAMS: Record<string, readonly string[]> = {
 /** Reject unimplemented filename policies and missing context/destination fields before filesystem access. */
 export function validateBrowser({ method, params }: NativeCommand): void {
   if (!Object.hasOwn(BROWSER_PARAMS, method)) return;
+  if (method === 'Browser.setDownloadBehavior' && params.browserContextId === undefined) return; // answered as a no-op
   requireBrowserString(params.browserContextId);
   if (method === 'Browser.cancelDownload') return requireBrowserString(params.guid);
-  if (!['deny', 'allowAndName'].includes(String(params.behavior))) throw Error('Unsupported native download behavior');
-  if (params.behavior === 'allowAndName') requireBrowserString(params.downloadPath);
-  else if (params.downloadPath !== undefined) throw Error('A denied download cannot select a destination');
+  validateBehavior(params);
   if (params.eventsEnabled !== undefined && typeof params.eventsEnabled !== 'boolean')
     throw Error('eventsEnabled must be boolean');
 }
 /** Identifiers and paths must be nonempty strings; never coerce arbitrary values. */
 function requireBrowserString(value: unknown): void {
   if (typeof value !== 'string' || !value) throw Error('A nonempty browser context, GUID or path is required');
+}
+
+/** Only deny, or allowAndName into a named folder. */
+function validateBehavior(params: Record<string, unknown>): void {
+  if (!['deny', 'allowAndName'].includes(String(params.behavior))) throw Error('Unsupported native download behavior');
+  if (params.behavior === 'allowAndName') requireBrowserString(params.downloadPath);
+  else if (params.downloadPath !== undefined) throw Error('A denied download cannot select a destination');
 }

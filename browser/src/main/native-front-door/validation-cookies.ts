@@ -8,14 +8,19 @@ export const COOKIE_PARAMS: Record<string, readonly string[]> = {
   'Storage.clearCookies': ['browserContextId'],
   'Oya.deleteCookie': ['browserContextId', 'url', 'name'],
 };
-/** Missing context never means the person's default profile. */
+/** A missing context means the browser's own profile (the persona's), as in Chrome. */
 export function validateCookies({ method, params }: NativeCommand): void {
   if (!Object.hasOwn(COOKIE_PARAMS, method)) return;
-  if (typeof params.browserContextId !== 'string' || !params.browserContextId)
-    throw Error('An owned browserContextId is required');
+  optionalContext(params.browserContextId);
   if (method === 'Storage.setCookies') cookieBatch(params.cookies);
   if (method === 'Oya.deleteCookie') {
     cookieURL(params.url);
     cookieString(params.name, true);
   }
+}
+
+/** A context is omitted (the browser's own profile) or a nonempty id. */
+function optionalContext(context: unknown): void {
+  if (context !== undefined && (typeof context !== 'string' || !context))
+    throw Error('An owned browserContextId is required');
 }

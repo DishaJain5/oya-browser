@@ -69,3 +69,42 @@ export const NATIVE_SIGNIN_TEST_SIZE = { width: 1100, height: 800 };
 export const SAVED_ACCOUNT_LIMIT = 10;
 /** Hex characters of a saved account's id: enough to tell keys apart, never the key itself. */
 export const SAVED_ACCOUNT_ID_CHARS = 16;
+
+/** The CDP version the passthrough attaches a tab's debugger with. */
+export const PASSTHROUGH_CDP_VERSION = '1.3';
+/** Page domains the external CDP front door passes through to a tab's own debugger when it has no native answer. */
+export const PASSTHROUGH_DOMAINS = [
+  'Accessibility',
+  'Animation',
+  'CSS',
+  'DOM',
+  'DOMSnapshot',
+  'Emulation',
+  'Fetch',
+  'Input',
+  'Inspector',
+  'Log',
+  'Network',
+  'Overlay',
+  'Page',
+  'Performance',
+  'Runtime',
+  'Security',
+];
+/** Target methods a page session may pass through: its own iframes and workers, never other tabs. */
+export const PASSTHROUGH_TARGET_METHODS = ['Target.setAutoAttach', 'Target.detachFromTarget'];
+/** Passthrough methods refused: the persona owns identity, and the browser owns files and other tabs. */
+export const PASSTHROUGH_REFUSED: Record<string, string> = {
+  'Emulation.setUserAgentOverride': 'The persona owns the user agent',
+  'Network.setUserAgentOverride': 'The persona owns the user agent',
+  'Emulation.setTimezoneOverride': 'The persona owns the timezone',
+  'Emulation.setLocaleOverride': 'The persona owns the locale',
+  'Emulation.setHardwareConcurrencyOverride': 'The persona owns the device',
+  'Page.setDownloadBehavior': 'Downloads follow this browser’s own policy',
+  'DOM.setFileInputFiles': 'Files on the browser’s computer cannot be chosen remotely',
+  'Page.close': 'Close tabs with Target.closeTarget, which keeps the browser’s tab ownership',
+  'Page.crash': 'The browser’s renderers are not crashed remotely',
+  'Network.loadNetworkResource': 'Load pages with Page.navigate, which checks the egress rules',
+};
+/** The browser's own profile as a CDP browserContextId: Playwright needs one on every target. */
+export const DEFAULT_BROWSER_CONTEXT = 'default';

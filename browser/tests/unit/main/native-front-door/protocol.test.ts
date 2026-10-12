@@ -211,3 +211,53 @@ test('capability discovery describes actual adapter methods and validation witho
   await assert.rejects(f.run('Oya.getCapabilities', { verbose: true }), /Unsupported/);
   assert.deepEqual(f.calls, []);
 });
+/** A fixture whose backend passes page methods through, recording each call. */
+function passing() {
+  const f = fixture();
+  const through: unknown[][] = [];
+  Object.assign(f.backend, {
+    passesThrough: (method: string) => method.startsWith('Page.') || method.startsWith('Runtime.'),
+    passthrough: async (...args: unknown[]) => (through.push(args), { passed: true }),
+    passthroughEvents: () => () => {},
+  });
+  return { ...f, through };
+}
+test('a page session passes standard methods through to its exact tab, with their own params', async () => {
+  const f = passing();
+  const { sessionId } = (await f.run('Target.attachToTarget', { targetId: 'a', flatten: true })) as any;
+  const params = { url: 'https://example.test', frameId: 'a', referrerPolicy: 'unsafeUrl' };
+  assert.deepEqual(await f.run('Page.navigate', params, sessionId), { passed: true });
+  assert.deepEqual(f.through, [['a', 'Page.navigate', params, '']]);
+  assert.equal(f.calls.length, 0);
+});
+test('Oya extensions and browser-endpoint methods never pass through', async () => {
+  const f = passing();
+  const { sessionId } = (await f.run('Target.attachToTarget', { targetId: 'a', flatten: true })) as any;
+  await f.run('Oya.analyze', {}, sessionId);
+  await assert.rejects(f.run('Page.navigate', { url: 'https://example.test' }), /outside/);
+  assert.equal(f.through.length, 0);
+});
+test('a session of another connection cannot pass through', async () => {
+  const f = passing(),
+    other = new NativeProtocol(f.backend);
+  const { sessionId } = (await f.run('Target.attachToTarget', { targetId: 'a', flatten: true })) as any;
+  await assert.rejects(other.dispatch({ id: 1, method: 'Page.enable', params: {}, sessionId }));
+  assert.equal(f.through.length, 0);
+});
+test('the browser endpoint describes itself when asked for its own target info', async () => {
+  const f = fixture();
+  assert.equal(((await f.run('Target.getTargetInfo')) as any).targetInfo.type, 'browser');
+});
+test("the browser's own profile ignores download settings rather than choosing a folder", async () => {
+  const f = fixture();
+  assert.deepEqual(await f.run('Browser.setDownloadBehavior', { behavior: 'allowAndName', downloadPath: '/x' }), {});
+  assert.equal(f.calls.length, 0);
+});
+test("cookie calls without a context reach the browser's own profile natively", async () => {
+  const f = fixture();
+  const seen: unknown[] = [];
+  Object.assign(f.backend, { manage: async (...args: unknown[]) => (seen.push(args.slice(0, 2)), {}) });
+  await f.run('Storage.clearCookies');
+  assert.deepEqual(seen, [['cookies:clear', {}]]);
+  await assert.rejects(f.run('Storage.getCookies', { browserContextId: '' }), /browserContextId/);
+});

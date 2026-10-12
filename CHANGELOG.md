@@ -6,6 +6,14 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Added
+
+- **Check for updates** button at the bottom of Settings, next to the version. It reports the result, and restarts into an update once one is downloaded.
+
+### Fixed
+
+- **Playwright works with cloud browsers again.** Since 1.0.178, `chromium.connectOverCDP(browser.cdpUrl)` failed at connect (`Target.setAutoAttach`). Page sessions now pass the standard CDP methods the native layer has no answer for straight to their own tab, so `goto` returns its Response, and `fill`, `check`, `click`, `waitForLoadState('networkidle')`, `screenshot({ fullPage })`, `newPage` and `context.clearCookies()` all work. The front door still refuses persona overrides (user agent, timezone, locale), non-web addresses, addresses the egress rules block, remote file uploads and browser-wide methods, and keeps tab ownership and Human Mode. `OYA_CDP_PASSTHROUGH=0` turns the passthrough off.
+
 ## [1.0.178](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.178) · 2026-10-12
 
 ### Added

@@ -1,4 +1,6 @@
 /** Real native contexts, cookies, local storage and downloads through Oya's external compatibility boundary. */
+// These suites check the native implementations alone; the Playwright passthrough is checked in qa/playwright-compat.
+process.env.OYA_CDP_PASSTHROUGH = '0';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');

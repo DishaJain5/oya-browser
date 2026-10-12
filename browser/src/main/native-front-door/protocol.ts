@@ -3,6 +3,7 @@ import { COOKIE_PARAMS } from './validation-cookies.ts';
 import { NativeSubscriptions } from './subscriptions.ts';
 import { NativeAutoAttach } from './auto-attach.ts';
 import { NativeDiscovery } from './discovery.ts';
+import { PassthroughSessions } from './passthrough.ts';
 import { randomUUID } from 'node:crypto';
 import { isWebAddress, NOT_A_WEB_ADDRESS } from '../tabs/navigation.ts';
 import { validateParams, nativeParameterNames } from './validation.ts';
@@ -80,7 +81,7 @@ const METHODS: Record<string, (session: NativeProtocol, command: NativeCommand) 
   'Storage.setCookies': (s, c) => s.manage('cookies:set', c.params),
   'Storage.clearCookies': (s, c) => s.manage('cookies:clear', c.params),
   'Oya.deleteCookie': (s, c) => s.manage('cookies:delete', c.params),
-  'Browser.setDownloadBehavior': (s, c) => s.manage('download:set', c.params),
+  'Browser.setDownloadBehavior': (s, c) => (c.params.browserContextId ? s.manage('download:set', c.params) : {}),
   'Browser.cancelDownload': (s, c) => s.manage('download:cancel', c.params),
   'Target.createBrowserContext': (s, c) => s.manage('context:create', c.params),
   'Target.getBrowserContexts': (s, c) => s.manage('context:list', c.params),
@@ -112,7 +113,10 @@ const METHODS: Record<string, (session: NativeProtocol, command: NativeCommand) 
     jsVersion: '',
   }),
   'Target.getTargets': (s) => ({ targetInfos: s.backend.targets() }),
-  'Target.getTargetInfo': (s, c) => ({ targetInfo: s.target(c.params.targetId || s.targetId(c)) }),
+  'Target.getTargetInfo': (s, c) =>
+    !c.params.targetId && !c.sessionId && !s.pinned
+      ? { targetInfo: BROWSER_TARGET }
+      : { targetInfo: s.target(c.params.targetId || s.targetId(c)) },
   'Target.createTarget': async (s, c) => ({
     targetId: await s.backend.open(
       address({ url: 'about:blank', ...c.params }),
@@ -145,6 +149,8 @@ export class NativeProtocol {
   private readonly sessions = new Map<string, string>();
   /** Event subscriptions are scoped to this socket’s exact session. */
   private readonly subscriptions = new NativeSubscriptions();
+  /** Page sessions whose standard methods pass through to their tab. */
+  private readonly through: PassthroughSessions;
   /** Transport event sink supplied only after the socket is authenticated. */
   private readonly emit: (event: object) => void;
   /** Optional direct page endpoint pins one target. */
@@ -154,6 +160,7 @@ export class NativeProtocol {
     this.backend = backend.connection?.() || backend;
     this.direct = direct;
     this.emit = emit;
+    this.through = new PassthroughSessions(this.backend, emit);
     this.discovery = this.createDiscovery();
     this.automatic = this.createAutomatic(fatal);
   }
@@ -202,6 +209,7 @@ export class NativeProtocol {
     this.discovery.dispose();
     this.automatic.dispose();
     this.subscriptions.dispose();
+    this.through.dispose();
     this.sessions.clear();
     this.backend.dispose?.();
   }
@@ -210,6 +218,14 @@ export class NativeProtocol {
     const target = this.backend.targets().find((candidate) => candidate.targetId === id);
     if (!target) throw new ProtocolError('Target is closed, unavailable, or outside this endpoint');
     return target;
+  }
+  /** Whether a page endpoint is pinned to one target. */
+  get pinned(): boolean {
+    return !!this.direct;
+  }
+  /** Whether `command` is on a page: an attached session, or the pinned page endpoint. */
+  private pageSession(command: NativeCommand): boolean {
+    return command.sessionId ? this.sessions.has(command.sessionId) : !!this.direct;
   }
   /** Page commands need a valid local session or exact direct target, never the current active tab. */
   targetId(command: NativeCommand): string {
@@ -235,6 +251,7 @@ export class NativeProtocol {
   detach(command: NativeCommand): object {
     const id = stringParam(command.params, 'sessionId');
     this.subscriptions.release(id);
+    this.through.release(id);
     if (!this.sessions.delete(id)) throw new ProtocolError('Unknown session');
     this.automatic.forget(id);
     this.discovery.refresh();
@@ -267,6 +284,7 @@ export class NativeProtocol {
     for (const [sessionId, id] of this.sessions) {
       if (id !== targetId) continue;
       this.subscriptions.release(sessionId);
+      this.through.release(sessionId);
       this.sessions.delete(sessionId);
       this.emit({ method: 'Target.detachedFromTarget', params: { sessionId, targetId } });
     }
@@ -301,6 +319,8 @@ export class NativeProtocol {
   }
   /** Reject unknown commands rather than forwarding them to an engine debugging transport. */
   async dispatch(command: NativeCommand): Promise<unknown> {
+    if (this.through.handles(command, this.pageSession(command)))
+      return this.through.send(command, () => this.targetId(command));
     validateParams(command);
     this.checkScope(command);
     if (Object.hasOwn(METHODS, command.method)) return METHODS[command.method](this, command);
@@ -309,6 +329,8 @@ export class NativeProtocol {
     throw new ProtocolError(`Unsupported native capability: ${command.method}`, NATIVE_DOOR.unsupported);
   }
 }
+/** What Target.getTargetInfo answers for the browser endpoint itself. */
+const BROWSER_TARGET = { targetId: 'browser', type: 'browser', title: '', url: '', attached: true };
 /** Reject semantic options this subset does not implement, especially alternate execution contexts. */
 function onlyParams(command: NativeCommand, allowed: string[]): void {
   if (Object.keys(command.params).some((key) => !allowed.includes(key)))

@@ -1,4 +1,6 @@
 /** Exercise the authenticated external compatibility protocol on real Oya pages with debugger access forbidden. */
+// These suites check the native implementations alone; the Playwright passthrough is checked in qa/playwright-compat.
+process.env.OYA_CDP_PASSTHROUGH = '0';
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
 const http = require('node:http');

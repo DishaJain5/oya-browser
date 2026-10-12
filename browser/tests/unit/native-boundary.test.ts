@@ -163,9 +163,16 @@ function reachableModules(entries: string[]): Map<string, string> {
   return files;
 }
 
+/**
+ * The one sanctioned exception: page methods the native front door cannot answer pass through to
+ * the exact tab's own debugger (maintainer decision, 2026-10-12, for Playwright compatibility).
+ */
+const PASSTHROUGH = path.join(main, 'app/cdp-passthrough.ts');
+
 it('all shipped native main and preload dependencies exclude internal protocol and browser-launch backends', () => {
   const entries = ['main/main.ts', 'preload/index.ts', 'preload/dialog.ts', 'preload/recording.ts'];
   const reachable = reachableModules(entries.map((entry) => path.resolve(main, '..', entry)));
+  reachable.delete(PASSTHROUGH);
   const failures = [...reachable].flatMap(([filename, source]) =>
     violations(source).map((detail) => `${path.relative(main, filename)}: ${detail}`),
   );

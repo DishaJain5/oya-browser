@@ -1,10 +1,51 @@
 # Native external CDP compatibility
 
-**Partial compatibility. Not a complete CDP implementation.**
+**Native where implemented; page sessions pass the rest through to their own tab.**
 
 The listener terminates external CDP requests and invokes Oya-owned native APIs.
-It never forwards to a debugging endpoint, attaches Electron's debugger, or falls
-back to internal CDP. Retired adapters are excluded from the shipped dependency graph.
+It never forwards to a debugging endpoint. Browser-wide state (targets, contexts,
+cookies, downloads) is always native. On an attached page session, standard
+methods pass through to that exact tab's own debugger (see "Page-session
+passthrough" below); that is the only place Electron's debugger is used, and
+`OYA_CDP_PASSTHROUGH=0` turns it off.
+
+## Page-session passthrough
+
+Playwright, Puppeteer and Stagehand correlate frame, execution-context, node and
+loader ids across many domains, so a page session cannot mix native answers with
+debugger answers. When passthrough is on, every standard method on a page session
+(Accessibility, Animation, CSS, DOM, DOMSnapshot, Emulation, Fetch, Input,
+Inspector, Log, Network, Overlay, Page, Performance, Runtime, Security, plus
+`Target.setAutoAttach` / `detachFromTarget` for the tab's own iframes and
+workers) goes to `app/cdp-passthrough.ts`. Oya.* extensions stay native.
+
+The passthrough keeps the door's rules:
+
+- the session must belong to this connection and map to an authorized, protected
+  tab; commands stay under the human/agent admission gate, and events are
+  dropped while a person holds control;
+- `Page.navigate` and `Fetch.continueRequest` with a URL open only http(s) or
+  about:blank addresses the egress rules allow;
+- refused: persona overrides (user agent, timezone, locale, hardware), remote
+  file uploads (`DOM.setFileInputFiles`), `Page.setDownloadBehavior`,
+  `Page.close` (use `Target.closeTarget`), `Page.crash`,
+  `Network.loadNetworkResource`, and every Browser, Storage, IO, Debugger,
+  Profiler, Tracing and SystemInfo method; iframe and worker sessions get the
+  same allowlist as their page;
+- the tab's CDP target id is translated to the door's target id both ways, so
+  the main frame id equals the target id as clients expect.
+
+Browser-endpoint compatibility for Playwright: `Target.setAutoAttach` accepts
+`waitForDebuggerOnStart:true` (nothing is ever paused) and no filter (pages
+only); `Target.getTargetInfo` with no target describes the browser; every target
+carries a `browserContextId` (`default` for the browser's own profile);
+`Storage.*Cookies` without a context use the browser's own profile (the
+persona's), so cookie sync carries those changes to the persona's other browsers;
+`Browser.setDownloadBehavior` for the default profile, and every remote (relayed)
+call, is a no-op: downloads keep the browser's own policy.
+
+Checked against Playwright 1.59 on the patched Linux engine with
+`qa/playwright-compat/run.cjs`.
 
 ## Activation
 
@@ -129,8 +170,8 @@ patched-engine integration, not merely adapter-level checks.
   extensions mapped to the production native PageDriver. Element commands use
   the analyzer's selector handles; these are not standard CDP commands.
 
-Unknown methods and unsupported parameters return explicit errors. Do not claim
-unmodified general-purpose CDP clients work with this subset.
+Without passthrough, unknown methods and unsupported parameters return explicit
+errors, and unmodified general-purpose CDP clients do not work with this subset.
 
 ## Native private contexts, downloads and network
 

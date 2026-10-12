@@ -4,7 +4,7 @@ export interface NativeTarget {
   targetId: string;
   /** Only application-owned page tabs are exposed. */
   type: 'page';
-  /** Present only for this connection's explicitly private session. */
+  /** This connection's private context, or the browser's own profile ('default'). */
   browserContextId?: string;
   /** Current document title. */
   title: string;
@@ -49,6 +49,15 @@ export interface NativeBackend {
   close(target: string): Promise<void>;
   /** Execute a supported native operation on this exact target. */
   execute(target: string, action: string, params: Record<string, unknown>): Promise<unknown>;
+  /** Whether a standard page method passes through to the tab when it has no native answer. */
+  passesThrough?(method: string): boolean;
+  /** Passes one page method through to the exact tab, or to one of its own child sessions. */
+  passthrough?(target: string, method: string, params: Record<string, unknown>, child?: string): Promise<unknown>;
+  /** Forwards the exact tab's passed-through events until the returned stop is called. */
+  passthroughEvents?(
+    target: string,
+    emit: (method: string, params: Record<string, unknown>, child: string) => void,
+  ): () => void;
 }
 /** An explicitly authorized local listener, independent of any debugging endpoint. */
 export interface NativeDoorOptions {
