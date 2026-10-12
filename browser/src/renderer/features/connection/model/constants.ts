@@ -69,6 +69,7 @@ export const TEXT = {
   importNoBrowser: 'No supported browser found on this computer.',
   importOffline: 'Connect to Oya to import your logins.',
   restarting: 'Restarting…',
+  checkUpdates: 'Check for updates',
   noServer: 'Not configured',
   noBrowserId: 'Not connected',
 } as const;

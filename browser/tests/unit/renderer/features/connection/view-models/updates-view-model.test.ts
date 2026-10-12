@@ -43,6 +43,13 @@ describe('the update pill', () => {
     assert.equal(app.fake.called('installUpdate').length, 0);
   });
 
+  it('marks a check as asked for, so the footer button reports its result', async () => {
+    const app = build({ checkForUpdates: { state: 'none', current: '1.0' } });
+    assert.equal(app.updates.state.checked, false);
+    await app.updates.check();
+    assert.deepEqual([app.updates.state.checked, app.updates.state.text], [true, 'v1.0, up to date']);
+  });
+
   it('restarts into a staged update on click', async () => {
     const app = build();
     await settle();

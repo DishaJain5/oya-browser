@@ -4,7 +4,9 @@
  * shell dialog's footer (#app-version).
  */
 import { useViewModel } from '../../../hooks/index.ts';
-import type { UpdatesViewModel } from '../view-models/updates-view-model.ts';
+import type { UpdatesState, UpdatesViewModel } from '../view-models/updates-view-model.ts';
+import { TEXT } from '../model/constants.ts';
+import { Icon } from '../../../ui/index.ts';
 import type { ConnectionPillViewModel } from '../view-models/connection-pill-view-model.ts';
 import type { ViewProps } from '../model/models.ts';
 import { accountCard, type AccountViewModel } from '../view-models/account-view-model.ts';
@@ -27,9 +29,21 @@ export function UpdatePill({ vm }: ViewProps<UpdatesViewModel>) {
   );
 }
 
-/** The version line in the shell dialog's footer. */
+/** The footer button's words: "Check for updates" until there is news or a check to report. */
+const checkLabel = (s: UpdatesState): string => (s.checked || !s.hidden || s.disabled ? s.text : TEXT.checkUpdates);
+
+/** The version line in the shell dialog's footer, with a button that checks for updates (or restarts into one). */
 export function AppVersion({ vm }: ViewProps<UpdatesViewModel>) {
-  return <span id="app-version">{useViewModel(vm).version}</span>;
+  const s = useViewModel(vm);
+  return (
+    <span id="app-version">
+      {s.version}
+      <button className="check-updates" disabled={s.disabled} title={s.title} onClick={() => void vm.click()}>
+        <Icon name="reload" />
+        {checkLabel(s)}
+      </button>
+    </span>
+  );
 }
 
 /** What the profile button is given. */

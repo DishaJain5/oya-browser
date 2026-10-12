@@ -26,6 +26,8 @@ export interface UpdatesState {
   ready: boolean;
   /** The running version ('' while unknown). */
   current: string;
+  /** A person asked for a check: the footer button now says how it went. */
+  checked: boolean;
 }
 
 /** The parts of the bridge updates use. */
@@ -67,7 +69,7 @@ function updateTitle(state: string, ready: boolean): string {
 }
 
 /** Everything the pill and the version line show for `status`. */
-export function updatesFor(status: UpdateStatus): UpdatesState {
+export function updatesFor(status: UpdateStatus): Omit<UpdatesState, 'checked'> {
   const [state, current] = [status.state ?? '', status.current ?? ''];
   const ready = state === 'ready';
   const [text, title] = [updateLabel(status), updateTitle(state, ready)];
@@ -84,7 +86,7 @@ export class UpdatesViewModel extends ViewModel<UpdatesState> {
 
   /** Hidden until the updater says something, following it. */
   constructor(bridge: UpdatesBridge) {
-    super(updatesFor({}));
+    super({ ...updatesFor({}), checked: false });
     this.bridge = bridge;
     this.own(bridge.onUpdateStatus((status) => this.show(status)));
     bridge.getUpdateStatus().then(
@@ -106,6 +108,7 @@ export class UpdatesViewModel extends ViewModel<UpdatesState> {
     this.show({ state: 'checking', current });
     const answer = await this.bridge.checkForUpdates().catch(() => ({ state: 'error', current }));
     this.show(answer);
+    this.set({ checked: true });
   }
 
   /** Shows an update status. */

@@ -115,6 +115,39 @@
 #app-version {
   margin-left: auto;
   font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+#app-version .check-updates {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+#app-version .check-updates svg {
+  width: 14px;
+  height: 14px;
+}
+#app-version .check-updates:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+#app-version .check-updates:disabled {
+  color: var(--secondary);
+  background: none;
+  cursor: default;
+}
+#app-version .check-updates:disabled svg {
+  animation: spin 1s linear infinite;
 }
 @media (max-width: 959px) {
   .conn-pill {
