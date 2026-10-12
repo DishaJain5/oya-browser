@@ -128,7 +128,20 @@ const claudeAdd = ({ url, token }: Endpoint) => [
   ...['--header', `Authorization: Bearer ${token}`],
 ];
 
-/** Claude Code: its own CLI adds and removes the server, at user scope so every project sees it. */
+/** Claude Code's permission rule that lets every Oya tool run without a prompt. */
+const CLAUDE_RULE = `mcp__${MCP_SERVER_NAME}`;
+
+/** Adds (or with `allow` false, removes) Oya's rule in Claude Code's user settings, leaving every other rule as it was. */
+export function allowInClaude(allow: boolean): void {
+  const file = home('.claude', 'settings.json');
+  const settings = readJson(file) as Record<string, Record<string, unknown>>;
+  const permissions = { ...(settings.permissions ?? {}) };
+  const rules = (Array.isArray(permissions.allow) ? permissions.allow : []).filter((r) => r !== CLAUDE_RULE);
+  permissions.allow = allow ? [...rules, CLAUDE_RULE] : rules;
+  writePrivate(file, JSON.stringify({ ...settings, permissions }, null, JSON_INDENT) + '\n');
+}
+
+/** Claude Code: its own CLI adds and removes the server, at user scope so every project sees it; Oya's tools are allowed with it. */
 const CLAUDE_CODE: AgentTarget = {
   name: 'Claude Code',
   installed: () => binary('claude') !== null,
@@ -136,16 +149,25 @@ const CLAUDE_CODE: AgentTarget = {
   connect: async (e) => {
     await cli('claude', ['mcp', 'remove', MCP_SERVER_NAME, '--scope', 'user']).catch(() => {});
     await cli('claude', claudeAdd(e));
+    allowInClaude(true);
   },
-  disconnect: async () => void (await cli('claude', ['mcp', 'remove', MCP_SERVER_NAME, '--scope', 'user'])),
+  disconnect: async () => {
+    await cli('claude', ['mcp', 'remove', MCP_SERVER_NAME, '--scope', 'user']);
+    allowInClaude(false);
+  },
 };
 
 /** Codex's config, where Oya's section goes. */
 const codexConfig = () => home('.codex', 'config.toml');
 
-/** Oya's section in Codex's TOML config. */
+/** Oya's section in Codex's TOML config: its URL, the token, and its tools allowed without a prompt. */
 const codexSection = (e: Endpoint) =>
-  `\n[mcp_servers.${MCP_SERVER_NAME}]\nurl = ${JSON.stringify(e.url)}\nhttp_headers = { Authorization = ${JSON.stringify(`Bearer ${e.token}`)} }\n`;
+  [
+    `\n[mcp_servers.${MCP_SERVER_NAME}]`,
+    `url = ${JSON.stringify(e.url)}`,
+    `http_headers = { Authorization = ${JSON.stringify(`Bearer ${e.token}`)} }`,
+    'default_tools_approval_mode = "approve"\n',
+  ].join('\n');
 
 /** Codex: its CLI cannot set a header, so Oya's section is appended after its CLI removes any older one. */
 const CODEX: AgentTarget = {

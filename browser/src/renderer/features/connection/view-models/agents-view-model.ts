@@ -20,6 +20,9 @@ export interface AgentsState {
 /** The parts of the bridge the agents use. */
 export type AgentsBridge = Pick<OyaBrowser, 'localAgents' | 'connectAgent' | 'disconnectAgent'>;
 
+/** Agents whose config Oya can tell to run its tools without asking; the others ask the first time. */
+const ALLOWED_ON_CONNECT = ['claude-code', 'codex'];
+
 /** A list answer, or none when it is not a list. */
 const listOf = (answer: unknown): LocalAgent[] => (Array.isArray(answer) ? (answer as LocalAgent[]) : []);
 
@@ -60,8 +63,8 @@ export class AgentsViewModel extends ViewModel<AgentsState> {
 
   /** What a change did, by what the agent was before it. */
   private done(agent: LocalAgent): string {
-    return agent.connected
-      ? `Oya removed from ${agent.name}.`
-      : `Connected. Restart ${agent.name} and it can use this browser.`;
+    if (agent.connected) return `Oya removed from ${agent.name}.`;
+    const asks = ALLOWED_ON_CONNECT.includes(agent.id) ? '' : ' Choose Always allow the first time it asks.';
+    return `Connected. Restart ${agent.name} and it can use this browser.${asks}`;
   }
 }

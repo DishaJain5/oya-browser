@@ -8,7 +8,7 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ### Added
 
-- **Connect your coding agent.** The desktop app now runs an MCP server on your own computer (`127.0.0.1:47321`, protected by a token). The footer shows Claude Code, Codex, Cursor and VS Code when they are installed; one click adds Oya to them, and they drive this browser directly. Human Mode pauses them like any agent.
+- **Connect your coding agent.** The desktop app now runs an MCP server on your own computer (`127.0.0.1:47321`, protected by a token). The footer shows Claude Code, Codex, Cursor and VS Code when they are installed; one click adds Oya to them, and they drive this browser directly. Claude Code and Codex are also set to run Oya's tools without asking; Cursor and VS Code ask once. Human Mode pauses them like any agent.
 - **Choose an account.** Logging out keeps the account on this Mac (sealed in the keychain), and the welcome screen offers it again: one click signs back in. Remove forgets it.
 - **Touch ID passkeys** on macOS: create a passkey in Oya and sign in with your fingerprint. Passkeys kept in iCloud or on your phone are not supported yet.
 - Privacy Policy and Terms of Service at oyabrowser.com/privacy and /terms, linked from the footer and sign-up.

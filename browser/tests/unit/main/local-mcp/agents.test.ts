@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { AGENTS, installedAgents } from '../../../../src/main/local-mcp/agents.ts';
+import { AGENTS, installedAgents, allowInClaude } from '../../../../src/main/local-mcp/agents.ts';
 
 const endpoint = { url: 'http://127.0.0.1:47321/mcp', token: 'oya_local_t' };
 
@@ -51,6 +51,20 @@ describe('coding agents', () => {
     assert.deepEqual(JSON.parse(fs.readFileSync(cursorFile(), 'utf8')).mcpServers, { other: { url: 'x' } });
   });
 
+  it('allows every Oya tool in Claude Code beside the rules already there, and takes only that rule back', () => {
+    const file = path.join(home, '.claude', 'settings.json');
+    fs.mkdirSync(path.dirname(file));
+    fs.writeFileSync(file, JSON.stringify({ permissions: { allow: ['Bash(ls:*)'] }, theme: 'dark' }));
+    allowInClaude(true);
+    allowInClaude(true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).permissions.allow, ['Bash(ls:*)', 'mcp__oya-browser']);
+    allowInClaude(false);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+      permissions: { allow: ['Bash(ls:*)'] },
+      theme: 'dark',
+    });
+  });
+
   it('refuses a config with comments rather than overwrite it', async () => {
     fs.mkdirSync(path.join(home, '.cursor'));
     fs.writeFileSync(cursorFile(), '{ // mine\n "mcpServers": {} }');
@@ -66,6 +80,7 @@ describe('coding agents', () => {
     assert.match(toml, /^model = "o3"/);
     assert.match(toml, /\[mcp_servers\.oya-browser\]\nurl = "http:\/\/127\.0\.0\.1:47321\/mcp"\n/);
     assert.match(toml, /http_headers = \{ Authorization = "Bearer oya_local_t" \}/);
+    assert.match(toml, /default_tools_approval_mode = "approve"/, 'its tools run without a prompt');
     assert.equal(AGENTS.codex.connected(), true);
   });
 });

@@ -25,6 +25,15 @@ it('connects an agent and says to restart it', async () => {
   assert.equal(vm.state.busy, '');
 });
 
+it('tells a Cursor user to allow Oya’s tools once, since Oya cannot do that for it', async () => {
+  const cursor = { id: 'cursor', name: 'Cursor', connected: false };
+  const fake = fakeBridge({ localAgents: [cursor], connectAgent: [{ ...cursor, connected: true }] });
+  const vm = new AgentsViewModel(fake.bridge);
+  await settle();
+  await vm.toggle('cursor');
+  assert.match(vm.state.note, /Always allow/);
+});
+
 it('disconnects a connected agent', async () => {
   const on = { ...claude, connected: true };
   const fake = fakeBridge({ localAgents: [on], disconnectAgent: [claude] });
