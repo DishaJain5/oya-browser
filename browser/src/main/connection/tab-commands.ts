@@ -105,9 +105,19 @@ function tabRefusal(deps: CommandRunner['deps'], tabId: number | undefined): str
   return theirs ? 'The person is using that tab. Use another tab, or open_tab.' : null;
 }
 
+/**
+ * Whether the running agent may work in tab `tabId`: its first tab or one it opened. With
+ * no lanes (no server agents, such as a local MCP agent on a desktop not signed in), it
+ * drives the tab in front, so that one too, never the person's other tabs.
+ */
+function agentMay(deps: CommandRunner['deps'], tabId: number): boolean {
+  if (deps.agentTab.mayWorkIn(tabId)) return true;
+  return !deps.agentTab.scoped() && tabId === deps.tabs.activeTabId;
+}
+
 /** An agent works in its own tab (its first one, or one it opened); the person's other tabs and other agents' are not its to take. */
 function switchRefusal(deps: CommandRunner['deps'], tabId: number): string | null {
-  if (!deps.agentTab.scoped() || deps.agentTab.mayWorkIn(tabId)) return null;
+  if (agentMay(deps, tabId)) return null;
   return 'Not switched: that tab belongs to the person or another agent. Work in your own tab; use open_tab to open what you need.';
 }
 
@@ -131,7 +141,7 @@ export const TAB_COMMANDS: Record<string, TabHandler> = {
   },
   list_tabs: (runner, id) => {
     const { list } = runner.deps.tabs;
-    const mine = (tabId: number) => !runner.deps.agentTab.scoped() || runner.deps.agentTab.mayWorkIn(tabId);
+    const mine = (tabId: number) => agentMay(runner.deps, tabId);
     const tabs = list.map((t: ListedTab) => ({
       ...tSummary(t, runner.deps.agentTab.tabId()),
       yours: mine(t.id),

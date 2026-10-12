@@ -116,6 +116,23 @@ describe('CommandRunner', () => {
     assert.equal(answer.ok, true);
   });
 
+  it('without server agents, an agent still never moves into the person’s background tabs', async () => {
+    const mine = ctx.tabs.createTab('https://mine.test/', false);
+    await ctx.commands.handleCommand({
+      id: 'o',
+      lane: 'mcp-a',
+      action: 'open_tab',
+      params: { url: 'https://a.test/' },
+    });
+    await ctx.commands.handleCommand({ id: 's', lane: 'mcp-a', action: 'switch_tab', params: { tab_id: mine } });
+    assert.match(resultOf('s')[0].error, /belongs to the person/);
+    await ctx.commands.handleCommand({ id: 'l', lane: 'mcp-a', action: 'list_tabs' });
+    const yours = resultOf('l')[0]
+      .data.tabs.filter((t) => t.yours)
+      .map((t) => t.id);
+    assert.equal(yours.includes(mine), false);
+  });
+
   it('never closes a tab the person opened', async () => {
     const mine = ctx.tabs.createTab('https://mine.test/', true);
     await ctx.commands.handleCommand({ id: 'x', action: 'close_tab', params: { tab_id: mine } });

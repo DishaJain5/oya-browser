@@ -3,7 +3,7 @@
  * in, a web page or another host name never does, and each session drives the
  * browser as its own agent, paused like any other in Human Mode.
  */
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -100,6 +100,33 @@ describe('LocalMcp', () => {
     paused = false;
     assert.equal(reply.result.isError, true);
     assert.match(reply.result.content[0].text, /OyaAI Mode/);
+  });
+
+  it('never offers its token when another program holds the port', async () => {
+    const second = new LocalMcp(deps);
+    await second.start(); // the first one already holds the port
+    assert.equal(second.token, '', 'agents must not be configured to send the token elsewhere');
+    second.stop();
+  });
+
+  it('keeps control held until a timed-out command really ends', async () => {
+    let finished = 0;
+    let end: (r: object) => void = () => {};
+    const slow: any = {
+      ...deps,
+      control: { beginLocalCommand: async () => () => finished++ },
+      commands: { runLocal: () => new Promise((resolve) => (end = resolve)) },
+    };
+    mock.timers.enable({ apis: ['setTimeout'] });
+    const reply = new LocalMcp(slow)['run']('s', 'click', {});
+    await new Promise((resolve) => setImmediate(resolve));
+    mock.timers.tick(120_000);
+    assert.match((await reply).error, /did not answer in time/);
+    assert.equal(finished, 0, 'still running, so still held');
+    mock.timers.reset();
+    end({ ok: true, data: null, error: null });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(finished, 1);
   });
 
   it('answers a notification with no body', async () => {

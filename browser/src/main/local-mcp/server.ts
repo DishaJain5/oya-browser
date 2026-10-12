@@ -37,6 +37,8 @@ export class LocalMcp {
   private server: http.Server | null = null;
   /** The bearer token agents send. */
   private secret = '';
+  /** Whether this process holds the port; a port another program holds must never be handed the token. */
+  private bound = false;
 
   /** `deps` is the main-process services. */
   constructor(deps: Deps) {
@@ -48,9 +50,9 @@ export class LocalMcp {
     return `http://${C.MCP_HOST}:${C.MCP_PORT}${C.MCP_PATH}`;
   }
 
-  /** The token agents are configured with. */
+  /** The token agents are configured with; empty unless this process is the one listening. */
   get token(): string {
-    return this.secret;
+    return this.bound ? this.secret : '';
   }
 
   /** Starts listening; a port already in use is reported, not fatal. */
@@ -59,7 +61,7 @@ export class LocalMcp {
     this.server = http.createServer((req, res) => void this.serve(req, res));
     return new Promise((resolve) => {
       this.server!.once('error', (e) => (console.warn('[oya] MCP port unavailable:', e.message), resolve()));
-      this.server!.listen(C.MCP_PORT, C.MCP_HOST, () => resolve());
+      this.server!.listen(C.MCP_PORT, C.MCP_HOST, () => ((this.bound = true), resolve()));
     });
   }
 
@@ -67,6 +69,7 @@ export class LocalMcp {
   stop(): void {
     this.server?.close();
     this.server = null;
+    this.bound = false;
   }
 
   /** Answers one request; nothing it throws escapes into the main process. */
@@ -112,15 +115,14 @@ export class LocalMcp {
   }
 
   /** Runs one browser command as session `session`'s agent, after control lets automation in. */
-  private async run(session: string, action: string, params: Record<string, unknown>) {
+  private async run(session: string, action: string, params: Record<string, unknown>): Promise<LocalResult> {
     const finish = await this.deps.control.beginLocalCommand().catch((e: Error) => e);
     if (finish instanceof Error)
       return { ok: false, data: null, error: `${finish.message}. Switch Oya to OyaAI Mode.` };
-    try {
-      return await withTimeout(this.deps.commands.runLocal(`local-${randomUUID()}`, `mcp-${session}`, action, params));
-    } finally {
-      finish();
-    }
+    const work = this.deps.commands.runLocal(`local-${randomUUID()}`, `mcp-${session}`, action, params);
+    // Control is held until the command really ends, even when the agent stops waiting for it.
+    void work.finally(finish);
+    return withTimeout(work);
   }
 }
 
