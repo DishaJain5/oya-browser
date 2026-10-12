@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.179](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.179) · 2026-10-12
+
 ### Added
 
 - **Check for updates** button at the bottom of Settings, next to the version. It reports the result, and restarts into an update once one is downloaded.
