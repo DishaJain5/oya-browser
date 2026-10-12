@@ -33,7 +33,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   ['move-tab-right', 'Move tab right', 'Tabs', 'primary-shift', 'PageDown'],
   ['commands', 'Search commands and settings', 'Workspace', 'primary', 'K'],
   ['tools', 'Toggle workspace', 'Workspace', 'primary-shift', 'D'],
-  ['ask', 'Focus Ask Oya', 'Workspace', 'primary-alt', 'A', 'KeyA'],
+  ['ask', 'Open or close Ask Oya', 'Workspace', 'primary-alt', 'A', 'KeyA'],
   ['record', 'Start or stop recording', 'Workspace', 'primary-alt', 'R', 'KeyR'],
   ['playbooks', 'Open playbooks', 'Workspace', 'primary-alt', 'P', 'KeyP'],
   ['routines', 'Open routines', 'Workspace', 'primary-alt', 'U', 'KeyU'],

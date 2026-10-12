@@ -320,7 +320,7 @@ Stop a browser and release its session.
 Parameters: browser_id (string, optional; defaults to the one being driven)
 
 ### analyze_page
-Analyzes the current page. Returns the full page with every interactive element numbered, written as markdown (the default), TOON or JSONL. Includes viewport size, scroll position and each element's state (off-screen, disabled, checked, a field's hint).
+Analyzes the current page. Returns the full page with every interactive element numbered, written as TOON (the default), markdown or JSONL. Includes viewport size, scroll position and each element's state (off-screen, disabled, checked, a field's hint).
 
 Parameters: format (string, optional): "markdown", "toon" or "jsonl". Left out, the server's OYA_PAGE_FORMAT (toon unless set).
 
@@ -372,11 +372,11 @@ Open a new browser tab.
 Parameters: url (string, optional)
 
 ### switch_tab
-Switch to a different tab.
+Switch to one of your own tabs (list_tabs marks them yours). Tabs the person or another agent is using are refused; use open_tab instead.
 Parameters: tab_id (number, required)
 
 ### close_tab
-Close a tab. Closes active tab if no tab_id specified.
+Close a tab you opened with open_tab (default: your current tab). Tabs the person or another agent opened are refused; leave them open.
 Parameters: tab_id (number, optional)
 
 ### wait
@@ -552,7 +552,7 @@ Navigation actions:
   list_tabs  , no params                          , List all open tabs
 
 Page analysis actions:
-  analyze    , format? (markdown | toon | jsonl)   , Full page + numbered elements, as markdown (default), TOON or JSONL
+  analyze    , format? (markdown | toon | jsonl)   , Full page + numbered elements, as TOON (default), markdown or JSONL
   read_page  , params: selector, limit (default 50), Lightweight element listing
   screenshot , no params                          , Capture page as PNG
 

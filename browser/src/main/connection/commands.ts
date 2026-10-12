@@ -80,6 +80,16 @@ export interface CommandMessage {
   lane?: unknown;
 }
 
+/** A command's answer as a local caller receives it, instead of as a cmd_result on the socket. */
+export interface LocalResult {
+  /** Whether it worked. */
+  ok: boolean;
+  /** What it returned. */
+  data: unknown;
+  /** Why it failed. */
+  error: string | null;
+}
+
 /** The code to send with a failed result: one of ours, or none. */
 const codeOf = (err: unknown): string | undefined => {
   const code = (err as Partial<NodeJS.ErrnoException> | null | undefined)?.code;
@@ -107,6 +117,8 @@ export class CommandRunner {
    * the number of dialogs raised.
    */
   private readonly answeredCommands = new Set<CommandId | undefined>();
+  /** Commands from this machine (the local MCP port), answered to their caller rather than the server. */
+  private readonly localAnswers = new Map<CommandId, (result: LocalResult) => void>();
 
   /** `deps` is the main-process services (see src/main/main.ts). */
   constructor(deps: CommandDeps) {
@@ -189,14 +201,31 @@ export class CommandRunner {
     await this.deps.actions.runPageAction(id!, action, params, view);
   }
 
+  /** Runs one command for a caller on this machine, as agent `lane`, and resolves with its answer. */
+  runLocal(id: CommandId, lane: string, action: string, params: RemoteParams = {}): Promise<LocalResult> {
+    const answered = new Promise<LocalResult>((resolve) => this.localAnswers.set(id, resolve));
+    void this.handleCommand({ id, lane, action, params });
+    return answered;
+  }
+
+  /** Hands a local command its answer; false when `id` is not a local command. */
+  private answerLocally(id: CommandId | undefined, result: LocalResult): boolean {
+    const answer = id === undefined ? undefined : this.localAnswers.get(id);
+    if (!answer) return false;
+    this.localAnswers.delete(id!);
+    answer(result);
+    return true;
+  }
+
   /** Sends one result, with any dialog that fired during it, and its code when it has one of ours; drops a late answer already given. */
   sendResult(id: CommandId | undefined, ok: boolean, data?: unknown, error?: string | null, code?: string): void {
-    if (!this.deps.socket.isOpen()) return;
     if (this.answeredCommands.delete(id)) return;
     // Every command result passes through here, which makes it the one place a
     // dialog that fired mid-action can be reported without editing 40 call sites.
     const dialog = this.deps.dialogs.takeNotes();
     if (dialog) data = { ...((data as object | null) || {}), dialog };
+    if (this.answerLocally(id, { ok, data: data ?? null, error: error || null })) return;
+    if (!this.deps.socket.isOpen()) return;
     this.deps.shell.devLog('out', ok ? 'result: ok' : 'result: error', resultSummary(id, ok, data, error));
     const coded = RESULT_CODES.has(code) ? { code } : {};
     this.deps.socket.send({ type: 'cmd_result', id, ok, data: data || null, error: error || null, ...coded });

@@ -77,3 +77,5 @@ export const SAFARI_PAGE_HEADER = 4;
 export const SAFARI_TABLE_START = 8;
 /** System Settings' Full Disk Access pane, where a person lets Oya read Safari's files. */
 export const FULL_DISK_ACCESS_PANE = 'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles';
+/** The switch-profile question's answer that moves to the imported profile; the other keeps the current one. */
+export const SWITCH_TO_IMPORTED = 0;

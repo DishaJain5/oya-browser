@@ -75,17 +75,36 @@ describe('tabs', () => {
     assert.deepEqual(await driver.dispatch('switch-tab', {}), { ok: false, error: 'tab id required' });
   });
 
-  it('closes another tab without leaving the attached one', async () => {
+  it('closes another tab it opened without leaving the attached one', async () => {
     const { driver, conn } = browser();
+    driver.openedTabs = new Set(['t-2']);
     assert.deepEqual(await driver.dispatch('close-tab', { id: 't-2' }), { ok: true });
     assert.deepEqual(conn.sent('Target.closeTarget')[0].params, { targetId: 't-2' });
     assert.equal(driver.targetId, TARGET);
   });
 
-  it('moves to another page after closing the attached one, never back to it', async () => {
+  it('moves to another page after closing the attached one it opened, never back to it', async () => {
     const { driver, conn } = browser();
+    driver.openedTabs = new Set([TARGET]);
     await driver.dispatch('close_tab');
     assert.deepEqual(conn.sent('Target.closeTarget')[0].params, { targetId: TARGET });
     assert.equal(driver.targetId, 't-2');
+  });
+
+  it("never closes a tab it did not open, the person's or another agent's", async () => {
+    const { driver, conn } = browser();
+    const answer = await driver.dispatch('close-tab', { id: 't-2' });
+    assert.equal(answer.ok, false);
+    assert.match(answer.error, /only tabs it opened itself/);
+    assert.equal((await driver.dispatch('close_tab')).ok, false, 'its attached tab was the person’s');
+    assert.equal(conn.sent('Target.closeTarget').length, 0);
+  });
+
+  it('may close a tab it opened with open_tab', async () => {
+    const { driver, conn } = browser();
+    conn.replies['Target.createTarget'] = { targetId: 't-new' };
+    await driver.dispatch('open_tab', { url: 'https://c.example/' });
+    assert.deepEqual(await driver.dispatch('close_tab'), { ok: true });
+    assert.deepEqual(conn.sent('Target.closeTarget')[0].params, { targetId: 't-new' });
   });
 });

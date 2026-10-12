@@ -99,7 +99,7 @@ export class Browser {
   }
 
   /**
-   * The page, written as markdown (the default), TOON or JSONL, plus its blocks and
+   * The page, written as TOON (the default), markdown or JSONL, plus its blocks and
    * the numbered elements to act on.
    */
   async analyze(options: AnalyzeOptions = {}): Promise<Analysis> {

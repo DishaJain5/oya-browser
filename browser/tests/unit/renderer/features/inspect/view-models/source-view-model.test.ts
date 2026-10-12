@@ -110,21 +110,21 @@ describe('SourceViewModel', () => {
   });
 
   it('renders the kept analysis again in a picked format', async () => {
-    const analysis = { format: 'markdown', blocks: [] };
+    const analysis = { format: 'toon', blocks: [] };
     const { fake, vm, look } = await pane({
       getPageSource: { html: '', markdown: '# A', analysis, url: 'https://a.test/' },
       renderPage: (_a: unknown, format: string) => `as ${format}`,
     });
     await vm.refresh();
-    await vm.pick('toon');
-    assert.deepEqual([look().page.text, look().label], ['as toon', 'TOON']);
-    await vm.pick('toon');
+    await vm.pick('markdown');
+    assert.deepEqual([look().page.text, look().label], ['as markdown', 'Markdown']);
+    await vm.pick('markdown');
     assert.equal(fake.called('renderPage').length, 1, 'no second render for the format it is in');
   });
 
   it('says why a format could not be shown', async () => {
     const { vm, look } = await pane({
-      getPageSource: { html: '', markdown: '# A', analysis: { format: 'markdown' }, url: 'u' },
+      getPageSource: { html: '', markdown: '# A', analysis: { format: 'toon' }, url: 'u' },
       renderPage: () => {
         throw new Error('bad');
       },
@@ -140,19 +140,19 @@ describe('SourceViewModel', () => {
       getPageSource: {
         html: '',
         markdown: '# A',
-        analysis: { format: 'markdown', blocks: [] },
+        analysis: { format: 'toon', blocks: [] },
         url: 'https://a.test/',
       },
       renderPage: (_a: unknown, format: string) =>
         new Promise((resolve) => pending.push(() => resolve('as ' + format))),
     });
     await vm.refresh();
-    const toon = vm.pick('toon');
+    const md = vm.pick('markdown');
     const jsonl = vm.pick('jsonl');
     pending[1]();
     await jsonl;
     pending[0]();
-    await toon;
+    await md;
     assert.equal(look().page.text, 'as jsonl');
   });
 
@@ -175,9 +175,9 @@ describe('SourceViewModel', () => {
 
   it('saves a default format chosen in settings, and shows the read in it', async () => {
     const { fake, vm } = await pane();
-    await vm.chooseDefault('toon');
-    assert.deepEqual(fake.called('saveUiPreferences'), [[{ pageFormat: 'toon' }]]);
-    assert.equal(vm.state.format, 'toon');
+    await vm.chooseDefault('markdown');
+    assert.deepEqual(fake.called('saveUiPreferences'), [[{ pageFormat: 'markdown' }]]);
+    assert.equal(vm.state.format, 'markdown');
   });
 
   it('copies a half and says so for a moment', async () => {

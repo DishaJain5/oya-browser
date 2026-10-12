@@ -100,6 +100,7 @@ function initialImportState(): ImportState {
 /** A partial import says what failed instead of silently claiming complete success. */
 function importResult(status: MirrorStatus): string {
   if (status.warnings?.length) return `Imported with warnings: ${status.warnings.join(' ')}`;
+  if (status.kept && status.cookies) return `Imported. Still browsing as ${status.kept}; switch from the profile menu.`;
   return status.cookies ? TEXT.importDone : 'No logins were found. You may need to sign in to your sites in Oya.';
 }
 

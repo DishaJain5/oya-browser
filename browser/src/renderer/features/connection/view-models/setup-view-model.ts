@@ -1,10 +1,10 @@
 /**
- * The first-run welcome screen: one panel that switches between three views:
- * start (one-click "Sign in with Oya", which the dashboard answers with a
+ * The first-run welcome screen: one panel that switches between its views:
+ * accounts (sign back in to one this browser signed out of), start (one-click "Sign in with Oya", which the dashboard answers with a
  * pairing link), waiting (for that sign-in to finish) and manual (server
  * address, API key and browser name, for self-hosters).
  */
-import type { ConnectionStatus } from '../../../../shared/ipc.ts';
+import type { ConnectionStatus, SavedAccountView } from '../../../../shared/ipc.ts';
 import { ViewModel } from '../../../core/view-model.ts';
 import { RendererConstants as C } from '../../../core/constants.ts';
 import type { RendererServices } from '../../../app/services.ts';
@@ -13,7 +13,7 @@ import { SERVER_URL, TEXT } from '../model/constants.ts';
 import { messageOf, shape, type Config } from '../model/models.ts';
 
 /** The panel's views. */
-export type SetupView = 'checklist' | 'start' | 'waiting' | 'manual';
+export type SetupView = 'accounts' | 'checklist' | 'start' | 'waiting' | 'manual';
 
 /** The manual form's fields. */
 export type SetupField = 'server' | 'apiKey' | 'name';
@@ -26,12 +26,25 @@ export interface SetupState extends Record<SetupField, string> {
   error: string;
   /** Connect is waiting for the server. */
   busy: boolean;
+  /** Accounts this browser signed out of, newest first. */
+  accounts: SavedAccountView[];
+  /** The account being signed back in to ('' for none). */
+  choosing: string;
 }
 
 /** The parts of the bridge the welcome screen uses. */
 export type SetupBridge = Pick<
   OyaBrowser,
-  'makeDefaultBrowser' | 'getConfig' | 'saveConfig' | 'openConsole' | 'enterBrowsing' | 'onWsStatus' | 'onModeChanged'
+  | 'makeDefaultBrowser'
+  | 'getConfig'
+  | 'saveConfig'
+  | 'openConsole'
+  | 'enterBrowsing'
+  | 'onWsStatus'
+  | 'onModeChanged'
+  | 'savedAccounts'
+  | 'useSavedAccount'
+  | 'forgetSavedAccount'
 >;
 
 /** Why the entered settings cannot be used, or '' when they can. */
@@ -62,7 +75,7 @@ export class SetupViewModel extends ViewModel<SetupState> {
 
   /** On the start view, filled from the saved settings, following the connection and the mode. */
   constructor(deps: SetupDeps) {
-    super({ view: 'checklist', server: '', apiKey: '', name: '', error: '', busy: false });
+    super({ view: 'checklist', server: '', apiKey: '', name: '', error: '', busy: false, accounts: [], choosing: '' });
     this.bridge = deps.bridge;
     this.shell = deps.shell;
     this.own(() => clearTimeout(this.timer));
@@ -75,13 +88,42 @@ export class SetupViewModel extends ViewModel<SetupState> {
   private connectionStatus(status: ConnectionStatus): void {
     if (!status.connected && !status.failure) return;
     clearTimeout(this.timer);
-    this.set({ busy: false, error: status.failure || '' });
+    this.set({ busy: false, choosing: '', error: status.failure || '' });
   }
 
   /** Fills the form from the saved settings. */
   async load(): Promise<void> {
     const config = shape<Config>(await this.bridge.getConfig().catch(() => null));
     this.set({ server: config.serverUrl ?? '', apiKey: config.apiKey ?? '', name: config.browserName ?? '' });
+    await this.loadAccounts();
+  }
+
+  /** The remembered accounts; while there are any, choosing one is the first view. */
+  private async loadAccounts(): Promise<void> {
+    this.showAccounts(await this.bridge.savedAccounts().catch(() => []));
+  }
+
+  /** Lists `answer` when it is a list, choosing among them first while there are any. */
+  private showAccounts(answer: unknown): void {
+    const accounts = Array.isArray(answer) ? (answer as SavedAccountView[]) : [];
+    this.set({ accounts, view: accounts.length ? 'accounts' : 'checklist' });
+  }
+
+  /** Signs back in to a remembered account, then waits for the connection like any sign-in. */
+  async useAccount(id: string): Promise<void> {
+    this.set({ busy: true, error: '', choosing: id });
+    try {
+      await this.bridge.useSavedAccount(id);
+    } catch (error) {
+      this.set({ error: messageOf(error, TEXT.saveFailed), busy: false, choosing: '' });
+      return this.loadAccounts();
+    }
+    this.wait();
+  }
+
+  /** Removes a remembered account from this browser. */
+  async forgetAccount(id: string): Promise<void> {
+    this.showAccounts(await this.bridge.forgetSavedAccount(id).catch(() => this.state.accounts));
   }
 
   /** Shows one of the panel's views, clearing the error. */
@@ -145,12 +187,13 @@ export class SetupViewModel extends ViewModel<SetupState> {
 
   /** No connection yet after the wait. */
   private timedOut(): void {
-    this.set({ busy: false });
+    this.set({ busy: false, choosing: '' });
     if (!this.shell.state.connected) this.set({ error: TEXT.setupTimedOut });
   }
 
-  /** Logged out: back to the start, with nothing of the old key left in the form. */
+  /** Logged out: back to the start, with nothing of the old key left in the form, offering the remembered accounts. */
   private loggedOut(): void {
     this.set({ apiKey: '', view: 'checklist', error: '' });
+    void this.loadAccounts();
   }
 }

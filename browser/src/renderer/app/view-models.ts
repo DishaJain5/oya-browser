@@ -39,6 +39,7 @@ import {
   UpdatesViewModel,
   PaletteViewModel,
   ConnectionPillViewModel,
+  AgentsViewModel,
 } from '../features/connection/index.ts';
 
 /** What the page gives the root: the bridge, its clock and clipboard, and the platform. */
@@ -243,6 +244,8 @@ export interface ConnectionModels {
   palette: PaletteViewModel;
   /** The connection pill. */
   pill: ConnectionPillViewModel;
+  /** The coding agents the footer connects to Oya's MCP port. */
+  agents: AgentsViewModel;
 }
 
 /** The account page's parts, then the dialog over them. */
@@ -293,6 +296,6 @@ function connectionModels(env: PageEnvironment, root: ShellViewModels): Connecti
   const [setup, checklist] = [new SetupViewModel({ bridge, shell }), new ChecklistViewModel(bridge)];
   const [reconnect, updates] = [new ReconnectViewModel({ bridge, shell, dialog, setup }), new UpdatesViewModel(bridge)];
   const palette = new PaletteViewModel({ bridge, panel, shell, dialog, updates, host: paletteHost(root), platform });
-  const pill = new ConnectionPillViewModel({ bridge, shell, account: dialog });
-  return { ...parts, dialog, setup, checklist, reconnect, updates, palette, pill };
+  const [pill, agents] = [new ConnectionPillViewModel({ bridge, shell, account: dialog }), new AgentsViewModel(bridge)];
+  return { ...parts, dialog, setup, checklist, reconnect, updates, palette, pill, agents };
 }

@@ -6,6 +6,25 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Added
+
+- **Connect your coding agent.** The desktop app now runs an MCP server on your own computer (`127.0.0.1:47321`, protected by a token). The footer shows Claude Code, Codex, Cursor and VS Code when they are installed; one click adds Oya to them, and they drive this browser directly. Human Mode pauses them like any agent.
+- **Choose an account.** Logging out keeps the account on this Mac (sealed in the keychain), and the welcome screen offers it again: one click signs back in. Remove forgets it.
+- **Touch ID passkeys** on macOS: create a passkey in Oya and sign in with your fingerprint. Passkeys kept in iCloud or on your phone are not supported yet.
+- Privacy Policy and Terms of Service at oyabrowser.com/privacy and /terms, linked from the footer and sign-up.
+
+### Changed
+
+- Agents work only in their own tab: the tab you asked from and the tabs they open. They no longer move into your other tabs, and they close only tabs they opened themselves.
+- Importing another browser's logins asks before switching you to its profile, instead of switching silently.
+- Pages are read in TOON by default (fewer tokens for the same accuracy); markdown and JSONL stay available.
+- Profile and model are now dropdowns under the Ask box, and Clear is **New chat**. The Ask shortcut closes the panel when Ask is already open.
+
+### Fixed
+
+- **Connect desktop** on oyabrowser.com works from inside Oya, as it does from Chrome.
+- Sign in with ChatGPT no longer fails with `invalid_grant`: it returns to a fixed local port and registers afresh each time.
+
 ## [1.0.177](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.177) · 2026-10-11
 
 ### Changed

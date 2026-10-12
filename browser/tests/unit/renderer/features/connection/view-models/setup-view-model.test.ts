@@ -137,3 +137,60 @@ describe('logging out', () => {
     assert.deepEqual([app.setup.state.view, app.setup.state.apiKey], ['checklist', '']);
   });
 });
+
+describe('the account chooser', () => {
+  const ada = { id: 'a1', label: 'Ada', email: 'ada@example.com', project: 'Lab', host: 'oya.test' };
+
+  it('opens on the remembered accounts when there are any', async () => {
+    const app = build({ savedAccounts: [ada] });
+    await settle();
+    assert.equal(app.setup.state.view, 'accounts');
+    assert.deepEqual(app.setup.state.accounts, [ada]);
+  });
+
+  it('opens on the first-run checklist when there are none', async () => {
+    const app = build({ savedAccounts: [] });
+    await settle();
+    assert.equal(app.setup.state.view, 'checklist');
+  });
+
+  it('offers the account just logged out of', async () => {
+    let saved: (typeof ada)[] = [];
+    const app = build({ savedAccounts: () => saved });
+    await settle();
+    saved = [ada];
+    app.fake.emit('onModeChanged', 'setup');
+    await settle();
+    assert.equal(app.setup.state.view, 'accounts');
+  });
+
+  it('one click signs back in and waits for the connection', async () => {
+    const app = build({ savedAccounts: [ada], useSavedAccount: true });
+    await settle();
+    await app.setup.useAccount('a1');
+    assert.deepEqual(app.fake.called('useSavedAccount'), [['a1']]);
+    assert.equal(app.setup.state.busy, true);
+    assert.equal(app.setup.state.choosing, 'a1');
+  });
+
+  it('says why an account could not be used and shows what is left', async () => {
+    const app = build({
+      savedAccounts: [],
+      useSavedAccount: () => Promise.reject(new Error('Sign in again.')),
+    });
+    await settle();
+    await app.setup.useAccount('a1');
+    assert.equal(app.setup.state.busy, false);
+    assert.equal(app.setup.state.error, 'Sign in again.');
+    assert.equal(app.setup.state.choosing, '');
+    assert.equal(app.setup.state.view, 'checklist');
+  });
+
+  it('removing the last account leaves the chooser for the checklist', async () => {
+    const app = build({ savedAccounts: [ada], forgetSavedAccount: [] });
+    await settle();
+    await app.setup.forgetAccount('a1');
+    assert.deepEqual(app.fake.called('forgetSavedAccount'), [['a1']]);
+    assert.equal(app.setup.state.view, 'checklist');
+  });
+});

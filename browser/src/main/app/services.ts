@@ -104,6 +104,8 @@ export interface AppServices {
   commands: CommandRunner;
   /** oya:// links (src/main/app/deep-links.ts). */
   deepLinks: DeepLinks;
+  /** Oya's MCP port for coding agents on this computer (src/main/local-mcp), once started. */
+  localMcp?: import('../local-mcp/index.ts').LocalMcp;
   /** Scheduled routines (src/main/routines/routines.ts). */
   routines: Routines;
   /** The analyzer's isolated world (src/main/native/world.ts). */

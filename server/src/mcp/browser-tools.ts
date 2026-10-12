@@ -221,7 +221,8 @@ format picks how it is written: toon (default; one table of blocks, fewer tokens
     text: (data, { url }) => `Opened tab ${data.tab_id}${url ? ' at ' + url : ''}`,
   },
   switch_tab: {
-    description: 'Switch to a different browser tab by its tab ID (from list_tabs).',
+    description:
+      'Switch to one of your own tabs by ID: list_tabs marks them yours. Tabs the person or another agent is using are refused; use open_tab instead.',
     schema: { tab_id: z.number().describe('The tab ID to switch to') },
     command: ({ tab_id }) => ['switch_tab', { tab_id }],
     text: (_, { tab_id }) => `Switched to tab ${tab_id}`,
@@ -237,7 +238,8 @@ format picks how it is written: toon (default; one table of blocks, fewer tokens
     text: (data) => `${data?.accepted === false ? 'Dismissed' : 'Accepted'} the ${data?.type || ''} dialog`,
   },
   close_tab: {
-    description: 'Close a browser tab. Closes active tab if no tab_id specified.',
+    description:
+      'Close a tab you opened with open_tab (default: your current tab). Tabs the person or another agent opened are refused; leave them open.',
     schema: { tab_id: z.number().optional().describe('Tab ID to close (default: active tab)') },
     command: ({ tab_id }) => ['close_tab', { tab_id }],
     text: () => 'Closed tab',

@@ -1,15 +1,15 @@
 /**
- * The Ask pane (`#pane-chat`): the toolbar (profile picker, Model, Clear), the
+ * The Ask pane (`#pane-chat`): New chat (ask-toolbar.tsx), the
  * Sign in and model cards, the conversation, and the input bar.
  */
 import { ASK_TEXT } from '../model/constants.ts';
 import { useViewModel } from '../../../hooks/index.ts';
-import { Button, Icon, IconButton } from '../../../ui/index.ts';
+import { Button, Icon } from '../../../ui/index.ts';
 import './ask.css';
 import type { RendererServices } from '../../../app/services.ts';
 import type { AskViewModel } from '../view-models/ask-view-model.ts';
-import { personaLocked } from '../view-models/persona-view-model.ts';
 import { ModelCard } from './model-card.tsx';
+import { AskToolbar } from './ask-toolbar.tsx';
 import { Messages } from './messages.tsx';
 import { Composer } from './composer.tsx';
 
@@ -27,42 +27,6 @@ export interface AskPaneProps {
 interface AskPartProps {
   /** The conversation and its collaborators. */
   ask: AskViewModel;
-}
-
-/** The pane's toolbar: the profile picker, the Model button and Clear. */
-function AskToolbar({ ask }: AskPartProps) {
-  const { sending } = useViewModel(ask);
-  const persona = useViewModel(ask.persona);
-  const { signedIn, status } = useViewModel(ask.model);
-  return (
-    <div className="studio-header chat-toolbar">
-      <select
-        id="chat-persona"
-        aria-label="Profile"
-        title="The profile Oya browses as. Switching reopens your tabs with that profile's cookies."
-        disabled={personaLocked(persona.ready, sending)}
-        value={persona.active}
-        onChange={(e) => ask.persona.change(e.target.value)}
-      >
-        {persona.options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <Button
-        id="chat-model-open"
-        title={
-          status.provider ? `${status.provider} · ${status.model}. Change model settings` : 'Change model settings'
-        }
-        hidden={!signedIn}
-        onClick={() => void ask.model.openCard()}
-      >
-        {status.model || 'Model'}
-      </Button>
-      <IconButton id="chat-clear" label="Clear chat" data-icon="trash" onClick={() => ask.clear()} icon="trash" />
-    </div>
-  );
 }
 
 /** "Sign in to use Ask", while this browser has no project. */
@@ -130,10 +94,10 @@ export function AskPane({ ask, panel, onViewPlaybook }: AskPaneProps) {
     <div className={pane === 'chat' ? 'dev-pane active' : 'dev-pane'} id="pane-chat">
       <AskToolbar ask={ask} />
       <SignInCard ask={ask} />
-      <ModelCard model={ask.model} />
       <Messages ask={ask} onViewPlaybook={onViewPlaybook} />
       <StepLimitCard ask={ask} />
       <TrialCard ask={ask} />
+      <ModelCard model={ask.model} />
       <Composer ask={ask} panel={panel} />
     </div>
   );

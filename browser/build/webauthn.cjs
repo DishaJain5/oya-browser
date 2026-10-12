@@ -19,9 +19,16 @@ function configuredAccessGroup(env = process.env) {
   if (!group) throw new Error('A WebAuthn provisioning profile also requires APPLE_TEAM_ID');
   return group;
 }
+/** macOS only honours a profile-backed keychain group when the app also claims the profile's identity. */
+function identityEntitlements(team) {
+  return (
+    `<key>com.apple.application-identifier</key><string>${team}.ai.oya.browser</string>` +
+    `<key>com.apple.developer.team-identifier</key><string>${team}</string>`
+  );
+}
 /** Experimental custom engines alone request Apple's browser credential entitlement. */
 function keychainEntitlements(group, native = process.env.OYA_NATIVE_PASSKEYS) {
-  const local = `<key>keychain-access-groups</key><array><string>${group}</string></array>`;
+  const local = `${identityEntitlements(group.split('.')[0])}<key>keychain-access-groups</key><array><string>${group}</string></array>`;
   if (native !== '1') return local;
   return `${local}<key>com.apple.developer.web-browser.public-key-credential</key><true/>`;
 }

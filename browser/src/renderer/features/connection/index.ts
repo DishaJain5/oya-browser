@@ -17,3 +17,4 @@ export { ReconnectViewModel } from './view-models/reconnect-view-model.ts';
 export { UpdatesViewModel } from './view-models/updates-view-model.ts';
 export { PaletteViewModel } from './view-models/palette-view-model.ts';
 export { ConnectionPillViewModel } from './view-models/connection-pill-view-model.ts';
+export { AgentsViewModel, type AgentsState } from './view-models/agents-view-model.ts';

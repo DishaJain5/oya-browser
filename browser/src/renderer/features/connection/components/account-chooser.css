@@ -1,0 +1,219 @@
+/**
+ * The account chooser (account-chooser.tsx): one hairline card of rows, each a
+ * person to continue as. The row is the button; its arrow leans in on hover,
+ * the cross to forget it surfaces only on hover or keyboard focus, and the rows
+ * arrive one after another.
+ */
+.chooser {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.chooser-item {
+  position: relative;
+  animation: chooser-in 480ms var(--spring) both;
+  animation-delay: calc(var(--row, 0) * 70ms + 80ms);
+}
+.chooser-item + .chooser-item {
+  border-top: 1px solid var(--border);
+}
+.chooser-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 72px;
+  padding: 14px 18px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.chooser-row:hover:not(:disabled),
+.chooser-row:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+.chooser-row:focus-visible {
+  box-shadow: inset 3px 0 0 var(--logo-green);
+}
+.chooser-row:disabled {
+  cursor: default;
+}
+.chooser-item:not([data-opening]) .chooser-row:disabled {
+  opacity: 0.45;
+}
+
+/* The person: a soft green disc with a hairline ring, so it reads as Oya's, not a stock avatar. */
+.chooser-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 30% 25%,
+    color-mix(in srgb, var(--logo-green) 34%, transparent),
+    color-mix(in srgb, var(--logo-green) 10%, transparent) 70%
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--logo-green) 30%, transparent);
+  color: var(--logo-green);
+  font-size: 16px;
+  font-weight: 650;
+}
+.chooser-other .chooser-avatar {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--secondary);
+  font-size: 20px;
+  font-weight: 400;
+}
+.chooser-other {
+  min-height: 60px;
+}
+
+.chooser-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 3px;
+}
+.chooser-text strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.chooser-email {
+  font-size: 12.5px;
+  color: var(--secondary);
+}
+.chooser-text strong,
+.chooser-email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chooser-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 2px;
+}
+.chooser-meta:empty {
+  display: none;
+}
+.chooser-project {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--logo-green) 12%, transparent);
+  color: var(--logo-green);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chooser-host {
+  overflow: hidden;
+  color: var(--secondary);
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+/* The arrow leans toward the person on hover; while signing in it turns into a ring. */
+.chooser-go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  margin-left: 26px; /* room for the cross, so hover never covers the name */
+  color: var(--secondary);
+  font-size: 16px;
+  transition:
+    transform 220ms var(--spring),
+    color 160ms ease;
+}
+.chooser-row:hover:not(:disabled) .chooser-go,
+.chooser-row:focus-visible .chooser-go {
+  color: var(--logo-green);
+  transform: translateX(4px);
+}
+.chooser-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--logo-green) 25%, transparent);
+  border-top-color: var(--logo-green);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+/* Forget: out of the way until the row is pointed at or reached by keyboard. */
+.chooser-remove {
+  position: absolute;
+  top: 50%;
+  right: 42px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--secondary);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-50%) scale(0.85);
+  transition:
+    opacity 140ms ease,
+    transform 180ms var(--spring),
+    color 140ms ease,
+    background 140ms ease;
+}
+.chooser-item:hover .chooser-remove,
+.chooser-remove:focus-visible {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+.chooser-remove:hover,
+.chooser-remove:focus-visible {
+  background: var(--danger-soft);
+  color: var(--danger);
+  outline: none;
+}
+.chooser-remove:disabled {
+  display: none;
+}
+
+@keyframes chooser-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chooser-item,
+  .chooser-spinner {
+    animation: none;
+  }
+  .chooser-go,
+  .chooser-remove {
+    transition: none;
+  }
+}

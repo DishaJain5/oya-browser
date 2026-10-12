@@ -69,6 +69,22 @@ describe('Import logins', () => {
     assert.equal(canImport(app), true);
   });
 
+  it('says which profile is still in use when the person chose not to switch', async () => {
+    const app = await connected();
+    await app.imports.start();
+    app.fake.emit('onMirrorStatus', {
+      done: true,
+      source: 'Chrome',
+      profiles: 1,
+      cookies: 40,
+      kept: 'Firefox · default',
+    });
+    assert.equal(
+      importStatus(app.imports.state).text,
+      'Imported. Still browsing as Firefox · default; switch from the profile menu.',
+    );
+  });
+
   it('imports a passwords export and says how many, reminding that the file is unencrypted', async () => {
     const app = build({ importPasswords: { imported: 12, skipped: 3 } });
     await settle();

@@ -24,6 +24,7 @@ export const newTab: Handler = async (driver, params) => {
   const url = String(params.url || 'about:blank');
   if (!isWebAddress(url)) return { ok: false, error: NOT_A_WEB_ADDRESS };
   const { targetId } = await driver.conn.send('Target.createTarget', { url });
+  (driver.openedTabs ??= new Set()).add(targetId);
   await driver.attach(targetId);
   return { ok: true, data: { id: targetId, tab_id: targetId } };
 };
@@ -35,9 +36,15 @@ export const switchTab: Handler = async (driver, params) => {
   return { ok: true, data: { id: params.id } };
 };
 
-/** Closes a tab (the attached one by default), moving to another page if it was attached. */
+/** What an agent is told when it tries to close a tab someone else opened; the Oya browser answers the same. */
+const NOT_ITS_TAB =
+  'Not closed: an agent may close only tabs it opened itself with open_tab. Leave this tab open and use switch_tab or open_tab.';
+
+/** Closes a tab this driver opened (the attached one by default), moving to another page if it was attached. */
 export const closeTab: Handler = async (driver, params) => {
   const id = params.id || driver.targetId;
+  if (!driver.openedTabs?.has(id)) return { ok: false, error: NOT_ITS_TAB };
+  driver.openedTabs.delete(id);
   await driver.conn.send('Target.closeTarget', { targetId: id });
   if (id === driver.targetId) await attachAnotherPage(driver, id);
   return { ok: true };

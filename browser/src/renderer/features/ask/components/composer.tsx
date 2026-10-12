@@ -1,6 +1,6 @@
 /**
- * The Ask pane's input bar: the attached files as chips, the paperclip, the
- * Ask box (Enter sends, Shift+Enter and IME composition insert text; it grows
+ * The Ask pane's input bar: the attached files as chips, the Ask box, and under
+ * it the paperclip, the profile and model dropdowns, and Send. The Ask box (Enter sends, Shift+Enter and IME composition insert text; it grows
  * with its text up to a limit), and Send, with Stop in its place while the
  * agent works. The box takes focus when the panel opens on Ask and after an
  * answer.
@@ -12,6 +12,7 @@ import { RendererConstants as C } from '../../../core/constants.ts';
 import type { RendererServices } from '../../../app/services.ts';
 import type { AskViewModel } from '../view-models/ask-view-model.ts';
 import type { FilesViewModel } from '../view-models/files-view-model.ts';
+import { ModelChip, ProfileChip } from './ask-toolbar.tsx';
 
 /** What the input bar is given. */
 interface ComposerProps {
@@ -129,7 +130,6 @@ export function Composer({ ask, panel }: ComposerProps) {
     <div className="chat-input-bar">
       <FileChips files={ask.files} />
       <div className="chat-composer">
-        <AttachButton ask={ask} />
         <textarea
           className="chat-input"
           id="chat-input"
@@ -142,7 +142,12 @@ export function Composer({ ask, panel }: ComposerProps) {
           onChange={(e) => ask.setInput(e.target.value)}
           onKeyDown={(e) => isSendKey(e) && (e.preventDefault(), void ask.send())}
         />
-        <SendButtons ask={ask} />
+        <div className="chat-composer-row">
+          <AttachButton ask={ask} />
+          <ProfileChip ask={ask} />
+          <ModelChip ask={ask} />
+          <SendButtons ask={ask} />
+        </div>
       </div>
       <p className="chat-hint">Enter to send · Shift Enter for a new line</p>
     </div>

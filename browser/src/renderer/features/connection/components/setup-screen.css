@@ -251,6 +251,7 @@ body.mode-setup .setup-screen {
 .welcome-view {
   display: none;
 }
+.setup-screen[data-view='accounts'] .welcome-view[data-view='accounts'],
 .setup-screen[data-view='checklist'] .welcome-view[data-view='checklist'],
 .setup-screen[data-view='start'] .welcome-view[data-view='start'],
 .setup-screen[data-view='waiting'] .welcome-view[data-view='waiting'],

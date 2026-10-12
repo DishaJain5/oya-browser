@@ -1,0 +1,108 @@
+/**
+ * The Ask controls (ask-toolbar.tsx): New chat alone at the top, and the profile
+ * and model as plain text dropdowns in the composer's bottom row. A chevron
+ * says "this opens", a hover tint says "this is a button"; nothing is boxed.
+ */
+.ask-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px 0;
+  flex-shrink: 0;
+}
+
+/* Profile and model: text and a chevron, tinted only on hover. */
+.ask-chip,
+.ask-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.ask-chip:hover,
+.ask-new:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.ask-chip:focus-visible,
+.ask-new:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  outline-offset: -2px;
+}
+.ask-chip-chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--secondary);
+  transform: rotate(90deg);
+}
+.ask-chip-chevron svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* The profile keeps the panel's dropdown chevron but loses its box (id-scoped to outrank #dev-panel select). */
+#dev-panel .ask-profile {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  height: 28px;
+  padding: 0 22px 0 8px;
+  overflow: hidden;
+  background-color: transparent;
+  background-position: right 8px center;
+  box-shadow: none;
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+#dev-panel .ask-profile:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+}
+#dev-panel .ask-profile:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.ask-model {
+  flex: 0 1 auto;
+  color: var(--secondary);
+}
+.ask-model:hover {
+  color: var(--text);
+}
+.ask-chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-new {
+  flex: none;
+  margin-left: auto;
+  color: var(--secondary);
+}
+.ask-new:hover:not(:disabled) {
+  color: var(--text);
+}
+.ask-new svg {
+  width: 13px;
+  height: 13px;
+}
+.ask-new:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

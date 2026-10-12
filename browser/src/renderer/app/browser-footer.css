@@ -39,3 +39,40 @@ body:not(.mode-browsing) .browser-footer {
 .browser-footer kbd {
   font-size: 10px;
 }
+/* Coding agents, between the two keyboard entries: a dot that turns green once an agent can use Oya. */
+.footer-agents {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  min-width: 0;
+  margin-left: auto;
+  margin-right: 12px;
+}
+.footer-note {
+  overflow: hidden;
+  margin-right: 8px;
+  color: var(--secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.browser-footer .footer-agent {
+  gap: 6px;
+}
+.footer-agent-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--secondary);
+}
+.footer-agent[data-connected] .footer-agent-dot {
+  background: var(--logo-green);
+  box-shadow: none;
+}
+.footer-agent[data-connected] {
+  color: var(--text);
+}
+.browser-footer .footer-agent:disabled {
+  opacity: 0.6;
+}

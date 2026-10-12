@@ -38,8 +38,8 @@ const RENDERERS: Record<string, Renderer> = { markdown, toon, jsonl };
 /** The formats there are. */
 export const FORMATS = Object.keys(RENDERERS);
 
-/** The format when none is configured: markdown, what analysis has always returned. */
-export const DEFAULT_FORMAT = 'markdown';
+/** The format when none is configured: TOON, the fewest tokens for the same accuracy (the server's agent default too). */
+export const DEFAULT_FORMAT = 'toon';
 
 /** The facts in reading order, whatever order they arrived in (a trip through the isolated world sorts them). */
 const FACT_ORDER = [

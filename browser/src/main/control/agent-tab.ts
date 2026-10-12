@@ -38,6 +38,10 @@ const currentLane = (): string => lanes.getStore() ?? DEFAULT_LANE;
 export class AgentTab {
   /** Each lane's tab. */
   private readonly claims = new Map<string, number>();
+  /** Each lane's first tab (the one its chat was sent from, or the shown one it started on): the one tab it did not open that it may work in. */
+  private readonly homes = new Map<string, number>();
+  /** The lane that opened each tab an agent opened: an agent may close only the tabs it opened itself. */
+  private readonly openers = new Map<number, string>();
   /** Each lane's lapse: a lane quiet for LANE_IDLE_MS has finished. */
   private readonly lapses = new Map<string, ReturnType<typeof setTimeout>>();
   /** Control and the tabs. */
@@ -68,7 +72,7 @@ export class AgentTab {
 
   /** On every control change: anything but the server's agents driving ends every claim. */
   sync(state: ControlSnapshot): void {
-    if (!this.scoped(state) && this.claims.size) this.update(() => this.claims.clear());
+    if (!this.scoped(state) && this.claims.size) this.update(() => (this.claims.clear(), this.homes.clear()));
   }
 
   /**
@@ -79,25 +83,38 @@ export class AgentTab {
   start(): void {
     if (!this.scoped() || this.claims.has(currentLane())) return;
     const { tabs } = this.deps;
-    this.claim(this.claims.size ? tabs.createTab(HOME_URL, false) : tabs.activeTabId);
+    if (this.claims.size) this.opened(tabs.createTab(HOME_URL, false));
+    else this.claim(tabs.activeTabId);
   }
 
   /** The running lane's run ended: its tab is the person's again. */
   release(): void {
-    if (this.claims.has(currentLane())) this.update(() => this.claims.delete(currentLane()));
+    if (this.claims.has(currentLane())) this.update(() => this.forget(currentLane()));
   }
 
   /** The running lane now drives tab `id` (a tab it opened, one it switched to, the one a chat was sent from). */
   claim(id: number | null | undefined): void {
     if (!this.scoped() || id === null || id === undefined || this.claims.get(currentLane()) === id) return;
+    if (!this.homes.has(currentLane())) this.homes.set(currentLane(), id);
     this.update(() => this.claims.set(currentLane(), id));
     this.keepAlive(currentLane());
   }
 
-  /** A tab the running lane opened becomes its tab; answers its id. */
+  /** A tab the running lane opened becomes its tab, and one it may close; answers its id. */
   opened(id: number): number {
+    this.openers.set(id, currentLane());
     this.claim(id);
     return id;
+  }
+
+  /** Whether the running lane may work in tab `id`: its first tab or one it opened, never the person's other tabs or another agent's. */
+  mayWorkIn(id: number | null | undefined): boolean {
+    return this.openedByThisLane(id) || (id !== null && id !== undefined && this.homes.get(currentLane()) === id);
+  }
+
+  /** Whether the running lane opened tab `id`; a person's tab, or another agent's, is never its to close. */
+  openedByThisLane(id: number | null | undefined): boolean {
+    return id !== null && id !== undefined && this.openers.get(id) === currentLane();
   }
 
   /** The page a command acts on, taking a tab first when its lane has none yet; the lane is alive again. */
@@ -111,7 +128,7 @@ export class AgentTab {
   private keepAlive(lane: string): void {
     clearTimeout(this.lapses.get(lane));
     if (!this.claims.has(lane)) return void this.lapses.delete(lane);
-    const lapse = setTimeout(() => this.claims.has(lane) && this.update(() => this.claims.delete(lane)), LANE_IDLE_MS);
+    const lapse = setTimeout(() => this.claims.has(lane) && this.update(() => this.forget(lane)), LANE_IDLE_MS);
     this.lapses.set(lane, (lapse.unref?.(), lapse));
   }
 
@@ -143,10 +160,11 @@ export class AgentTab {
     if (!this.humanMay(tabId)) throw new Error('Switch to Human Mode before using this page');
   }
 
-  /** A link the agent's tab `from` opened in tab `to`: whichever lane drives `from` drives `to` now, as with open_tab. */
+  /** A link the agent's tab `from` opened in tab `to`: whichever lane drives `from` drives `to` now, and opened it, as with open_tab. */
   handOff(from: number, to: number): void {
     const lane = [...this.claims].find(([, id]) => id === from)?.[0];
     if (lane === undefined) return;
+    this.openers.set(to, lane);
     this.update(() => this.claims.set(lane, to));
     this.keepAlive(lane);
   }
@@ -154,6 +172,12 @@ export class AgentTab {
   /** Whether the window shows the running lane's tab, so what it opens is shown too. */
   following(): boolean {
     return !this.scoped() || this.id === null || this.deps.tabs.activeTabId === this.id;
+  }
+
+  /** Lane `lane` has finished: its tab and its first tab are the person's again. */
+  private forget(lane: string): void {
+    this.claims.delete(lane);
+    this.homes.delete(lane);
   }
 
   /** Changes the claims, then tells the windows. */

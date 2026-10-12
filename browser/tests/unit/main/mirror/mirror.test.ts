@@ -68,7 +68,7 @@ describe('Mirror', () => {
     assert.deepEqual(ctx.statuses[0], { started: true });
     assert.equal(ctx.sent[0].type, 'mirror_persona');
     assert.equal(ctx.sent[0].profiles[0].name, 'Chrome · Work', 'named without an em-dash');
-    mirror.onOk({ personaIds: ['p-1', 'p-2'], defaultPersonaId: 'p-1' });
+    await mirror.onOk({ personaIds: ['p-1', 'p-2'], defaultPersonaId: 'p-1' });
     const { at, ...done } = ctx.statuses.at(-1);
     assert.deepEqual(done, { done: true, source: 'Chrome', profiles: 2, cookies: 3, sites: 2 });
     assert.equal(typeof at, 'number');
@@ -80,7 +80,7 @@ describe('Mirror', () => {
   it("brings the default profile's bookmarks and history into the default persona's own library", async () => {
     const { ctx, mirror } = mirrorWith();
     await mirror.reimport('chrome');
-    mirror.onOk({ personaIds: ['p-1', 'p-2'], defaultPersonaId: 'p-2' });
+    await mirror.onOk({ personaIds: ['p-1', 'p-2'], defaultPersonaId: 'p-2' });
     assert.deepEqual(Object.keys(ctx.libraries), ['persist:oya-p-2']);
     assert.equal(ctx.libraries['persist:oya-p-2'].bookmarks[0].url, 'https://chrome.test/Profile 1');
   });
@@ -98,7 +98,7 @@ describe('Mirror', () => {
     const { ctx, mirror } = mirrorWith();
     ctx.config.values.imports = [1, 2, 3, 4, 5].map((n) => ({ source: `Old ${n}` }));
     await mirror.reimport('chrome');
-    mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
+    await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
     const { imports } = ctx.config.values;
     assert.deepEqual(
       imports.map((record) => record.source),
@@ -154,8 +154,51 @@ describe('Mirror', () => {
     await mirror.reimport('chrome');
     mock.timers.tick(MIRROR_ANSWER_TIMEOUT_MS);
     assert.match(ctx.statuses.at(-1).error, /did not answer/i);
-    mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
+    await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
     assert.equal(ctx.reconnects, 0);
+  });
+
+  it('moves to the imported profile without asking when none is in use yet', async () => {
+    const { ctx, mirror } = mirrorWith();
+    ctx.electron.dialog = { showMessageBox: async () => assert.fail('must not ask') };
+    await mirror.reimport('chrome');
+    await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
+    assert.equal(ctx.config.values.persona, 'p-1');
+    assert.equal(ctx.reconnects, 1);
+  });
+
+  it('asks before leaving another profile, and stays on it when the person says so', async () => {
+    const { ctx, mirror } = mirrorWith();
+    const asked: any[] = [];
+    ctx.electron.dialog = { showMessageBox: async (o: any) => (asked.push(o), { response: 1 }) };
+    Object.assign(ctx.config.values, { persona: 'm-firefox', profileName: 'Firefox · default' });
+    await mirror.reimport('chrome');
+    await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
+    assert.deepEqual(asked[0].buttons, ['Switch to Chrome · Work', 'Stay on Firefox · default']);
+    assert.equal(asked[0].cancelId, 1, 'Escape stays');
+    assert.equal(ctx.config.values.persona, 'm-firefox');
+    assert.equal(ctx.reconnects, 0);
+    assert.equal(ctx.statuses.at(-1).kept, 'Firefox · default');
+  });
+
+  it('switches to the imported profile when the person chooses it', async () => {
+    const { ctx, mirror } = mirrorWith();
+    ctx.electron.dialog = { showMessageBox: async () => ({ response: 0 }) };
+    Object.assign(ctx.config.values, { persona: 'm-firefox', profileName: 'Firefox · default' });
+    await mirror.reimport('chrome');
+    await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
+    assert.equal(ctx.config.values.persona, 'p-1');
+    assert.equal(ctx.reconnects, 1);
+    assert.equal(ctx.statuses.at(-1).kept, undefined);
+  });
+
+  it('refreshes the profile in use without asking when the import is of that same profile', async () => {
+    const { ctx, mirror } = mirrorWith();
+    ctx.electron.dialog = { showMessageBox: async () => assert.fail('must not ask') };
+    Object.assign(ctx.config.values, { persona: 'p-1', profileName: 'Chrome · Work' });
+    await mirror.reimport('chrome');
+    await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
+    assert.equal(ctx.reconnects, 1);
   });
 
   it("reports the server's refusal", async () => {

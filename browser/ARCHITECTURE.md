@@ -815,6 +815,20 @@ Cancel/reorder removes it immediately; drop keeps it until the destination is
 presented. The real Oya windows regression checks preview focus/cleanup and chrome
 readiness at the destination's first native show call, alongside live page preservation.
 
+### Local MCP port for coding agents
+
+`src/main/local-mcp/` serves MCP (streamable HTTP, JSON replies) on
+`127.0.0.1:47321/mcp` (`OYA_MCP_PORT` moves it) on macOS and Windows desktops,
+never in a governed or cloud runtime (`OYA_LOCAL_MCP=0` turns it off). Every
+request needs the bearer token kept sealed in `local-mcp-token.enc`; a request
+with an `Origin` (a web page) or another `Host` (DNS rebinding) is refused.
+Tool calls become the agent loop's own commands through
+`CommandRunner.runLocal`, admitted by `control.beginLocalCommand()` (Human Mode
+pauses them) and run as lane `mcp-<session>`, so each agent works in its own
+tab and closes only tabs it opened. The footer lists Claude Code, Codex, Cursor
+and VS Code when installed; Connect adds only the `oya-browser` entry, through
+the agent's CLI where it has one, and Disconnect removes only that entry.
+
 ### Experimental native CDP compatibility listener
 
 `main/native-front-door/` is a separate, explicitly enabled native-only external

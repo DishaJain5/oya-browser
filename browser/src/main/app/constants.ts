@@ -65,3 +65,7 @@ export const NATIVE_SIGNIN_TEST_SWITCH = '--oya-native-signin-test';
 export const NATIVE_SIGNIN_TEST_URL = 'https://mail.google.com/';
 /** Native test window dimensions, independent of persona screen emulation. */
 export const NATIVE_SIGNIN_TEST_SIZE = { width: 1100, height: 800 };
+/** How many signed-out accounts the welcome screen offers to sign back in to. */
+export const SAVED_ACCOUNT_LIMIT = 10;
+/** Hex characters of a saved account's id: enough to tell keys apart, never the key itself. */
+export const SAVED_ACCOUNT_ID_CHARS = 16;

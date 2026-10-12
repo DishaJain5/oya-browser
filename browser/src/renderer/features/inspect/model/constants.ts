@@ -122,7 +122,7 @@ export const DEFAULT_ENTRY_TYPE = 'message';
 export const FORMAT_LABELS: Readonly<Record<string, string>> = { markdown: 'Markdown', toon: 'TOON', jsonl: 'JSONL' };
 
 /** The format the Source pane starts at. */
-export const DEFAULT_FORMAT = 'markdown';
+export const DEFAULT_FORMAT = 'toon';
 
 /** The words the Source pane shows. */
 export const SOURCE_TEXT = {

@@ -14,7 +14,8 @@ function fixture() {
   const state = { interactive: true, destroyed: false, url: 'https://us02web.zoom.us/j/123?pwd=private', response: 1 };
   const contents = Object.assign(new EventEmitter(), { getURL: () => state.url, isDestroyed: () => state.destroyed });
   const opened = [],
-    asked = [];
+    asked = [],
+    paired = [];
   const deps = {
     electron: {
       shell: {
@@ -33,8 +34,14 @@ function fixture() {
     tabs: { getActiveView: () => ({ webContents: contents }) },
     control: { snapshot: () => ({ interactive: state.interactive }) },
     governance: { configuration: null },
+    deepLinks: {
+      applyDeepLink: async (url) => {
+        paired.push(url);
+        return true;
+      },
+    },
   };
-  return { state, contents, opened, asked, deps, service: new ExternalApps(deps as any) };
+  return { state, contents, opened, paired, asked, deps, service: new ExternalApps(deps as any) };
 }
 it('accepts Zoom meeting joins without losing query values', () => {
   assert.equal(zoomMeetingLink(link), link);
@@ -167,4 +174,41 @@ it('intercepts a pasted meeting link before URL normalization or page loading', 
   };
   await new NavigationHandlers(ctx).handlers.navigate({} as any, link);
   assert.deepEqual(calls, [link]);
+});
+const pairing = 'oya://connect?code=abc&server=wss%3A%2F%2Foyabrowser.com%2Fws';
+it('an oya:// link from a page the person controls pairs this browser, as a link from Chrome would', async () => {
+  const f = fixture();
+  f.service.wire(f.contents as any);
+  let prevented = 0;
+  f.contents.emit('will-frame-navigate', { url: pairing, preventDefault: () => prevented++ });
+  await settle();
+  assert.equal(prevented, 1);
+  assert.deepEqual(f.paired, [pairing]);
+  assert.deepEqual(f.opened, []);
+});
+it('agent, managed, background and destroyed surfaces cannot start pairing', async () => {
+  for (const block of [
+    (f) => (f.state.interactive = false),
+    (f) => (f.deps.governance.configuration = {}),
+    (f) => (f.deps.tabs.getActiveView = () => null),
+    (f) => (f.state.destroyed = true),
+  ]) {
+    const f = fixture();
+    block(f);
+    assert.equal(f.service.request(pairing, f.contents as any), true);
+    await settle();
+    assert.deepEqual(f.paired, []);
+  }
+});
+it('coalesces repeated pairing links while one confirmation is open', async () => {
+  const f = fixture(),
+    pending = Promise.withResolvers();
+  f.deps.deepLinks.applyDeepLink = (url) => (f.paired.push(url), pending.promise);
+  f.service.request(pairing, f.contents as any);
+  f.service.request(pairing, f.contents as any);
+  assert.equal(f.paired.length, 1);
+  pending.resolve(true);
+  await settle();
+  f.service.request(pairing, f.contents as any);
+  assert.equal(f.paired.length, 2);
 });

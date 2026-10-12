@@ -50,8 +50,6 @@ export interface ConfigValues {
   account?: Record<string, unknown> | null;
   /** The persona's display name, as the server sent it. */
   profileName?: string;
-  /** This install's ChatGPT agent host id: opaque, made once (src/main/chatgpt/auth.ts). */
-  chatgptHostId?: string;
   /** Where the person claims a key this app made into an Oya account. */
   claimUrl?: string;
   /** The shell's appearance and panel. */
@@ -78,7 +76,7 @@ export interface ConfigStoreDeps {
 }
 
 /** Whether `safe` really encrypts: Linux without a keyring falls back to 'basic_text', which only obscures. */
-const sealable = (safe: Sealer | undefined): boolean =>
+export const sealable = (safe: Sealer | undefined): boolean =>
   !!safe?.isEncryptionAvailable?.() && safe.getSelectedStorageBackend?.() !== 'basic_text';
 
 /** What people call each platform; the name a browser gets is read by people, in the dialog and in the console's fleet. */

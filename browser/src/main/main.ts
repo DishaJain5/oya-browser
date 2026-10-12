@@ -23,6 +23,7 @@ import { AppNativeBackend, startAppNativeCdp } from './app/native-cdp.ts';
 import { nativeDoorConfig } from './native-front-door/index.ts';
 import { nativeSigninTestEnabled, startNativeSigninTest } from './app/native-signin-test.ts';
 import { Passkeys, configurePasskeys } from './app/passkeys.ts';
+import { startLocalMcp } from './local-mcp/index.ts';
 /** Signing-bound WebAuthn group embedded by the build, empty for unsigned development. */
 declare const __OYA_WEBAUTHN_GROUP__: string;
 import { MediaPermissions } from './app/media-permissions.ts';
@@ -249,6 +250,7 @@ if (NATIVE_SIGNIN_TEST) {
     configurePasskeys(app, __OYA_WEBAUTHN_GROUP__);
     await new Boot(ctx).run();
     startAppNativeCdp(ctx, nativeListener);
+    ctx.localMcp = await startLocalMcp(ctx);
   });
   lifecycle.install();
 }

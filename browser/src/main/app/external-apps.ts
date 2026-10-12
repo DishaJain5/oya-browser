@@ -1,11 +1,13 @@
-/** Explicit, human-approved Zoom handoff; never arbitrary OS protocol execution. */
+/** Explicit, human-approved Zoom handoff and oya:// pairing; never arbitrary OS protocol execution. */
 import type { WebContents, MessageBoxOptions } from 'electron';
 import type { AppServices } from './services.ts';
 import { EXTERNAL_APP_URL_LIMIT, OPEN_EXTERNAL_APP_CHOICE } from './constants.ts';
 /** Control, active surface, policy and native APIs remain injectable. */
-type Deps = Pick<AppServices, 'electron' | 'shell' | 'tabs' | 'control' | 'governance'>;
+type Deps = Pick<AppServices, 'electron' | 'shell' | 'tabs' | 'control' | 'governance' | 'deepLinks'>;
 /** Recognize a Zoom app attempt even when malformed so it cannot become a broken tab or search. */
 const isZoomScheme = (raw: string): boolean => /^zoommtg:/i.test(raw.trim());
+/** Oya's own links: Chrome hands these to Oya, so a page inside Oya must reach the same handler. */
+const isOyaLink = (raw: string): boolean => /^oya:/i.test(raw.trim());
 /** Accept only Zoom meeting joins; other protocols and Zoom app commands remain blocked. */
 export function zoomMeetingLink(raw: string): string | null {
   if (raw.length > EXTERNAL_APP_URL_LIMIT || /[\p{Cc}\s]/u.test(raw)) return null;
@@ -40,10 +42,19 @@ export class ExternalApps {
   }
   /** Synchronously claim the navigation, then ask asynchronously without changing the page. */
   request(raw: string, contents?: WebContents): boolean {
+    if (isOyaLink(raw)) return this.pair(raw.trim(), contents);
     if (!isZoomScheme(raw)) return false;
     const url = zoomMeetingLink(raw.trim());
     if (!url || this.pending || !contents || !this.allowed(contents)) return true;
     this.begin(url, contents);
+    return true;
+  }
+  /** Same path as a link from Chrome: pairing names the server and Cancel is the default. */
+  private pair(link: string, contents?: WebContents): true {
+    if (link.length > EXTERNAL_APP_URL_LIMIT || this.pending || !contents || !this.allowed(contents)) return true;
+    this.pending = true;
+    const done = (): void => void (this.pending = false);
+    void this.deps.deepLinks.applyDeepLink(link).then(done, done);
     return true;
   }
   /** Keep the prompt locked until every success or failure path settles. */

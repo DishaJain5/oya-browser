@@ -103,6 +103,45 @@ describe('CommandRunner', () => {
     assert.equal(resultOf('h')[0].ok, true);
   });
 
+  it('answers a command from this machine to its caller, never to the server', async () => {
+    const answer = await ctx.commands.runLocal('local-1', 'mcp-s1', 'open_tab', { url: 'https://a.test/' });
+    assert.equal(answer.ok, true);
+    assert.equal(answer.data.url, 'https://a.test/');
+    assert.equal(resultOf('local-1').length, 0, 'nothing went to the server');
+  });
+
+  it('answers a local command even with no server connection', async () => {
+    ctx.socket.open = false;
+    const answer = await ctx.commands.runLocal('local-2', 'mcp-s1', 'list_tabs');
+    assert.equal(answer.ok, true);
+  });
+
+  it('never closes a tab the person opened', async () => {
+    const mine = ctx.tabs.createTab('https://mine.test/', true);
+    await ctx.commands.handleCommand({ id: 'x', action: 'close_tab', params: { tab_id: mine } });
+    await ctx.commands.handleCommand({ id: 'y', action: 'close_tab' });
+    for (const id of ['x', 'y']) assert.match(resultOf(id)[0].error, /only tabs it opened itself/);
+    assert.deepEqual(
+      ctx.tabs.list.map((t) => t.id),
+      [mine],
+    );
+  });
+
+  it('never closes a tab another agent opened, only its own', async () => {
+    await ctx.commands.handleCommand({
+      id: 'a',
+      lane: 'agent-a',
+      action: 'open_tab',
+      params: { url: 'https://a.test/' },
+    });
+    const theirs = resultOf('a')[0].data.tab_id;
+    await ctx.commands.handleCommand({ id: 'b', lane: 'agent-b', action: 'close_tab', params: { tab_id: theirs } });
+    assert.match(resultOf('b')[0].error, /only tabs it opened itself/);
+    await ctx.commands.handleCommand({ id: 'c', lane: 'agent-a', action: 'close_tab', params: { tab_id: theirs } });
+    assert.equal(resultOf('c')[0].ok, true);
+    assert.equal(ctx.tabs.find(theirs), undefined);
+  });
+
   it('opens, lists, switches and closes tabs', async () => {
     await ctx.commands.handleCommand({ id: 'o', action: 'open_tab', params: { url: 'https://a.test/' } });
     await ctx.commands.handleCommand({ id: 'o2', action: 'open_tab' });

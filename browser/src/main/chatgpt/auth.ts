@@ -14,7 +14,7 @@ import * as C from './constants.ts';
 import { openOutside } from './outside.ts';
 
 /** The services sign-in uses. */
-type Deps = Pick<AppServices, 'config' | 'electron'>;
+type Deps = Pick<AppServices, 'electron'>;
 
 /** What tests replace: the network, the listener, and where the sealed file goes. */
 export interface AuthSeams {
@@ -70,8 +70,10 @@ export class ChatgptAuth {
 
   /** Opens the sign-in for `callback`'s address and waits for its credential. */
   private async through(callback: Callback): Promise<O.Credential> {
-    const login = O.newLogin(callback.redirectUri, this.store.load()?.client_id);
-    await openOutside(this.deps, O.authorizeUrl(login, this.hostId()));
+    // Every sign-in registers afresh under a new host id, as the reference flow does: reusing an
+    // earlier registration or client made OpenAI refuse the code exchange.
+    const login = O.newLogin(callback.redirectUri);
+    await openOutside(this.deps, O.authorizeUrl(login, `urn:uuid:${randomUUID()}`));
     return this.complete(login, await callback.done);
   }
 
@@ -111,13 +113,5 @@ export class ChatgptAuth {
   /** Forgets the sign-in. */
   signOut(): void {
     this.store.clear();
-  }
-
-  /** This install's agent host id: made once, kept, and carrying nothing about its owner. */
-  private hostId(): string {
-    const { config } = this.deps;
-    if (!config.values.chatgptHostId) config.merge({ chatgptHostId: `urn:uuid:${randomUUID()}` });
-    config.save();
-    return String(config.values.chatgptHostId);
   }
 }

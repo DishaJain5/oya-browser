@@ -457,9 +457,10 @@
 }
 .chat-composer {
   display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  padding: 6px 6px 6px 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 6px 6px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
@@ -587,9 +588,20 @@
   color: var(--danger);
   font-size: 11.5px;
 }
+/* Under the Ask box: paperclip, profile and model on the left, Send at the far right. */
+.chat-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  margin-left: -8px;
+}
+.chat-composer-row .chat-send {
+  flex: none;
+  margin-left: auto;
+}
 .chat-composer .chat-attach {
-  align-self: flex-end;
-  margin-left: -6px;
+  flex: none;
 }
 /* ── The conversation ── */
 .chat-messages {

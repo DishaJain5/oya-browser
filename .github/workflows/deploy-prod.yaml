@@ -133,6 +133,17 @@ jobs:
         security find-identity -v -p codesigning "$KEYCHAIN" | grep -q "Developer ID Application" \
           || { echo "::error::No Developer ID Application identity in the imported certificate"; exit 1; }
 
+    # Touch ID passkeys need a Developer ID provisioning profile for ai.oya.browser.
+    # Without the secret the app still ships, with Touch ID off.
+    - name: Install WebAuthn provisioning profile
+      shell: bash
+      env:
+        PROFILE: ${{ secrets.MAC_WEBAUTHN_PROFILE }}
+      run: |
+        [ -n "$PROFILE" ] || { echo "::warning::MAC_WEBAUTHN_PROFILE not set, Touch ID passkeys stay off"; exit 0; }
+        echo "$PROFILE" | base64 --decode > "$RUNNER_TEMP/webauthn.provisionprofile"
+        echo "OYA_WEBAUTHN_PROFILE=$RUNNER_TEMP/webauthn.provisionprofile" >> "$GITHUB_ENV"
+
     - name: Build, sign and notarize (universal)
       run: cd browser && npm run dist:mac
       env:

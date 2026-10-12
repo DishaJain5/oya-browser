@@ -32,6 +32,10 @@ it('adds the matching group only to the main macOS app, preserving helper entitl
       contents,
       /<key>keychain-access-groups<\/key><array><string>ABCDEFGHIJ.ai.oya.browser.webauthn<\/string><\/array>/,
     );
+    assert.match(
+      contents,
+      /<key>com.apple.application-identifier<\/key><string>ABCDEFGHIJ.ai.oya.browser<\/string><key>com.apple.developer.team-identifier<\/key><string>ABCDEFGHIJ<\/string>/,
+    );
     assert.match(contents, /com.apple.security.device.audio-input/);
     assert.equal(options.entitlementsInherit, 'helpers');
     assert.equal(options.provisioningProfile, resolve(process.env.OYA_WEBAUTHN_PROFILE));

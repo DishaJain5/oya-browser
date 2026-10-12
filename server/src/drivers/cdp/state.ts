@@ -28,6 +28,8 @@ export class CDPDriverState {
   declare dialogWaiters: any;
   /** Set once the dialog listeners are registered. */
   declare dialogsWatched: any;
+  /** The tabs this driver opened with open_tab: the only ones it may close. */
+  declare openedTabs: Set<string> | undefined;
   /** The persona fingerprint to apply, or null. */
   declare fingerprint: any;
   /** Saved login to restore: cookies plus localStorage by origin. */

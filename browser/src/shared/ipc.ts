@@ -160,6 +160,30 @@ export interface PersonaChoice {
   isDefault?: boolean;
 }
 
+/** A coding agent on this computer that Oya's MCP port can be added to. */
+export interface LocalAgent {
+  /** Its id. */
+  id: string;
+  /** Its name. */
+  name: string;
+  /** Whether its config lists Oya. */
+  connected: boolean;
+}
+
+/** An account this browser signed out of, as the welcome screen offers it (never its key). */
+export interface SavedAccountView {
+  /** A hash of its server and key. */
+  id: string;
+  /** The person's name or email. */
+  label: string;
+  /** Their email ('' when the label already is it, or it is unknown). */
+  email: string;
+  /** The project the key belongs to ('' when unknown). */
+  project: string;
+  /** The server's host. */
+  host: string;
+}
+
 /** The project's personas and the active one's id. */
 export interface PersonaList {
   /** Every persona (none while offline). */
@@ -242,6 +266,18 @@ export interface ShellCalls {
   signOut(): Promise<void>;
   /** The signed-in account, or the last one known. */
   getAccount(): Promise<Payload | null>;
+  /** Accounts this browser signed out of, without their keys. */
+  savedAccounts(): Promise<SavedAccountView[]>;
+  /** The coding agents on this computer, and which list Oya. */
+  localAgents(): Promise<LocalAgent[]>;
+  /** Adds Oya's MCP port to an agent; answers the list as it now stands. */
+  connectAgent(id: string): Promise<LocalAgent[]>;
+  /** Takes Oya's MCP port out of an agent; answers the list as it now stands. */
+  disconnectAgent(id: string): Promise<LocalAgent[]>;
+  /** Signs back in to a remembered account. */
+  useSavedAccount(id: string): Promise<boolean>;
+  /** Forgets a remembered account; answers the ones left. */
+  forgetSavedAccount(id: string): Promise<SavedAccountView[]>;
   /** The browsers on this machine that logins can be imported from. */
   importSources(): Promise<Payload[]>;
   /** Imports a browser's logins again. */
@@ -435,6 +471,18 @@ export const CALL_CHANNELS = {
   signOut: 'sign-out',
   /** The signed-in account, or the last one known. */
   getAccount: 'get-account',
+  /** Accounts this browser signed out of, without their keys. */
+  savedAccounts: 'saved-accounts',
+  /** The coding agents on this computer, and which list Oya. */
+  localAgents: 'local-agents',
+  /** Adds Oya's MCP port to an agent. */
+  connectAgent: 'connect-agent',
+  /** Takes Oya's MCP port out of an agent. */
+  disconnectAgent: 'disconnect-agent',
+  /** Signs back in to a remembered account. */
+  useSavedAccount: 'use-saved-account',
+  /** Forgets a remembered account. */
+  forgetSavedAccount: 'forget-saved-account',
   /** The browsers on this machine that logins can be imported from. */
   importSources: 'import-sources',
   /** Imports a browser's logins again. */

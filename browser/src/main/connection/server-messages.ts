@@ -124,7 +124,7 @@ const SERVER_MESSAGES: Record<string, Handler> = {
     deps.cookies.answerPull(msg.pullId);
   },
   // A mirror_ok always names the persona the desktop switches to.
-  mirror_ok: ({ deps }, msg) => deps.mirror.onOk(msg as MirrorOk),
+  mirror_ok: ({ deps }, msg) => void deps.mirror.onOk(msg as MirrorOk),
   mirror_failed: ({ deps }, msg) => deps.mirror.onFailed(msg),
   ping: ({ deps }) => {
     deps.socket.heard();

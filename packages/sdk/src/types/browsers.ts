@@ -106,12 +106,12 @@ export interface Element {
   formName?: string;
 }
 
-/** How `analyze()` writes the page: markdown (the default) or toon (toonformat.dev). */
+/** How `analyze()` writes the page: toon (the default, toonformat.dev), markdown or jsonl. */
 export type PageFormat = 'markdown' | 'toon' | 'jsonl';
 
 /** What `analyze()` accepts. */
 export interface AnalyzeOptions {
-  /** How the page is written: markdown (the default) or toon. */
+  /** How the page is written: toon (the default), markdown or jsonl. */
   format?: PageFormat;
 }
 
@@ -137,7 +137,7 @@ export interface Analysis {
   format?: PageFormat;
   /** The page, written in `format`. */
   page?: string;
-  /** The page as markdown; present when the format is markdown (the default). */
+  /** The page as markdown; present when the format is markdown. */
   markdown?: string;
   /** The page's facts: url, title, scroll, and when they apply panelScroll, modal, covered, truncated. */
   facts?: Record<string, string | number>;

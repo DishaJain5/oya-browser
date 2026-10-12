@@ -42,7 +42,7 @@ function setup(query: (state: string, nonce: string) => Record<string, string>, 
     listen: listen as never,
     store: store as never,
   });
-  return { auth, fetch, saved: () => saved };
+  return { auth, fetch, saved: () => saved, opened: () => opened };
 }
 
 it('exchanges the code under the issued client and keeps the credential sealed', async () => {
@@ -80,4 +80,36 @@ it('callers at the same time share one refresh of an expired token', async () =>
   (auth as any).store.save({ client_id: 'oaiapp_x', refresh_token: 'r', access_token: 'old', expires_at: 0 });
   const [a, b] = await Promise.all([auth.accessToken(), auth.accessToken()]);
   assert.deepEqual([a, b, fetch.mock.callCount()], ['a', 'a', 1]);
+});
+
+it('registers afresh on every sign-in, never reusing an earlier client or host id', async () => {
+  let nonce = '';
+  const { auth, fetch, opened } = setup((state, n) => ((nonce = n), { state, code: 'c', client_id: 'oaiapp_x' }));
+  fetch.mock.mockImplementation(
+    async () =>
+      new Response(
+        JSON.stringify({
+          access_token: 'a',
+          refresh_token: 'r',
+          expires_in: 3600,
+          scope: PLAN,
+          id_token: idToken({ nonce }),
+        }),
+      ),
+  );
+  await auth.signIn();
+  const first = new URL(opened());
+  await auth.signIn();
+  const second = new URL(opened());
+  assert.equal(second.searchParams.get('client_id'), 'dynamic_agent_client', 'not the client saved from the first');
+  assert.notEqual(second.searchParams.get('ext_agent_host_id'), first.searchParams.get('ext_agent_host_id'));
+});
+
+it('says what OpenAI refused, so a failed sign-in can be told apart', async () => {
+  const { auth, fetch } = setup((state) => ({ state, code: 'c', client_id: 'oaiapp_x' }));
+  fetch.mock.mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ error: 'invalid_grant', error_description: 'Code expired' }), { status: 400 }),
+  );
+  await assert.rejects(auth.signIn(), /invalid_grant: Code expired/);
 });

@@ -23,8 +23,12 @@ export const AGENT_NAME = 'Oya Browser';
 export const CALLBACK_PATH = '/auth/callback';
 /** Loopback only: the browser that signs in is on this machine. */
 export const LOOPBACK_HOST = '127.0.0.1';
-/** Any free port (0 asks the OS): 1455 is taken by other apps that sign in this way. */
-export const LOOPBACK_PORT = 0;
+/**
+ * The loopback port sign-in returns to. Fixed, as in every client that works
+ * (Codex and pi use 1455, so not that one): a different port on each sign-in made
+ * OpenAI refuse the code exchange with invalid_grant.
+ */
+export const LOOPBACK_PORT = 1456;
 /** How long a sign-in may take before the listener gives up. */
 export const LOGIN_TTL_MS = 600_000;
 /** Refresh an access token this long before it expires. */
@@ -67,3 +71,5 @@ export const STREAM_END = /"type":\s*"(response\.(completed|failed|incomplete)|e
 export const OTHER_MAC_BROWSERS = ['Google Chrome', 'Arc', 'Brave Browser', 'Microsoft Edge', 'Firefox', 'Safari'];
 /** Opens a page in Edge, which every Windows has, whatever the default browser is. */
 export const EDGE_SCHEME = 'microsoft-edge:';
+/** What the app says when another program holds the sign-in's loopback port. */
+export const PORT_BUSY = 'Another app is using the port ChatGPT sign-in returns to (1456). Close it and try again.';

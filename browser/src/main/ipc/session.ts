@@ -7,11 +7,22 @@ import type { HandlersOf } from './handle.ts';
 import { ServerApi } from '../connection/server-api.ts';
 import { pairingServer } from '../connection/pairing.ts';
 import { PasswordImport } from '../mirror/passwords.ts';
+import { rememberAccount, listAccounts, openAccount, forgetAccount } from '../app/saved-accounts.ts';
 
 /** The services the session handlers use. */
 type Deps = Pick<
   AppServices,
-  'config' | 'socket' | 'cookies' | 'persona' | 'tabs' | 'shell' | 'control' | 'mirror' | 'electron' | 'windows'
+  | 'config'
+  | 'socket'
+  | 'cookies'
+  | 'persona'
+  | 'tabs'
+  | 'shell'
+  | 'control'
+  | 'mirror'
+  | 'electron'
+  | 'windows'
+  | 'deepLinks'
 >;
 
 /** The channels this group answers. */
@@ -29,7 +40,10 @@ type Channel =
   | 'sign-out'
   | 'get-fingerprint'
   | 'list-personas'
-  | 'get-account';
+  | 'get-account'
+  | 'saved-accounts'
+  | 'use-saved-account'
+  | 'forget-saved-account';
 
 /** A persona as the server lists it. */
 interface ListedPersona {
@@ -102,6 +116,9 @@ export class SessionHandlers {
     'get-fingerprint': () => this.deps.persona.summary(),
     'list-personas': () => this.listPersonas(),
     'get-account': () => this.readAccount(),
+    'saved-accounts': () => listAccounts(this.deps),
+    'use-saved-account': (_e, id) => this.useSaved(String(id)),
+    'forget-saved-account': (_e, id) => forgetAccount(this.deps, String(id)),
   };
   /** The main-process services. */
   private readonly deps: Deps;
@@ -156,18 +173,30 @@ export class SessionHandlers {
   }
 
   /**
-   * Logs out of Oya: forgets the key and goes back to the welcome screen. The
-   * server address, browser name and the sites this browser is logged in to stay.
+   * Logs out of Oya: goes back to the welcome screen, which offers this account
+   * again (sealed, see app/saved-accounts.ts). The server address, browser name
+   * and the sites this browser is logged in to stay.
    * `signedOut` keeps an OYA_API_KEY in the environment from signing it back in
    * on the next launch; signing in again clears it.
    */
   private signOut(): void {
+    rememberAccount(this.deps);
     this.deps.socket.disconnect();
     this.deps.socket.browserId = null;
     this.deps.config.merge({ apiKey: '', signedOut: true, keyFromApp: false, account: null });
     this.deps.config.save();
     if (this.deps.windows) this.deps.windows.each((scope) => scope.tabs.leaveBrowsingMode());
     else this.deps.tabs.leaveBrowsingMode();
+  }
+
+  /** Signs back in to a remembered account, as a pairing link would; a key the keychain cannot open is dropped. */
+  private useSaved(id: string): boolean {
+    const opened = openAccount(this.deps, id);
+    if (!opened) forgetAccount(this.deps, id);
+    if (!opened) throw new Error('That account could not be opened on this Mac. Sign in again.');
+    this.deps.deepLinks.retarget(opened);
+    this.deps.socket.connect();
+    return true;
   }
 
   /** What is known of the account when the server cannot say: nothing, or what it said last time. */

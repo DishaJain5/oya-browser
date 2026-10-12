@@ -105,6 +105,18 @@ function tabRefusal(deps: CommandRunner['deps'], tabId: number | undefined): str
   return theirs ? 'The person is using that tab. Use another tab, or open_tab.' : null;
 }
 
+/** An agent works in its own tab (its first one, or one it opened); the person's other tabs and other agents' are not its to take. */
+function switchRefusal(deps: CommandRunner['deps'], tabId: number): string | null {
+  if (!deps.agentTab.scoped() || deps.agentTab.mayWorkIn(tabId)) return null;
+  return 'Not switched: that tab belongs to the person or another agent. Work in your own tab; use open_tab to open what you need.';
+}
+
+/** Closing is the one tab action that cannot be undone, so an agent closes only the tabs it opened itself. */
+function closeRefusal(deps: CommandRunner['deps'], tabId: number): string | null {
+  if (deps.agentTab.openedByThisLane(tabId)) return null;
+  return 'Not closed: an agent may close only tabs it opened itself with open_tab. Leave this tab open and use switch_tab or open_tab.';
+}
+
 /** Command → handler, for commands that do not need the active page. */
 export const TAB_COMMANDS: Record<string, TabHandler> = {
   ...LIBRARY_COMMANDS,
@@ -119,8 +131,10 @@ export const TAB_COMMANDS: Record<string, TabHandler> = {
   },
   list_tabs: (runner, id) => {
     const { list } = runner.deps.tabs;
+    const mine = (tabId: number) => !runner.deps.agentTab.scoped() || runner.deps.agentTab.mayWorkIn(tabId);
     const tabs = list.map((t: ListedTab) => ({
       ...tSummary(t, runner.deps.agentTab.tabId()),
+      yours: mine(t.id),
       window_id: runner.deps.windows?.owner(t.id)?.shell.window?.id,
     }));
     runner.sendResult(id, true, { tabs });
@@ -135,7 +149,7 @@ export const TAB_COMMANDS: Record<string, TabHandler> = {
   },
   open_tab: openTab,
   switch_tab: (runner, id, params) => {
-    const refused = tabRefusal(runner.deps, params?.tab_id);
+    const refused = tabRefusal(runner.deps, params?.tab_id) ?? switchRefusal(runner.deps, params!.tab_id!);
     if (refused) return runner.sendResult(id, false, null, refused);
     const { tabs, agentTab, layout } = runner.deps;
     if (layout.open) layout.openFor(params!.tab_id!); // the panel the person had open follows the agent
@@ -145,7 +159,7 @@ export const TAB_COMMANDS: Record<string, TabHandler> = {
   },
   close_tab: (runner, id, params) => {
     const target = params?.tab_id || runner.deps.agentTab.tabId()!;
-    const refused = tabRefusal(runner.deps, target);
+    const refused = tabRefusal(runner.deps, target) ?? closeRefusal(runner.deps, target);
     if (refused) return runner.sendResult(id, false, null, refused);
     runner.deps.tabs.closeTab(target);
     runner.sendResult(id, true, { closed: true });

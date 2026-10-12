@@ -143,3 +143,29 @@ it("a link the agent's page opens in a new tab stays the agent's, and the old ta
   agentTab.handOff(1, 3);
   assert.deepEqual(agentTab.claimed(), [2], 'a tab no agent drives hands nothing on');
 });
+
+it('an agent may work in its first tab and the tabs it opened, never the person’s other tabs', () => {
+  const { agentTab } = setup();
+  inLane('chat', () => {
+    agentTab.claim(1); // the tab the chat was sent from
+    const opened = agentTab.opened(agentTab['deps'].tabs.createTab('https://jobs.test/', false));
+    assert.equal(agentTab.mayWorkIn(1), true, 'its first tab');
+    assert.equal(agentTab.mayWorkIn(opened), true, 'a tab it opened');
+    assert.equal(agentTab.mayWorkIn(2), false, 'the person’s other tab');
+  });
+});
+
+it('another agent’s tabs are not this agent’s to work in', () => {
+  const { agentTab } = setup();
+  const theirs = inLane('a', () => agentTab.opened(agentTab['deps'].tabs.createTab('https://a.test/', false)));
+  inLane('b', () => assert.equal(agentTab.mayWorkIn(theirs), false));
+});
+
+it('a finished run gives its first tab back, so the next run starts afresh', () => {
+  const { agentTab } = setup();
+  inLane('chat', () => {
+    agentTab.claim(1);
+    agentTab.release();
+    assert.equal(agentTab.mayWorkIn(1), false);
+  });
+});

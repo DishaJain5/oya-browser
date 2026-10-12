@@ -74,6 +74,8 @@ export interface ImportSource {
 export interface MirrorStatus extends Partial<ImportRecord> {
   /** Profiles that could not be imported. */
   warnings?: string[];
+  /** The profile still in use when the person chose not to switch to the imported one. */
+  kept?: string;
   /** The import started. */
   started?: boolean;
   /** Why it failed. */

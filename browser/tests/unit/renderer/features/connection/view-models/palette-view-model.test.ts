@@ -41,6 +41,22 @@ describe('the command palette', () => {
     assert.equal(app.panel.state.pane, 'actions');
   });
 
+  it('the Ask shortcut closes the panel when Ask is already showing', async () => {
+    const app = build();
+    app.panel.set({ open: true, pane: 'chat' });
+    await app.palette.run('ask');
+    assert.equal(app.fake.called('toggleDevPanel').length, 1);
+    assert.deepEqual(app.host, [], 'closing does not focus the box');
+  });
+
+  it('the Ask shortcut switches to Ask, without closing, when another pane is showing', async () => {
+    const app = build();
+    app.panel.set({ open: true, pane: 'actions' });
+    await app.palette.run('ask');
+    assert.equal(app.fake.called('toggleDevPanel').length, 0);
+    assert.equal(app.panel.state.pane, 'chat');
+  });
+
   it('hands the address bar and recording to their features', async () => {
     const app = build();
     await app.palette.run('address');

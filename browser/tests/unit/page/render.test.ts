@@ -34,10 +34,10 @@ const analysis = () => ({
 });
 
 describe('createRenderer', () => {
-  it('picks the renderer for a format, markdown when none is given', () => {
+  it('picks the renderer for a format, TOON when none is given', () => {
     assert.deepEqual(FORMATS, ['markdown', 'toon', 'jsonl']);
-    assert.equal(DEFAULT_FORMAT, 'markdown');
-    assert.equal(createRenderer().format, 'markdown');
+    assert.equal(DEFAULT_FORMAT, 'toon');
+    assert.equal(createRenderer().format, 'toon');
     assert.equal(createRenderer('toon').format, 'toon');
   });
 

@@ -1,6 +1,7 @@
 /**
  * The welcome panel's three views: start (Sign in with Oya), waiting (for the
- * sign-in to finish in the web browser) and manual (server, key and name).
+ * sign-in to finish in the web browser) and manual (server, key and name). The
+ * account chooser is in account-chooser.tsx.
  * The screen shows one at a time by its data-view (setup-screen.css).
  */
 import type { KeyboardEvent, ReactNode } from 'react';

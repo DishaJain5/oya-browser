@@ -323,7 +323,8 @@ The real <input type="file"> is normally hidden behind a styled "Choose file" / 
     type: 'function',
     function: {
       name: 'switch_tab',
-      description: 'Switch to a different tab by ID (from list_tabs).',
+      description:
+        'Switch to one of your own tabs by ID: list_tabs marks them yours. Tabs the person or another agent is using are refused; use open_tab instead.',
       parameters: {
         type: 'object',
         properties: { tab_id: { type: 'number', description: 'The tab ID to switch to' } },
@@ -353,7 +354,8 @@ The real <input type="file"> is normally hidden behind a styled "Choose file" / 
     type: 'function',
     function: {
       name: 'close_tab',
-      description: 'Close a tab. Closes active tab if no tab_id specified.',
+      description:
+        'Close a tab you opened with open_tab (default: your current tab). Tabs the person or another agent opened are refused; leave them open.',
       parameters: {
         type: 'object',
         properties: { tab_id: { type: 'number', description: 'Tab ID to close (optional)' } },

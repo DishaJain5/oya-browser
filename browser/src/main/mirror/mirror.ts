@@ -11,6 +11,7 @@ import { seedStorage, type StorageElectron } from './storage.ts';
 import { installedSources, type ListedSource } from './locate.ts';
 import { readLibrary } from './library-read.ts';
 import { FULL_DISK_ACCESS } from './safari.ts';
+import { askToSwitch } from './switch-prompt.ts';
 import { personaPartition } from '../app/persona.ts';
 import { MIRROR_ANSWER_TIMEOUT_MS, IMPORTS_KEPT, FULL_DISK_ACCESS_PANE } from './constants.ts';
 
@@ -184,16 +185,37 @@ export class Mirror {
     return captured;
   }
 
-  /** The server made the personas: fill the default's storage and library, remember it and the import, and reconnect as it. */
-  onOk(msg: MirrorOk): void {
+  /** The server made the personas: fill the default's storage and library, remember the import, and move to it if the person wants. */
+  async onOk(msg: MirrorOk): Promise<void> {
     const captured = this.settle();
     if (!captured) return;
     this.fillDefault(captured, msg);
     const record = this.remember(captured);
-    this.ctx.config.merge({ mirroredFrom: captured.source, persona: msg.defaultPersonaId });
+    const moved = await this.chooseProfile(captured, msg).catch(() => false);
+    this.applyChoice(captured, msg, moved);
+    this.notify({ done: true, ...record, ...this.outcome(captured, moved) });
+  }
+
+  /** Marks the import done and, when the person moved, browses as the imported profile from the next sign-in. */
+  private applyChoice(captured: Capture, msg: MirrorOk, moved: boolean): void {
+    this.ctx.config.merge({ mirroredFrom: captured.source, ...(moved ? { persona: msg.defaultPersonaId } : {}) });
     this.ctx.config.save();
-    this.reconnect();
-    this.notify({ done: true, ...record, ...(captured.warnings?.length ? { warnings: captured.warnings } : {}) });
+    if (moved) this.reconnect();
+  }
+
+  /** What the import screen adds to the tally: the profile kept, and any warnings. */
+  private outcome(captured: Capture, moved: boolean): Status {
+    const kept = moved ? {} : { kept: this.ctx.config.values.profileName || 'your current profile' };
+    return { ...kept, ...(captured.warnings?.length ? { warnings: captured.warnings } : {}) };
+  }
+
+  /** Moves without asking from no profile, or to the same one; asks before leaving another profile's logins. */
+  private chooseProfile(captured: Capture, msg: MirrorOk): Promise<boolean> {
+    const current = this.ctx.config.values.persona;
+    if (!current || current === 'default' || current === msg.defaultPersonaId) return Promise.resolve(true);
+    const profile = captured.profiles[(msg.personaIds || []).indexOf(msg.defaultPersonaId)];
+    const to = profile ? `${captured.name} · ${profile.name}` : captured.name;
+    return askToSwitch(this.ctx, { from: this.ctx.config.values.profileName || 'your current profile', to });
   }
 
   /** Puts this import at the top of the history the account page shows; answers its record. */

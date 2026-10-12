@@ -194,15 +194,22 @@ export class PaletteViewModel extends ViewModel<PaletteState> {
     };
   }
 
-  /** The commands that open the workspace panel: Ask (then its box takes focus) and Inspect. */
+  /** The commands that open the workspace panel: Ask (then its box takes focus, or it closes if already showing) and Inspect. */
   private paneActions(): Record<'ask' | 'inspect' | 'network' | 'source', () => unknown> {
-    const { panel, host } = this.deps;
+    const { panel } = this.deps;
     return {
-      ask: () => panel.open('chat').then(() => host.focusChat()),
+      ask: () => this.toggleAsk(),
       inspect: () => panel.open('actions'),
       network: () => panel.open('network'),
       source: () => panel.open('source'),
     };
+  }
+
+  /** Ask's shortcut: closes the panel when Ask is already showing, else opens Ask and focuses its box. */
+  private toggleAsk(): Promise<void> {
+    const { panel, host } = this.deps;
+    if (panel.state.open && panel.state.pane === 'chat') return panel.toggle();
+    return panel.open('chat').then(() => host.focusChat());
   }
 
   /** Daily workflows are reachable without opening the web console. */

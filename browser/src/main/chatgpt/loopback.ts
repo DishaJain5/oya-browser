@@ -40,7 +40,7 @@ export function awaitCallback(ttlMs = C.LOGIN_TTL_MS): Promise<Callback> {
 /** Resolves once the server listens, with the address it listens on. */
 function listening(server: http.Server, done: Callback['done'], close: () => void): Promise<Callback> {
   return new Promise((resolve, reject) => {
-    server.once('error', reject);
+    server.once('error', (e: NodeJS.ErrnoException) => reject(e.code === 'EADDRINUSE' ? Error(C.PORT_BUSY) : e));
     server.listen(C.LOOPBACK_PORT, C.LOOPBACK_HOST, () => {
       const { port } = server.address() as AddressInfo;
       resolve({ redirectUri: `http://${C.LOOPBACK_HOST}:${port}${C.CALLBACK_PATH}`, done, close });

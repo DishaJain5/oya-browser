@@ -13,6 +13,7 @@ import { DevHandlers } from './dev.ts';
 import { RoutineHandlers } from './routines.ts';
 import { PlaybookHandlers } from './playbooks.ts';
 import { UpdateHandlers } from './updates.ts';
+import { AgentHandlers } from './agents.ts';
 
 export { ShellIpc };
 export type { Handler, ShellHandlers } from './handle.ts';
@@ -25,6 +26,7 @@ export type IpcDeps = ConstructorParameters<typeof NavigationHandlers>[0] &
   ConstructorParameters<typeof DevHandlers>[0] &
   ConstructorParameters<typeof RoutineHandlers>[0] &
   ConstructorParameters<typeof UpdateHandlers>[0] &
+  ConstructorParameters<typeof AgentHandlers>[0] &
   Pick<AppServices, 'electron' | 'shell' | 'windows'>;
 
 /** The page's own channels: navigation and tabs, the shell's overlays and panel, and the dev panel. */
@@ -42,9 +44,17 @@ function appHandlers(deps: IpcDeps) {
     ...new SessionHandlers(deps).handlers,
     ...new OnboardingHandlers(deps).handlers,
     ...new RecordingHandlers(deps).handlers,
+    ...libraryHandlers(deps),
+  };
+}
+
+/** Routines, playbooks, updates and the coding agents. */
+function libraryHandlers(deps: IpcDeps) {
+  return {
     ...new RoutineHandlers(deps).handlers,
     ...new PlaybookHandlers(deps).handlers,
     ...new UpdateHandlers(deps).handlers,
+    ...new AgentHandlers(deps).handlers,
   };
 }
 

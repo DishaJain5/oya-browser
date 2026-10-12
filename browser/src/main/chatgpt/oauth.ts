@@ -67,7 +67,9 @@ export async function tokenRequest(form: Record<string, string>, fetchImpl: Fetc
   const res = await fetchImpl(C.TOKEN_URL, { ...init, headers, body: new URLSearchParams(form).toString() });
   const body = await res.json().catch(() => ({}));
   if (res.ok) return body;
-  throw Object.assign(Error(`ChatGPT refused the sign-in (${body?.error || res.status})`), { code: body?.error });
+  const why = [body?.error || res.status, body?.error_description].filter(Boolean).join(': ');
+  console.warn('[chatgpt] token request refused:', why);
+  throw Object.assign(Error(`ChatGPT refused the sign-in (${why}). Try again.`), { code: body?.error });
 }
 
 /** An ID token's claims, read without verifying it: it came straight from the token endpoint over TLS. */

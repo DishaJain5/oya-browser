@@ -198,8 +198,8 @@ describe('IPC handlers', () => {
     assert.deepEqual(ctx.config.values.ui, { theme: 'dark' });
   });
 
-  it('saves the default page format chosen in settings, markdown until one is', () => {
-    assert.equal(call('get-ui-preferences').pageFormat, 'markdown');
+  it('saves the default page format chosen in settings, TOON until one is', () => {
+    assert.equal(call('get-ui-preferences').pageFormat, 'toon');
     assert.deepEqual(call('get-ui-preferences').pageFormats, ['markdown', 'toon', 'jsonl']);
     call('save-ui-preferences', { pageFormat: 'jsonl' });
     assert.equal(call('get-ui-preferences').pageFormat, 'jsonl');
