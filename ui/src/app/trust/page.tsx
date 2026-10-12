@@ -126,10 +126,10 @@ function Controls() {
   );
 }
 
-/** Who processes customer data for Oya Cloud. */
+/** Who processes customer data for Oya Cloud; the Privacy Policy links here by its id. */
 function Subprocessors() {
   return (
-    <section className={trust.section}>
+    <section className={trust.section} id="subprocessors">
       <h2>Subprocessors</h2>
       <p className={trust.note}>
         Third parties that process customer data for Oya Cloud. Self-hosted deployments use none of them.

@@ -17,6 +17,8 @@ export function SiteFooter() {
         <a href={`${repository}/blob/main/docs/self-hosting.md`}>Self-host</a>
         <Link href="/release-notes">Release notes</Link>
         <Link href="/trust">Trust</Link>
+        <Link href="/privacy">Privacy</Link>
+        <Link href="/terms">Terms</Link>
         <a href={repository}>GitHub</a>
         <a href={discord}>Discord</a>
         <a href={foundersCall}>Talk to Founders</a>

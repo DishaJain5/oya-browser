@@ -1,10 +1,11 @@
 /**
  * The sign-up form: optional display name, email, password with a length
- * hint, and the submit button.
+ * hint, the submit button, and the line saying what creating an account agrees to.
  */
 'use client';
 
 import type { FormEvent } from 'react';
+import Link from 'next/link';
 import { FormError, PasswordField, SubmitButton, TextField } from '@/components/auth/fields';
 import { clearing, type FormState } from '@/components/auth/use-auth-form';
 import { Turnstile } from '@/components/auth/turnstile';
@@ -36,6 +37,23 @@ function LengthHint({ password }: HintProps) {
   return (
     <p className="text-xs text-yellow">
       {missing} more character{missing !== 1 ? 's' : ''} needed
+    </p>
+  );
+}
+
+/** What creating an account agrees to, with both documents a click away. */
+function Consent() {
+  return (
+    <p className="text-center text-xs text-text-dim">
+      By creating an account you agree to the{' '}
+      <Link href="/terms" className="underline hover:text-text">
+        Terms of Service
+      </Link>{' '}
+      and{' '}
+      <Link href="/privacy" className="underline hover:text-text">
+        Privacy Policy
+      </Link>
+      .
     </p>
   );
 }
@@ -75,6 +93,7 @@ export function SignupForm({ fields, form, captcha, onSubmit }: Props) {
       <Turnstile captcha={captcha} />
       <FormError error={form.error} />
       <SubmitButton busy={form.submitting} label="Create account" busyLabel="Creating account..." />
+      <Consent />
     </form>
   );
 }
