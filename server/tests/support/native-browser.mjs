@@ -19,7 +19,9 @@ export async function openNativeFixture() {
   );
   const child = spawn(engine, [harness], {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '', OYA_SERVER_FIXTURE_PROFILE: profile },
+    // Strict native door: these tests forbid the debugger to prove the native path. The Playwright
+    // passthrough (OYA_CDP_PASSTHROUGH) is checked on the real engine by qa/playwright-compat.
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '', OYA_SERVER_FIXTURE_PROFILE: profile, OYA_CDP_PASSTHROUGH: '0' },
   });
   return connect(child, profile);
 }
