@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.178](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.178) · 2026-10-12
+
 ### Added
 
 - **Connect your coding agent.** The desktop app now runs an MCP server on your own computer (`127.0.0.1:47321`, protected by a token). The footer shows Claude Code, Codex, Cursor and VS Code when they are installed; one click adds Oya to them, and they drive this browser directly. Claude Code and Codex are also set to run Oya's tools without asking; Cursor and VS Code ask once. Human Mode pauses them like any agent.
