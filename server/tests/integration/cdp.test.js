@@ -229,7 +229,7 @@ try {
   console.log('\n7\ufe0f\u20e3c  The markdown carries what the agent needs to read the page...');
   {
     await driver.send('navigate', { url: siteUrl + 'reader' });
-    const md = (await driver.send('analyze')).data?.markdown || '';
+    const md = (await driver.send('analyze', { format: 'markdown' })).data?.markdown || '';
     assert(/\$19\.99\s+4\.5 stars/.test(md), 'adjacent blocks are separated, not run together');
     assert(md.includes('Price $249.00'), 'a link wrapping a card keeps the text its label cannot hold');
     assert(/"Dark mode" \(checked\)/.test(md), 'an aria-checked switch reads as checked');
@@ -247,7 +247,7 @@ try {
     );
 
     await driver.send('navigate', { url: siteUrl + 'app' });
-    const app = (await driver.send('analyze')).data;
+    const app = (await driver.send('analyze', { format: 'markdown' })).data;
     assert(
       !/^modal:/m.test(app.markdown) && app.markdown.includes('Inbox'),
       'a small non-modal dialog does not hide the page',
@@ -263,7 +263,7 @@ try {
     assert(app.markdown.includes('a\\|b'), 'a pipe inside a table cell is escaped');
 
     await driver.send('navigate', { url: siteUrl + 'lists' });
-    const lists = (await driver.send('analyze')).data;
+    const lists = (await driver.send('analyze', { format: 'markdown' })).data;
     const ids = [...lists.markdown.matchAll(/\[#(\d+) /g)].map((m) => Number(m[1]));
     assert(
       ids.join() === ids.map((_, i) => i + 1).join() && lists.elements.length === ids.length,
