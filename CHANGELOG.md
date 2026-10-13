@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.183](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.183) · 2026-10-13
+
 ### Fixed
 
 - Request macOS Screen Recording access before refusing screen sharing, with a direct link to the correct System Settings pane and instructions for missing app entries.
