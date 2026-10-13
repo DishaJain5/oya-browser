@@ -25,8 +25,6 @@ export class BrowserWindows {
   current: AppServices;
   /** Monotonic application-wide id allocation prevents collisions after transfer or close. */
   private nextId = 1;
-  /** An application quit may close windows even while automation owns the session. */
-  private quitting = false;
   /** Set once a quit saved the session: the windows close one by one, and a later save would keep only the last one's tabs. */
   private quitSaved = false;
   /** Hidden preparation and transactional transfer lifetime. */
@@ -39,13 +37,9 @@ export class BrowserWindows {
     this.opening = new WindowOpening(this);
     new WindowServiceRouter(root, this).install();
   }
-  /** Lets windows close once the app quits, including an update restart, which closes every window before 'before-quit' fires. */
+  /** An update restart closes every window before 'before-quit' fires; it commits the quit first. Lifecycle commits every other quit. */
   private watchQuit(): void {
-    const quitting = (): void => {
-      this.quitting = true;
-    };
-    this.root.electron.app.on('before-quit', quitting);
-    this.root.electron.autoUpdater.on('before-quit-for-update', quitting);
+    this.root.electron.autoUpdater.on('before-quit-for-update', () => this.root.callGuard.commit());
   }
   /** A fresh globally unique tab id. */
   allocateTabId(): number {
@@ -94,10 +88,12 @@ export class BrowserWindows {
     this.scopes.push(scope);
     if (this.root.control.snapshot().interactive) this.select(scope);
   }
-  /** A native close button cannot destroy an agent's page while its task is in flight. */
+  /** A native close button cannot destroy an agent's page while its task is in flight, nor end a call without asking. */
   private beforeClose(scope: AppServices, event: Event): void {
-    if (!this.quitting && scope.tabs.list.some((tab) => !this.root.agentTab.humanMay(tab.id)))
+    const { callGuard } = this.root;
+    if (!callGuard.committed && scope.tabs.list.some((tab) => !this.root.agentTab.humanMay(tab.id)))
       return event.preventDefault();
+    if (callGuard.holdClose(scope.shell.window!, scope.tabs.list, event)) return;
     this.saveSession();
     closeWindowTabs(scope);
   }
@@ -108,8 +104,9 @@ export class BrowserWindows {
    * window's tabs are still open.
    */
   private saveSession(): void {
-    if (this.quitting && this.quitSaved) return;
-    this.quitSaved = this.quitting;
+    const quitting = this.root.callGuard.committed;
+    if (quitting && this.quitSaved) return;
+    this.quitSaved = quitting;
     this.root.sessionTabs?.flush();
   }
   /** Open a full browser shell; never create a second profile or duplicate the server connection. */
