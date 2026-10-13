@@ -26,7 +26,7 @@ async function painted(contents: WebContents, until: number): Promise<string> {
 }
 
 /** Captures are bounded independently of a stalled renderer's response. */
-async function capture(contents: WebContents): Promise<string> {
+async function capturePreview(contents: WebContents): Promise<string> {
   return withinTime(painted(contents, Date.now() + PICKER.PREVIEW_TIMEOUT_MS), PICKER.PREVIEW_TIMEOUT_MS).catch(
     () => '',
   );
@@ -66,7 +66,7 @@ export class TabPreviews {
     const view = tab.view as BrowserView;
     try {
       if (!tab.window && typeof view.getBounds === 'function') this.attach(view);
-      return await capture(view.webContents);
+      return await capturePreview(view.webContents);
     } finally {
       this.restore(view);
     }
