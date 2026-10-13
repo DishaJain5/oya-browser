@@ -518,13 +518,13 @@ jobs:
 
     # The hosted image starts the server directly, so create billing adjustment
     # tables before any new pod can read them. This additive migration is safe to retry.
-    - name: Apply admin billing migration
+    - name: Apply billing and Keel telemetry migrations
       env:
         PGDATABASE: ${{ secrets.OYA_MIGRATE_DATABASE_URL || secrets.DATABASE_URL }}
         PGCONNECT_TIMEOUT: '10'
       run: |
         : "${PGDATABASE:?Missing database connection for billing migration}"
-        psql -X --dbname="$PGDATABASE" --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/022_admin_billing.sql --file=server/migrations/023_agent_step_grants.sql
+        psql -X --dbname="$PGDATABASE" --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/022_admin_billing.sql --file=server/migrations/023_agent_step_grants.sql --file=server/migrations/024_keel_usage.sql
 
     - name: Deploy with Kustomize
       run: kubectl apply -k k8s/overlays/prod
@@ -852,6 +852,16 @@ jobs:
             type=gha,scope=server-prod
             type=gha,scope=server-dev
           cache-to: type=gha,mode=max,scope=server-hotfix
+
+      - name: Apply Keel telemetry migration before rollout
+        env:
+          PGDATABASE: ${{ secrets.OYA_MIGRATE_DATABASE_URL || secrets.DATABASE_URL }}
+          PGCONNECT_TIMEOUT: '10'
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${PGDATABASE:?Missing database connection for Keel telemetry migration}"
+          psql -X --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/024_keel_usage.sql
 
       - name: Roll out only the server container by immutable digest
         env:

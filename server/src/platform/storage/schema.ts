@@ -108,6 +108,14 @@ export const TABLES: Record<string, Table> = {
       ...{ pings: 'int', first_seen: 'time', last_seen: 'time' },
     },
   },
+  // Anonymous Keel reports, deduplicated by installation and reported usage day.
+  keel_usage: {
+    key: ['install_id', 'day'],
+    columns: {
+      ...{ install_id: 'text', day: 'text', version: 'text', os: 'text', steps: 'int', license_id: 'text' },
+      received_at: 'time',
+    },
+  },
   // Downloads and update checks, counted per UTC day, kind and platform.
   download_counts: {
     key: ['day', 'kind', 'platform'],

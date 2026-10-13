@@ -6,6 +6,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Added
+
+- Received Keel’s anonymous daily step reports at `/api/telemetry/keel/ping`, with validated fields, rate limiting, and one stored report per installation and usage day.
+
 ## [1.0.180](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.180) · 2026-10-12
 
 ### Changed
