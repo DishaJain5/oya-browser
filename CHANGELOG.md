@@ -6,6 +6,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- Links can open installed desktop apps, including Docker, Slack and Zoom, after confirmation. Human-owned tabs work in AI Mode and separate windows; callback parameters are preserved.
+
 ## [1.0.181](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.181) · 2026-10-13
 
 ### Added

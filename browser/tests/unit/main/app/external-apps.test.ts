@@ -1,4 +1,4 @@
-/** Zoom links leave the sandbox only after a person consents; no OS apps are launched by tests. */
+/** Desktop links leave the sandbox only after a person consents; no OS apps are launched by tests. */
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -18,6 +18,7 @@ function fixture() {
     paired = [];
   const deps = {
     electron: {
+      app: { getApplicationInfoForProtocol: async () => ({ name: 'Zoom' }) },
       shell: {
         openExternal: async (url) => {
           opened.push(url);
@@ -31,7 +32,9 @@ function fixture() {
       },
     },
     shell: { window: null },
-    tabs: { getActiveView: () => ({ webContents: contents }) },
+    tabs: { activeTabId: 1, getActiveView: () => ({ webContents: contents }) },
+    agentTab: { humanMay: () => state.interactive },
+    persona: { partitionName: () => 'persist:external-test' },
     control: { snapshot: () => ({ interactive: state.interactive }) },
     governance: { configuration: null },
     deepLinks: {
@@ -142,7 +145,7 @@ it('reports a missing handler without logging private URLs and permits retry', a
   };
   f.service.request(link, f.contents as any);
   await settle();
-  assert.equal(f.asked[1].message, 'Could not open Zoom');
+  assert.equal(f.asked[1].message, 'Could not open the app');
   assert.doesNotMatch(JSON.stringify(f.asked), /private OS failure/);
   f.service.request(link, f.contents as any);
   await settle();
@@ -211,4 +214,127 @@ it('coalesces repeated pairing links while one confirmation is open', async () =
   await settle();
   f.service.request(pairing, f.contents as any);
   assert.equal(f.paired.length, 2);
+});
+
+it('opens registered apps without rewriting authentication callbacks', async () => {
+  for (const [name, url] of [
+    ['Docker', 'docker-desktop://auth/callback?code=abc%2Fdef+ghi&state=a%3Db#complete'],
+    ['Slack', 'slack://channel?team=T123&id=C456'],
+    ['Zoom', 'zoomus://zoom.us/start?confno=123'],
+    ['Zoom', 'zoommtg://zoom.us/join?confno=123'],
+    ['Mail', 'mailto:person@example.test?subject=Hello%20there'],
+    ['Editor', 'example-editor://open/project?token=private'],
+  ]) {
+    const f = fixture();
+    f.deps.electron.app.getApplicationInfoForProtocol = async () => ({ name });
+    assert.equal(f.service.request(url, f.contents as any), true);
+    await settle();
+    assert.deepEqual(f.opened, [url]);
+    assert.equal(f.asked[0].message, `Open ${name}?`);
+    assert.doesNotMatch(JSON.stringify(f.asked), /private|abc%2F|C456/);
+  }
+});
+it('human-owned tabs work in AI Mode while agents use other tabs', async () => {
+  const f = fixture();
+  f.state.interactive = false;
+  f.deps.agentTab.humanMay = (id) => id === 1;
+  f.service.request('slack://open', f.contents as any);
+  await settle();
+  assert.deepEqual(f.opened, ['slack://open']);
+});
+it('never sends web, internal, file, script or OS command protocols to apps', async () => {
+  const f = fixture();
+  for (const url of [
+    'https://example.test/',
+    'about:blank',
+    'localhost:3000/path',
+    'example.test:8080/path',
+    'file:///private',
+    'javascript:alert(1)',
+    'data:text/html,hi',
+    'shell:AppsFolder',
+    'ms-settings:appsfeatures',
+    'powershell:command',
+  ]) {
+    f.service.request(url, f.contents as any);
+    await settle();
+  }
+  assert.deepEqual(f.opened, []);
+  assert.deepEqual(f.asked, []);
+});
+it('consumes malformed app links without launching or searching their secrets', async () => {
+  const f = fixture();
+  for (const url of [
+    'slack://user:password@open',
+    'slack://open?code=a b',
+    'slack://open?code=%00bad',
+    'slack://open?code=a\nb',
+    'slack://open?code=' + 'a'.repeat(8192),
+  ]) {
+    assert.equal(f.service.request(url, f.contents as any), true);
+    await settle();
+  }
+  assert.deepEqual(f.opened, []);
+  assert.deepEqual(f.asked, []);
+});
+it('explains a missing handler without displaying private callback values', async () => {
+  const f = fixture();
+  f.deps.electron.app.getApplicationInfoForProtocol = async () => {
+    throw new Error('private OS lookup');
+  };
+  f.service.request('missing-app://auth?token=private', f.contents as any);
+  await settle();
+  assert.equal(f.asked[0].message, 'No app can open this link');
+  assert.doesNotMatch(JSON.stringify(f.asked), /private|token/);
+  assert.deepEqual(f.opened, []);
+});
+it('reload, profile change and tab selection cancel outstanding confirmation', async () => {
+  for (const change of [
+    (f) => f.contents.emit('did-start-navigation', { isMainFrame: true, isSameDocument: false }),
+    (f) => (f.deps.persona.partitionName = () => 'persist:another-profile'),
+    (f) => (f.deps.tabs.activeTabId = 2),
+  ]) {
+    const f = fixture(),
+      pending = Promise.withResolvers();
+    f.deps.electron.dialog.showMessageBox = () => pending.promise;
+    f.service.request(link, f.contents as any);
+    await settle();
+    change(f);
+    pending.resolve({ response: 1 });
+    await settle();
+    assert.deepEqual(f.opened, []);
+  }
+});
+it('checks ownership after handler lookup before asking', async () => {
+  const f = fixture(),
+    lookup = Promise.withResolvers();
+  f.deps.electron.app.getApplicationInfoForProtocol = () => lookup.promise;
+  f.service.request(link, f.contents as any);
+  f.deps.agentTab.humanMay = () => false;
+  lookup.resolve({ name: 'Zoom' });
+  await settle();
+  assert.deepEqual(f.asked, []);
+  assert.deepEqual(f.opened, []);
+});
+it('uses the source window and cancels when a tab transfers during confirmation', async () => {
+  for (const transfer of [false, true]) {
+    const f = fixture(),
+      pending = Promise.withResolvers();
+    const window = { isDestroyed: () => false };
+    const source = { ...f.deps, shell: { window } };
+    let owner = source;
+    f.deps.windows = { ownerOfContents: () => owner, fromContents: () => undefined };
+    f.deps.electron.dialog.showMessageBox = (parent, options) => {
+      assert.equal(parent, window);
+      f.asked.push(options);
+      return pending.promise;
+    };
+    f.service.request(link, f.contents as any);
+    await settle();
+    assert.equal(f.asked.length, 1);
+    if (transfer) owner = { ...source };
+    pending.resolve({ response: 1 });
+    await settle();
+    assert.deepEqual(f.opened, transfer ? [] : [link]);
+  }
 });

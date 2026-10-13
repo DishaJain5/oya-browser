@@ -698,15 +698,30 @@ unread filtering, no read side effects), `mark_notifications_read` (explicit IDs
 and `dismiss_notification` (one ID plus confirmation). These commands use normal
 socket control admission; neither reads another profile nor opens the inbox UI.
 
-### External meeting app links
+### External desktop app links
 
-`app/external-apps.ts` handles only validated `zoommtg://*.zoom.us/join` links,
-including the apex host. Tab/frame redirects and window-open requests are stopped
-before opening a broken web tab; shell address-bar input uses the same handler.
-A native Cancel-default confirmation is required for every launch. Only the
-active, human-controlled surface in an unmanaged browser can hand off, with
-control and source rechecked after the prompt. The normal remote navigate/open_tab
-HTTP(S) allowlist is unchanged. No meeting credentials enter logs or prompt text.
+`app/external-apps.ts` intercepts desktop protocols in native navigations,
+redirects, popup attempts, permission callbacks and address-bar submissions.
+The operating system resolves the installed handler (including Docker Desktop,
+Slack and both Zoom schemes); each launch asks the person with Cancel selected.
+The original URL is preserved, including private callback parameters, but dialogs
+show only the application name and source origin. Missing handlers and native
+launch failures leave the source page available with a plain explanation.
+
+`app/external-app-gate.ts` resolves the requesting window from its native contents
+and checks per-tab human ownership, so a person's tabs work in AI Mode while
+agents use their own tabs. Lookup and confirmation cannot survive tab transfer,
+selection changes, profile changes, navigation or same-URL reloads. Managed
+runtimes and agent-owned surfaces cannot prompt or launch. One pending request
+coalesces duplicate native callbacks. Browser-internal, local-file, script and
+OS-command protocols are never handed to the operating system; Oya pairing
+retains its separate internal path. Remote navigation remains HTTP(S)-only.
+
+`npm run test:desktop-external-apps` runs only Oya's stock desktop runtime with a
+disposable profile, real native pointer/navigation events and debugger access
+forbidden. Application lookup, consent and OS launches are stubbed, so it cannot
+open installed apps or consume real sign-in callbacks. Actual application sign-in
+and Windows desktop integration still require manual verification.
 
 ### Call media permissions
 

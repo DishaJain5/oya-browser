@@ -44,6 +44,8 @@ export const KEEP_RENDERING_SWITCHES = [
 
 /** Bound URLs passed to the operating system's protocol handler. */
 export const EXTERNAL_APP_URL_LIMIT = 8192;
+/** Bound the installed application's display name in consent dialogs. */
+export const EXTERNAL_APP_LABEL_LIMIT = 100;
 /** The explicit affirmative button, never the dialog's default. */
 export const OPEN_EXTERNAL_APP_CHOICE = 1;
 

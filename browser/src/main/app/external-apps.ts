@@ -1,93 +1,79 @@
-/** Explicit, human-approved Zoom handoff and oya:// pairing; never arbitrary OS protocol execution. */
-import type { WebContents, MessageBoxOptions } from 'electron';
-import type { AppServices } from './services.ts';
-import { EXTERNAL_APP_URL_LIMIT, OPEN_EXTERNAL_APP_CHOICE } from './constants.ts';
-/** Control, active surface, policy and native APIs remain injectable. */
-type Deps = Pick<AppServices, 'electron' | 'shell' | 'tabs' | 'control' | 'governance' | 'deepLinks'>;
-/** Recognize a Zoom app attempt even when malformed so it cannot become a broken tab or search. */
-const isZoomScheme = (raw: string): boolean => /^zoommtg:/i.test(raw.trim());
-/** Oya's own links: Chrome hands these to Oya, so a page inside Oya must reach the same handler. */
-const isOyaLink = (raw: string): boolean => /^oya:/i.test(raw.trim());
-/** Accept only Zoom meeting joins; other protocols and Zoom app commands remain blocked. */
-export function zoomMeetingLink(raw: string): string | null {
-  if (raw.length > EXTERNAL_APP_URL_LIMIT || /[\p{Cc}\s]/u.test(raw)) return null;
-  const url = URL.parse(raw);
-  if (!url || url.protocol !== 'zoommtg:' || url.username || url.password || url.port || url.hash) return null;
-  if (url.hostname !== 'zoom.us' && !url.hostname.endsWith('.zoom.us')) return null;
-  if (url.pathname !== '/join') return null;
-  return url.href;
-}
+/** Human-confirmed handoff to installed desktop apps, with Oya pairing kept internal. */
+import type { WebContents, MessageBoxOptions, Event, WebContentsWillFrameNavigateEventParams } from 'electron';
+import { OPEN_EXTERNAL_APP_CHOICE } from './constants.ts';
+import { externalProtocol, externalAppLink, externalAppName } from './external-app-links.ts';
+import { ExternalAppGate, type ExternalAppDeps, type ExternalAppTicket } from './external-app-gate.ts';
+export { zoomMeetingLink } from './external-app-links.ts';
 /** One pending native confirmation across all tabs prevents popup storms. */
 export class ExternalApps {
   /** Main-process collaborators. */
-  private readonly deps: Deps;
+  private readonly deps: ExternalAppDeps;
+  /** Admission and document lifetime checks. */
+  private readonly gate: ExternalAppGate;
   /** A prompt or OS launch is already in progress. */
   private pending = false;
   /** Navigation listeners are installed at most once per surface. */
   private readonly wired = new WeakSet<WebContents>();
   /** Constructed once, before tabs begin loading. */
-  constructor(deps: Deps) {
+  constructor(deps: ExternalAppDeps) {
     this.deps = deps;
+    this.gate = new ExternalAppGate(deps);
   }
   /** Include subframes, redirects and popup tabs without injecting page scripts. */
   wire(contents: WebContents): void {
     if (this.wired.has(contents)) return;
     this.wired.add(contents);
-    contents.on('will-frame-navigate', (event) => {
-      if (this.request(event.url, contents)) event.preventDefault();
-    });
-    contents.on('will-redirect', (event, url) => {
-      if (this.request(event.url || url, contents)) event.preventDefault();
-    });
+    this.gate.watch(contents);
+    contents.on('will-frame-navigate', (event) => this.intercept(event, contents));
+    contents.on('will-redirect', (event) => this.intercept(event, contents));
+  }
+  /** Claim app navigation before the renderer replaces the source document. */
+  private intercept(event: Event<WebContentsWillFrameNavigateEventParams>, contents: WebContents): void {
+    if (this.request(event.url, contents)) event.preventDefault();
   }
   /** Synchronously claim the navigation, then ask asynchronously without changing the page. */
   request(raw: string, contents?: WebContents): boolean {
-    if (isOyaLink(raw)) return this.pair(raw.trim(), contents);
-    if (!isZoomScheme(raw)) return false;
-    const url = zoomMeetingLink(raw.trim());
-    if (!url || this.pending || !contents || !this.allowed(contents)) return true;
-    this.begin(url, contents);
+    const protocol = externalProtocol(raw);
+    if (!protocol) return false;
+    const link = externalAppLink(raw),
+      ticket = this.gate.capture(contents);
+    if (!link || !ticket || this.pending) return true;
+    this.begin(link, protocol, ticket);
     return true;
   }
-  /** Same path as a link from Chrome: pairing names the server and Cancel is the default. */
-  private pair(link: string, contents?: WebContents): true {
-    if (link.length > EXTERNAL_APP_URL_LIMIT || this.pending || !contents || !this.allowed(contents)) return true;
+  /** Keep one lock across lookup, consent and launch, including every failure path. */
+  private begin(link: string, protocol: string, ticket: ExternalAppTicket): void {
     this.pending = true;
-    const done = (): void => void (this.pending = false);
-    void this.deps.deepLinks.applyDeepLink(link).then(done, done);
-    return true;
-  }
-  /** Keep the prompt locked until every success or failure path settles. */
-  private begin(url: string, contents: WebContents): void {
-    this.pending = true;
-    void this.launch(url, contents, contents.getURL())
-      .catch(() => this.failed())
+    const work = protocol === 'oya:' ? this.deps.deepLinks.applyDeepLink(link) : this.launch(link, ticket);
+    void work
+      .catch(() => this.failed(ticket))
       .catch(() => {})
       .finally(() => {
         this.pending = false;
       });
   }
-  /** Managed runtimes and agent control cannot launch a local desktop application. */
-  private allowed(contents: WebContents): boolean {
-    if (contents.isDestroyed() || this.deps.governance.configuration || !this.deps.control.snapshot().interactive)
-      return false;
-    return contents === this.deps.tabs.getActiveView()?.webContents || contents === this.deps.shell.window?.webContents;
+  /** The OS identifies the installed handler; page text never supplies an application name. */
+  private async handler(link: string): Promise<string> {
+    const info = await this.deps.electron.app.getApplicationInfoForProtocol(link).catch(() => null);
+    return externalAppName(info?.name || '');
   }
-  /** Recheck ownership and source after the person answers, before leaving the sandbox. */
-  private async launch(url: string, contents: WebContents, source: string): Promise<void> {
-    const result = await this.ask(this.confirmation(source));
-    if (result.response !== OPEN_EXTERNAL_APP_CHOICE || !this.allowed(contents) || contents.getURL() !== source) return;
-    await this.deps.electron.shell.openExternal(url);
+  /** Recheck native context after lookup and the person's affirmative response. */
+  private async launch(link: string, ticket: ExternalAppTicket): Promise<void> {
+    const name = await this.handler(link);
+    if (!this.gate.current(ticket)) return;
+    if (!name) return this.missing(ticket);
+    const result = await this.ask(ticket, this.confirmation(name, ticket.source));
+    if (result.response !== OPEN_EXTERNAL_APP_CHOICE || !this.gate.current(ticket)) return;
+    await this.deps.electron.shell.openExternal(link);
   }
   /** Cancellation is the default; only a person's affirmative click can launch. */
-  private confirmation(source: string): MessageBoxOptions {
+  private confirmation(name: string, source: string): MessageBoxOptions {
     return {
       type: 'question',
-      message: 'Open Zoom?',
-      detail: `${this.sourceLabel(source)} wants to open the Zoom app. Only continue if you trust this meeting link.`,
-      buttons: ['Cancel', 'Open Zoom'],
-      defaultId: 0,
-      cancelId: 0,
+      message: `Open ${name}?`,
+      detail: `${this.sourceLabel(source)} wants to open ${name}.`,
+      buttons: ['Cancel', `Open ${name}`],
+      ...{ defaultId: 0, cancelId: 0, noLink: true },
     };
   }
   /** Never display meeting passwords, private paths, or query strings in prompts. */
@@ -95,19 +81,28 @@ export class ExternalApps {
     const url = URL.parse(raw);
     return url && ['http:', 'https:'].includes(url.protocol) ? url.origin : 'Oya Browser';
   }
-  /** Missing app handlers leave the original meeting page available for web joining. */
-  private async failed(): Promise<void> {
-    await this.ask({
+  /** Keep the source page available when no desktop app owns this protocol. */
+  private async missing(ticket: ExternalAppTicket): Promise<void> {
+    await this.ask(ticket, {
       type: 'info',
-      message: 'Could not open Zoom',
-      detail:
-        'Install or open the Zoom desktop app, then try again. You can also use the meeting page’s browser-join option.',
+      message: 'No app can open this link',
+      detail: 'Install the app for this link, then try again.',
       buttons: ['OK'],
     });
   }
-  /** Electron requires an existing window or the unparented overload, never null. */
-  private ask(options: MessageBoxOptions) {
-    const window = this.deps.shell.window;
+  /** Native failures never expose callback tokens or opaque OS exception text. */
+  private async failed(ticket: ExternalAppTicket): Promise<void> {
+    if (!this.gate.current(ticket)) return;
+    await this.ask(ticket, {
+      type: 'info',
+      message: 'Could not open the app',
+      detail: 'Open or reinstall the desktop app, then try this link again.',
+      buttons: ['OK'],
+    });
+  }
+  /** Always parent to the requesting window rather than the app's last selected window. */
+  private ask(ticket: ExternalAppTicket, options: MessageBoxOptions) {
+    const window = ticket.scope.shell.window;
     return window && !window.isDestroyed()
       ? this.deps.electron.dialog.showMessageBox(window, options)
       : this.deps.electron.dialog.showMessageBox(options);

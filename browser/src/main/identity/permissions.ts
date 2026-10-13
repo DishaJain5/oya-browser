@@ -8,7 +8,7 @@
  * sensitive permissions remain refused; ordinary unasked permissions are allowed. The page injection
  * reports a refused permission as Chrome's "prompt" (anonymity/stealth.js).
  * External app requests remain denied here, but may be delegated to a separate
- * human-confirmed, allowlisted desktop handoff.
+ * human-confirmed desktop handoff to an installed protocol handler.
  */
 import type { Session, WebContents, MediaAccessPermissionRequest, PermissionRequest } from 'electron';
 import type { MediaPermissions } from '../app/media-permissions.ts';
