@@ -71,7 +71,10 @@ export class ScreenShare {
     const current = () =>
       this.deps.mediaPermissions.gate.current(contents, generation) && this.deps.persona.partitionName() === partition;
     const streams = await this.deps.screenPicker.pick(contents, new URL(contents.getURL()).origin, current);
-    return current() ? streams : null;
+    if (!current()) return null;
+    // Marked only once a source is handed over: the person can still cancel the picker.
+    if (streams) this.deps.mediaPermissions.gate.markLive(contents);
+    return streams;
   }
 
   /** Site consent (remembered as soon as given, as the camera's is), the document and control rechecked after the wait, then the macOS setting. */

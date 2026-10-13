@@ -144,6 +144,13 @@ it('cancelling the picker never falls back to an automatic screen', async () => 
   const f = fixture();
   f.picker.pick = async () => null;
   assert.equal(await f.request(), null);
+  assert.equal(f.service.gate.inCall(f.contents as any), false, 'a cancelled picker is not a call');
+});
+
+it('a chosen screen source marks the tab in a call', async () => {
+  const f = fixture();
+  await f.request();
+  assert.equal(f.service.gate.inCall(f.contents as any), true);
 });
 
 it('refuses a screen source if control, document or profile changes during capture selection', async () => {
