@@ -1,5 +1,96 @@
 @AGENTS.md
 
+## The gate
+
+A change is done when the gate for every part it touches is green. Run each part's gate from that
+part's folder. Each one is the same set of checks CI runs (`.github/workflows/ci.yaml`).
+
+| Part touched | Gate |
+|:---|:---|
+| `browser/` | `npm run lint && npm run format:check && npm run typecheck && npm run test:unit && npm run build` |
+| `server/` | `npm run lint && npm run format:check && npm run typecheck && npm run test:coverage` (floors: 95% lines, 90% branches, 90% functions) |
+| `ui/` | `npm run lint && npm run format:check && npm run typecheck && npm run test:coverage` |
+| `packages/*`, `tooling/`, `scripts/` | from the root: `npm run lint && npm run format:check && npm run test:packages && npm run test:scripts` |
+
+Integration suites need a real Electron or a running stack. Run the ones a change touches, under
+`xvfb-run -a` on Linux:
+- `browser/`: `npm run test:integration`, plus the named `test:*` suite for the area changed
+  (`test:shell` for the strip and toolbar, `test:control` for human/agent control, etc.).
+- `server/`: `npm run test:integration`.
+
+Run `npm run setup` at the root once to install every part.
+
+## Where things are
+
+| Path | What lives there |
+|:---|:---|
+| `server/src/app/` | Composition root (`container.ts`), HTTP wiring (`http.ts`), API surface (`api.ts`) |
+| `server/src/modules/<domain>/` | One folder per domain: `control`, `browsers`, `personas`, `playbooks`, `gateway`, `auth`, `billing`, … |
+| `server/src/modules/browsers/connection/commands.ts` | `sendCommand`: the one path every command takes to a browser |
+| `server/src/mcp/` | The MCP server's browser tools |
+| `browser/src/main/main.ts` | The desktop app's composition root: builds the services and wires events |
+| `browser/src/main/app/services.ts` | The `AppServices` type every main-process service takes its deps from |
+| `browser/src/main/tabs/` | Tab manager (`tabs.ts`), strip order and commands (`tab-order.ts`), right-click menu (`tab-menu.ts`), session save and restore (`session-tabs.ts`) |
+| `browser/src/main/ipc/` | Shell → main channel handlers, registered behind the shell-only guard in `index.ts` |
+| `browser/src/shared/ipc.ts` | The typed channel tables (`ShellCalls`, `ShellEvents`, `CALL_CHANNELS`, `EVENT_CHANNELS`) both sides compile against |
+| `browser/src/preload/` | The bridge the shell page calls |
+| `browser/src/renderer/features/<feature>/` | Shell UI by feature (`tabs`, `toolbar`, `library`, …): `components/`, `hooks/`, `view-models/` |
+| `browser/scripts/`, `browser/anonymity/` | Scripts injected into web pages. Pages can see them. |
+| `ui/src/` | Next.js console and public site |
+| `packages/sdk/`, `packages/cli/` | Public TypeScript client and install CLI |
+| `tooling/eslint/` | The shared lint rules every part imports |
+| `browser/tests/unit/`, `server/tests/unit/` | Mirror of `src/`; shared fakes in `tests/unit/support/` |
+
+Each part's `ARCHITECTURE.md` goes into more detail. Read the one for the part you are changing.
+
+## How a request flows
+
+- **API, MCP or SDK → a browser:** a route or MCP tool in `server/` calls `sendCommand(browserId, action, params)`.
+  `sendCommand` picks the transport: the control socket for Oya browsers, or the CDP driver for third-party ones.
+  The Oya browser receives the command and runs it through native operations in `browser/src/main/`. Control
+  ownership (human vs agent) is checked before anything runs.
+- **The person in the desktop shell → main:** a renderer feature calls the preload bridge, which uses a channel
+  in `CALL_CHANNELS`. That arrives at a handler in `browser/src/main/ipc/`, and the handler calls a main-process
+  service. The service sends state back to the renderer over an `EVENT_CHANNELS` event (e.g. the tab list via
+  `sendTabList`). The main process owns state; the shell only asks.
+
+## Invariants and the tests that hold them
+
+| Invariant | Guarded by |
+|:---|:---|
+| The egress host matcher is byte-identical in `server/src/modules/control/egress.ts` and `browser/src/main/identity/host-rules.ts` | `server/tests/integration/egress-rules.test.js` |
+| No internal CDP. The only debugger use is `browser/src/main/app/cdp-passthrough.ts` | `browser/tests/unit/native-boundary.test.ts` |
+| A persona's fingerprint is deterministic: the same persona gets the same device, forever | `browser/tests/unit/main/native-policy/persona.test.ts`, `browser/tests/unit/anonymity/fingerprint.test.js` |
+| Scripts injected into pages keep their shape | `npm run stealth` (server), `npm run test:analyzer` and `test:recorder` (browser) |
+| Restored tabs are web addresses only, restored once per launch, only into the same profile, never in a governed browser | `browser/tests/unit/main/tabs/session-tabs.test.ts` |
+| Shell channels answer only the shell's own pages | `browser/tests/unit/main/ipc/handle.test.ts` |
+| Server coverage stays at or above 95/90/90 | `npm run test:coverage` in `server/` |
+
+## How to extend
+
+- **A new shell → main action** (e.g. a tab command):
+  1. Add the method to `ShellCalls` and its channel to `CALL_CHANNELS` in `browser/src/shared/ipc.ts`. Until a
+     handler exists, it won't compile.
+  2. Add the handler in the matching file in `browser/src/main/ipc/`, calling a service. Keep the logic out of
+     the handler.
+  3. Expose the call through `browser/src/preload/`, and call it from a hook or view model under
+     `browser/src/renderer/features/<feature>/`.
+  4. Add unit tests for the service and the handler under `browser/tests/unit/main/`.
+- **A tab strip command:** write it as a function in `browser/src/main/tabs/tab-order.ts` (or a sibling file),
+  then add it to `TabMenu` in `tab-menu.ts`. Every item runs only while a person holds control (`item()`).
+- **Something saved across launches:** go through `JsonFile` (`browser/src/main/app/json-file.ts`), constructed
+  in `main.ts`. Treat what you read back as untrusted input and validate it. `SessionTabs` shows the pattern.
+- **A new server domain:** create `server/src/modules/<domain>/` with an `index.ts` facade, build the service in
+  `server/src/app/container.ts`, and keep its routes thin.
+- **A new browser command reachable from the API:** add a server route or MCP tool that calls `sendCommand`, and
+  a handler in the browser that runs it through native operations. Never add a CDP fallback.
+
+## How to run
+
+- Desktop browser: `cd browser && npm run dev` (builds, then launches a branded development copy of Electron via `src/dev/launch.ts`).
+- Server and console together: `npm run dev` at the root (reads `server/.env` if present).
+- Console alone: `cd ui && npm run dev`.
+
 ## Production
 
 The production checklist the reviewers enforce is in `docs/PRODUCTION.md`. It applies.
