@@ -51,6 +51,15 @@ describe('pairFromLink', () => {
     assert.equal(asked[0].checkboxChecked, true);
   });
 
+  it('leaves "import my logins" unticked, and reworded, once logins were imported', async () => {
+    fakeClaim(200, { apiKey: 'k' });
+    const asked: any[] = [];
+    const ask = async (options) => (asked.push(options), { response: 1, checkboxChecked: false });
+    assert.equal((await pairFromLink(LINK, ask, true)).importLogins, false);
+    assert.equal(asked[0].checkboxChecked, false);
+    assert.match(asked[0].checkboxLabel, /again/);
+  });
+
   it('uses the default persona when the server names none', async () => {
     fakeClaim(200, { apiKey: 'k' });
     assert.equal((await pairFromLink(LINK, fakeAsk(1).ask)).persona, 'default');

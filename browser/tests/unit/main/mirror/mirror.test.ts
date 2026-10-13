@@ -29,7 +29,8 @@ function mirrorWith({ capture = async (): Promise<any> => CAPTURED, up = true }:
     sent: [],
     reconnects: 0,
     config: { values: { apiKey: 'k' }, merge: (v: object) => Object.assign(ctx.config.values, v), save: () => {} },
-    electron: {},
+    // Unless a test says otherwise, the person answers the switch question with Switch.
+    electron: { dialog: { showMessageBox: async () => ({ response: 1 }) } },
     libraries: {},
   };
   ctx.library = { importInto: (partition: string, data: object) => (ctx.libraries[partition] = data) };
@@ -158,24 +159,29 @@ describe('Mirror', () => {
     assert.equal(ctx.reconnects, 0);
   });
 
-  it('moves to the imported profile without asking when none is in use yet', async () => {
+  it('asks before moving off the Default profile too, and names it when the person stays', async () => {
     const { ctx, mirror } = mirrorWith();
-    ctx.electron.dialog = { showMessageBox: async () => assert.fail('must not ask') };
+    const asked: any[] = [];
+    ctx.electron.dialog = { showMessageBox: async (o: any) => (asked.push(o), { response: 0 }) };
     await mirror.reimport('chrome');
     await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
-    assert.equal(ctx.config.values.persona, 'p-1');
-    assert.equal(ctx.reconnects, 1);
+    assert.equal(asked.length, 1, 'asked once');
+    assert.equal(asked[0].buttons[0], 'Stay on Default profile');
+    assert.equal(ctx.config.values.persona, undefined, 'still on Default');
+    assert.equal(ctx.reconnects, 0);
+    assert.equal(ctx.statuses.at(-1).kept, 'Default profile');
   });
 
   it('asks before leaving another profile, and stays on it when the person says so', async () => {
     const { ctx, mirror } = mirrorWith();
     const asked: any[] = [];
-    ctx.electron.dialog = { showMessageBox: async (o: any) => (asked.push(o), { response: 1 }) };
+    ctx.electron.dialog = { showMessageBox: async (o: any) => (asked.push(o), { response: 0 }) };
     Object.assign(ctx.config.values, { persona: 'm-firefox', profileName: 'Firefox · default' });
     await mirror.reimport('chrome');
     await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });
-    assert.deepEqual(asked[0].buttons, ['Switch to Chrome · Work', 'Stay on Firefox · default']);
-    assert.equal(asked[0].cancelId, 1, 'Escape stays');
+    assert.deepEqual(asked[0].buttons, ['Stay on Firefox · default', 'Switch to Chrome · Work']);
+    assert.equal(asked[0].defaultId, 0, 'Enter stays');
+    assert.equal(asked[0].cancelId, 0, 'Escape stays');
     assert.equal(ctx.config.values.persona, 'm-firefox');
     assert.equal(ctx.reconnects, 0);
     assert.equal(ctx.statuses.at(-1).kept, 'Firefox · default');
@@ -183,7 +189,7 @@ describe('Mirror', () => {
 
   it('switches to the imported profile when the person chooses it', async () => {
     const { ctx, mirror } = mirrorWith();
-    ctx.electron.dialog = { showMessageBox: async () => ({ response: 0 }) };
+    ctx.electron.dialog = { showMessageBox: async () => ({ response: 1 }) };
     Object.assign(ctx.config.values, { persona: 'm-firefox', profileName: 'Firefox · default' });
     await mirror.reimport('chrome');
     await mirror.onOk({ personaIds: ['p-1'], defaultPersonaId: 'p-1' });

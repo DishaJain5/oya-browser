@@ -127,7 +127,7 @@ try {
   await page.locator('#control-action').click();
   await page.locator('#control-action[aria-pressed="true"]').waitFor();
   assert.equal((await views()).length, 1, 'taking control removes the native shield');
-  assert.equal(await page.locator('#control-agent').isEnabled(), true, 'OyaAI Mode is on offer to hand back');
+  assert.equal(await page.locator('#control-agent').isEnabled(), true, 'AI Mode is on offer to hand back');
   await app.evaluate(async ({ app, BrowserWindow }) => {
     app.focus({ steal: true });
     const window = BrowserWindow.getAllWindows()[0];

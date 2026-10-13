@@ -8,6 +8,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import { useViewModel } from '../../../hooks/index.ts';
 import { Icon, IconButton } from '../../../ui/index.ts';
 import type { BookmarksBarViewModel } from '../view-models/bookmarks-bar-view-model.ts';
+import { LibraryButtons } from './library-buttons.tsx';
 import { TEXT } from '../model/constants.ts';
 import './bookmarks-bar.css';
 
@@ -78,9 +79,7 @@ export function BookmarksBar({ vm }: BookmarksBarProps) {
   return (
     <div className="bookmarks-bar" id="bookmarks-bar" hidden={!shown} role="toolbar" aria-label={TEXT.bookmarks}>
       <Bookmarks vm={vm} />
-      <button className="bookmarks-all" id="bookmarks-all" onClick={() => vm.showAll()}>
-        {TEXT.allBookmarks}
-      </button>
+      <LibraryButtons vm={vm} />
       <IconButton
         className="bookmarks-hide"
         id="bookmarks-hide"

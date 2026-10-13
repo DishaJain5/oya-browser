@@ -47,7 +47,9 @@ export class StartViewModel extends ViewModel<StartState> {
     super({ home: false, arrivals: 0 });
     this.asker = deps.asker;
     this.shell = deps.shell;
-    this.own(deps.bridge.onTabsUpdated((tabs) => this.follow(!!tabs.find((tab) => tab.active)?.home)));
+    this.own(
+      deps.bridge.onTabsUpdated((tabs) => this.follow(tabs.some((tab) => tab.active && tab.home && !tab.collection))),
+    );
   }
 
   /** Hands a task to the agent; answers whether it went (so the box clears), not for an empty one or while Ask is busy. */

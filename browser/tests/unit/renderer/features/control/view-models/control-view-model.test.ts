@@ -43,13 +43,13 @@ describe('the control status', () => {
     const { fake, look } = await bar();
     assert.deepEqual(
       [look().mode, look().label, look().action.text],
-      ['agent', 'OyaAI Mode', 'Switch to Human Mode: you drive this page'],
+      ['agent', 'AI Mode', 'Switch to Human Mode: you drive this page'],
     );
     assert.equal(look().title, 'OyaAI is driving this page. Switch to Human Mode to use it.');
     fake.emit('onControlState', MINE);
     assert.deepEqual(
       [look().label, look().action.text],
-      ['Human Mode', 'Switch to OyaAI Mode: hand the page back to the agent'],
+      ['Human Mode', 'Switch to AI Mode: hand the page back to the agent'],
     );
     fake.emit('onControlState', { ...MINE, mine: false, interactive: false });
     assert.deepEqual([look().label, look().action.hidden], ['Another operator', true]);
@@ -104,7 +104,7 @@ describe('taking and handing back control', () => {
     fake.emit('onControlState', AGENT);
     assert.equal(look().label, 'Another operator has control', 'the same state keeps the error');
     fake.emit('onControlState', { ...AGENT, revision: 2 });
-    assert.equal(look().label, 'OyaAI Mode');
+    assert.equal(look().label, 'AI Mode');
   });
 
   it('says so when the change could not be asked for', async () => {
@@ -185,10 +185,10 @@ describe('the control guard', () => {
   });
 });
 
-describe('the OyaAI Mode / Human Mode switch', () => {
+describe('the AI Mode / Human Mode switch', () => {
   const switchFor = (control: object, extra = {}) => modeSwitch({ control, error: '', pending: '', ...extra } as any);
 
-  it('lights OyaAI Mode while the agent drives, with Human Mode the one to choose', () => {
+  it('lights AI Mode while the agent drives, with Human Mode the one to choose', () => {
     const s = switchFor({ mode: 'agent', supported: true });
     assert.deepEqual(
       [s.hidden, s.agent.on, s.agent.disabled, s.human.on, s.human.disabled, s.status],
@@ -196,7 +196,7 @@ describe('the OyaAI Mode / Human Mode switch', () => {
     );
   });
 
-  it('lights Human Mode while you drive, with OyaAI Mode the one to hand back to', () => {
+  it('lights Human Mode while you drive, with AI Mode the one to hand back to', () => {
     const s = switchFor({ mode: 'human', mine: true, interactive: true, supported: true });
     assert.deepEqual(
       [s.agent.on, s.agent.disabled, s.human.on, s.human.disabled, s.status],
@@ -204,7 +204,7 @@ describe('the OyaAI Mode / Human Mode switch', () => {
     );
   });
 
-  it('after a pause, OyaAI Mode resumes the agent and the status says it is paused', () => {
+  it('after a pause, AI Mode resumes the agent and the status says it is paused', () => {
     const s = switchFor({ mode: 'paused', supported: true });
     assert.deepEqual([s.agent.on, s.agent.disabled, s.human.on, s.status], [false, false, false, 'Automation paused']);
     assert.match(s.agent.title, /picks up where it paused/);
@@ -215,7 +215,7 @@ describe('the OyaAI Mode / Human Mode switch', () => {
     assert.deepEqual([s.hidden, s.status], [true, 'Another operator']);
   });
 
-  it('does not light OyaAI Mode until a hand-back has finished', () => {
+  it('does not light AI Mode until a hand-back has finished', () => {
     const s = switchFor({ mode: 'human', mine: true, supported: true, busy: true, busyAction: 'return' });
     assert.deepEqual([s.agent.on, s.human.on, s.status], [false, true, 'Returning control…']);
   });

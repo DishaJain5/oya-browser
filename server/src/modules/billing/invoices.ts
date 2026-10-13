@@ -28,7 +28,10 @@ const issued = (i: Raw) => ({
   ...{ period_start: iso(i.period_start), period_end: iso(i.period_end) },
 });
 
-/** One line of an invoice: what it is for, how many, and what it comes to, in cents. */
+/** Empty usage meters add no information; keep free included usage, credits and every charged line. */
+const meaningful = (line: Raw): boolean => !(line.quantity === 0 && line.amount === 0);
+
+/** Preserve Stripe's exact amounts for every displayed line. */
 const lineOf = (l: Raw) => ({ description: l.description, quantity: l.quantity ?? null, amount: l.amount });
 
 /** A person's invoices. */
@@ -55,7 +58,7 @@ export class Invoices {
     if (!row?.stripe_customer_id || !row.stripe_subscription_id || row.status === 'canceled') return { upcoming: null };
     const params = { customer: row.stripe_customer_id, subscription: row.stripe_subscription_id };
     const next = await this.deps.stripe.post('/invoices/create_preview', params);
-    const lines = (next.lines?.data || []).map(lineOf);
+    const lines = (next.lines?.data || []).filter(meaningful).map(lineOf);
     return { upcoming: { total: next.total, currency: next.currency, date: iso(next.period_end), lines } };
   }
 }

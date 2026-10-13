@@ -30,6 +30,8 @@ export const shownViewOf = (tab: Tab | undefined): TabView | null => (tab && !ta
 export function leaveHomeFor(tab: Tab, url: string): boolean {
   if (!tab.home || isBlank(url)) return false;
   tab.home = false;
+  delete tab.collection;
+  delete tab.libraryPartition;
   return true;
 }
 
@@ -50,6 +52,8 @@ export function contentReady(tab: Tab): boolean {
   tab.blankCommitted = false;
   if (!tab.home || ownBlank) return false;
   tab.home = false;
+  delete tab.collection;
+  delete tab.libraryPartition;
   return true;
 }
 

@@ -457,7 +457,11 @@ try {
     0,
     'overlay detaches embedded page',
   );
+  await page.keyboard.press('Escape');
+  await page.locator('#conn-pill').click();
   await page.locator('#theme-preference').selectOption('dark');
+  await page.keyboard.press('Escape');
+  await page.locator('#btn-commands').click();
   await capture('commands-dark');
   await page.keyboard.press('Escape');
   assert.equal(
@@ -474,12 +478,14 @@ try {
   });
   await page.locator('#conn-pill').click();
   await page.locator('#profile-section').waitFor({ state: 'visible' });
+  await page.locator('#settings-nav-account').click();
   await page.locator('#account-name', { hasText: 'Ada Park' }).waitFor();
   assert.equal(await page.locator('#account-email').textContent(), 'ada@northline.test');
   assert.match(await page.locator('#account-meta').textContent(), /Northline Ops/);
   assert.equal(await page.locator('#sign-out').textContent(), 'Log out of ada@northline.test');
   assert.equal(await page.locator('#profile-advanced').evaluate((el) => el.open), false, 'Advanced starts folded');
   assert.equal(await page.locator('#profile-server').isVisible(), false, 'the server hides under Advanced');
+  await page.locator('#settings-nav-logins').click();
   assert.equal(await page.locator('#import-latest').textContent(), 'No imports yet');
   await application.evaluate(({ BrowserWindow }) => {
     const contents = BrowserWindow.getAllWindows()[0].webContents;
@@ -500,6 +506,7 @@ try {
   });
   await page.locator('#import-latest', { hasText: 'Imported from Chrome' }).waitFor();
   assert.equal(await page.locator('#import-detail').textContent(), 'just now · 412 sites');
+  await page.locator('.import-history-disclosure summary').click();
   assert.equal(await page.locator('#import-history').textContent(), 'Firefox · last week · 120 sites');
   assert.equal(await page.locator('#sync-title').textContent(), 'Logins synced just now · 937 sites');
   /** Shows the shell in `theme` for a capture, without saving it as the person's choice. */
@@ -511,9 +518,10 @@ try {
     await paint(theme);
     await capture(`account-${theme}`);
   }
+  await page.locator('#settings-nav-account').click();
   await page.locator('#profile-advanced summary').click();
   await page.locator('#profile-server').waitFor({ state: 'visible' });
-  await page.locator('#profile-section').evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await page.locator('.settings-content').evaluate((el) => (el.scrollTop = el.scrollHeight));
   await capture('account-advanced-dark');
   await paint('light');
   await capture('account-advanced-light');
@@ -615,7 +623,7 @@ try {
   await page.locator('.dev-panel-header').getByRole('tab', { name: 'Inspect', exact: true }).click();
   await capture('inspect-dark');
   await page.getByRole('tab', { name: 'Record', exact: true }).click();
-  await page.locator('#btn-commands').click();
+  await page.locator('#conn-pill').click();
   await page.locator('#theme-preference').selectOption('system');
   await application.evaluate(({ nativeTheme }) => {
     nativeTheme.themeSource = 'light';

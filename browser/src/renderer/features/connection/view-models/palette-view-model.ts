@@ -220,7 +220,7 @@ export class PaletteViewModel extends ViewModel<PaletteState> {
       models: () => host.openModels?.(),
       routines: () => panel.open('routines'),
       profiles: () => dialog.open(true),
-      imports: () => dialog.open(true),
+      imports: () => dialog.open(true, 'logins'),
     };
   }
 

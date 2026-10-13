@@ -8,7 +8,18 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ### Added
 
+- Separate, searchable **Bookmarks** and **History** tabs, with compact adjacent buttons on the bookmarks row, your browser theme, website filters, sorting, date sections for history, and clear save/remove actions.
+- A screen-sharing picker with Oya tabs, windows and entire screens. Every share requires an explicit source selection; Cancel and Escape share nothing. Sharing is video only.
+
 - Received Keel’s anonymous daily step reports at `/api/telemetry/keel/ping`, with validated fields, rate limiting, and one stored report per installation and usage day.
+
+### Fixed
+
+- Settings now separates General, Logins & sync, and Account, with expandable import history and appearance controls in General. Compact “AI Mode” and “Assistant” labels free space in the toolbar.
+- Camera and microphone consent is remembered per site and profile, including after an operating-system permission refusal. Screen sharing now reaches the source picker correctly.
+- Human-owned tabs can be moved while agents work in their own tabs. Detached windows wait for their toolbar and skip the app-start animation.
+- Open tabs restore after their profile's cookies are ready, without the startup page overwriting the saved session. Importing or pairing no longer silently switches an established profile.
+- Plan limits now show a readable account notice with a billing button instead of a raw error paragraph. Oya's upcoming-invoice preview omits unused zero-quantity, zero-value meters while preserving charges, credits and included usage.
 
 ## [1.0.180](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.180) · 2026-10-12
 

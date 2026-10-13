@@ -41,6 +41,10 @@ export interface Tab {
   url: string;
   /** Whether it is on the Oya start page (the shell draws it, no view is shown). */
   home?: boolean;
+  /** Local collection drawn by the shell, never inside the website view. */
+  collection?: 'bookmarks' | 'history';
+  /** Profile that opened the private collection. */
+  libraryPartition?: string;
   /** The real window, for a popup the page opened. */
   window?: BrowserWindow;
   /** Settles once protection settled (protected or given up on). */

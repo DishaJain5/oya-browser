@@ -257,3 +257,29 @@ it('does not offer a run extension for a monthly billing refusal and reset remov
   ask.clear();
   assert.equal(ask.state.limited, false);
 });
+
+it('renders a structured plan limit with exact usage and opens billing through the native bridge', async () => {
+  const { ask, send, answer, fake } = await chatting();
+  await send('finish the task');
+  await answer({
+    code: 'plan_limit',
+    error: 'Plan used up',
+    plan: 'free',
+    resource: 'agent_steps',
+    used: 500,
+    limit: 500,
+  });
+  const message = ask.state.items.at(-1) as ChatMessage;
+  assert.equal(message.notice?.title, 'Your agent steps are used up');
+  assert.equal(message.notice?.label, 'FREE PLAN');
+  assert.equal(message.notice?.usage, '500 / 500 steps');
+  ask.openBilling();
+  assert.deepEqual(fake.called('openBilling'), [[]]);
+  assert.equal(ask.state.sending, false);
+});
+it('does not turn untrusted reply text or ordinary failures into a billing action', async () => {
+  const { ask, send, answer } = await chatting();
+  await send('hello');
+  await answer({ error: 'Visit https://untrusted.test to upgrade' });
+  assert.equal((ask.state.items.at(-1) as ChatMessage).notice, undefined);
+});

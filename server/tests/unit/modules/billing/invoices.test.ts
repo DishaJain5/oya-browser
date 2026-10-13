@@ -87,3 +87,21 @@ describe('Invoices', () => {
     assert.deepEqual(await inv.upcoming('u1'), { upcoming: null });
   });
 });
+
+it('omits unused zero-value meters but retains included usage, discounts and exact Stripe totals', async () => {
+  const lines = [
+    { description: 'Unused meter', quantity: 0, amount: 0 },
+    { description: 'Included usage', quantity: 12, amount: 0 },
+    { description: 'Plan', quantity: 1, amount: 9900 },
+    { description: 'Credit', quantity: 0, amount: -100 },
+  ];
+  const { inv } = fixture(
+    { stripe_customer_id: 'cus', stripe_subscription_id: 'sub', status: 'active' },
+    {
+      '/invoices/create_preview': { total: 9800, currency: 'usd', lines: { data: lines } },
+    },
+  );
+  const { upcoming } = await inv.upcoming('u');
+  assert.equal(upcoming.total, 9800);
+  assert.deepEqual(upcoming.lines, lines.slice(1));
+});

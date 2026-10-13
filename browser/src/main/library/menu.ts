@@ -1,11 +1,28 @@
 /** Native library menus stay usable above page views, with no renderer access to saved browsing data. */
 import type { MenuItemConstructorOptions } from 'electron';
+import { showLibrary } from './tabs.ts';
 import type { AppServices } from '../app/services.ts';
-import { safeAddress, type LibraryEntry } from './library.ts';
-import { CLEAR_HISTORY_CONFIRMATION, CONFIRM_RESPONSE, MENU_PAGE_SIZE, MENU_TITLE_LENGTH } from './constants.ts';
+import { CLEAR_HISTORY_CONFIRMATION, CONFIRM_RESPONSE } from './constants.ts';
+
+/** The Forget item's label, counting the sites it would forget. */
+function forgetLabel(count: number): string {
+  return count ? `Forget site permissions (${count} ${count === 1 ? 'site' : 'sites'})` : 'Forget site permissions';
+}
 
 /** The native menu's collaborators. */
-type Deps = Pick<AppServices, 'library' | 'tabs' | 'electron' | 'shell' | 'control' | 'persona' | 'agentTab'>;
+type Deps = Pick<
+  AppServices,
+  | 'windows'
+  | 'appDir'
+  | 'library'
+  | 'tabs'
+  | 'electron'
+  | 'shell'
+  | 'control'
+  | 'persona'
+  | 'agentTab'
+  | 'sitePermissions'
+>;
 /** Native history/bookmark navigation, shared by the toolbar and application menu. */
 export class LibraryMenu {
   /** Services supplied by the composition root. */
@@ -19,55 +36,44 @@ export class LibraryMenu {
     return this.deps.agentTab.humanMay(this.deps.tabs.activeTabId);
   }
   /** Opens the library with fresh contents, even after a profile switch. */
-  show(): void {
+  show(kind: 'bookmarks' | 'history' = 'history'): void {
+    if (kind !== 'bookmarks' && kind !== 'history') throw Error('Unknown collection');
+    const scope = this.deps.windows?.fromContents(this.deps.shell.window!.webContents) ?? this.deps;
+    if (scope.agentTab.humanMay(null)) showLibrary(scope, kind);
+  }
+  /** Native maintenance actions retain their existing confirmations. */
+  manage(kind: 'bookmarks' | 'history' = 'history'): void {
     if (!this.mayUse()) return;
-    this.deps.electron.Menu.buildFromTemplate(this.items()).popup({ window: this.deps.shell.window! });
+    this.deps.electron.Menu.buildFromTemplate(this.items(kind)).popup({ window: this.deps.shell.window! });
   }
   /** The native list is built afresh for the current profile. */
-  private items(): MenuItemConstructorOptions[] {
-    const { history, bookmarks } = this.deps.library.snapshot();
+  private items(kind: 'bookmarks' | 'history'): MenuItemConstructorOptions[] {
+    return kind === 'history'
+      ? this.housekeeping(this.deps.library.snapshot().history.length).slice(1)
+      : [this.forgetItem()];
+  }
+  /** The items that take something away: clearing confirms (irreversible), forgetting does not (the sites ask again). */
+  private housekeeping(count: number): MenuItemConstructorOptions[] {
     return [
-      this.bookmarkItem(),
-      { label: 'Bookmarks', submenu: this.pages(bookmarks) },
-      { label: 'History (recent pages)', submenu: this.pages(history) },
       { type: 'separator' },
-      { label: 'Clear browsing history…', enabled: !!history.length, click: () => void this.clear() },
+      { label: 'Clear browsing history…', enabled: count > 0, click: () => void this.clear() },
+      this.forgetItem(),
     ];
+  }
+  /** Forgets the sites this profile allowed a device on; no confirmation, since the sites simply ask again. The count is the feedback. */
+  private forgetItem(): MenuItemConstructorOptions {
+    const partition = this.deps.persona.partitionName();
+    const count = this.deps.sitePermissions.origins(partition).length;
+    const click = (): void => {
+      if (this.mayUse() && partition === this.deps.persona.partitionName()) this.deps.sitePermissions.forget(partition);
+    };
+    return { label: forgetLabel(count), enabled: count > 0, click };
   }
   /** Bookmarking uses the active page, not user-editable address-bar text. */
   toggle(): void {
     if (!this.mayUse()) return;
     const tab = this.deps.tabs.find(this.deps.tabs.activeTabId);
     if (tab && !tab.home) this.deps.library.toggle(tab.url, tab.title);
-  }
-  /** Names the action honestly for the active page. */
-  private bookmarkItem(): MenuItemConstructorOptions {
-    const tab = this.deps.tabs.find(this.deps.tabs.activeTabId);
-    const saved = this.deps.library.snapshot().bookmarks.some((entry) => entry.url === tab?.url);
-    return {
-      label: saved ? 'Remove bookmark for this page' : 'Bookmark this page',
-      enabled: !!tab && !tab.home && safeAddress(tab.url),
-      click: () => this.toggle(),
-    };
-  }
-  /** Long lists are grouped instead of becoming an unmanageable single menu. */
-  private pages(entries: LibraryEntry[]): MenuItemConstructorOptions[] {
-    if (!entries.length) return [{ label: 'No pages yet', enabled: false }];
-    if (entries.length <= MENU_PAGE_SIZE) return entries.map((entry) => this.page(entry));
-    return Array.from({ length: Math.ceil(entries.length / MENU_PAGE_SIZE) }, (_value, index) => ({
-      label: `${index * MENU_PAGE_SIZE + 1}–${Math.min((index + 1) * MENU_PAGE_SIZE, entries.length)}`,
-      submenu: entries.slice(index * MENU_PAGE_SIZE, (index + 1) * MENU_PAGE_SIZE).map((entry) => this.page(entry)),
-    }));
-  }
-  /** A saved title is plain text, with its host visible for disambiguation. */
-  private page(entry: LibraryEntry): MenuItemConstructorOptions {
-    const partition = this.deps.persona.partitionName();
-    return {
-      label: `${entry.title.slice(0, MENU_TITLE_LENGTH)} — ${new URL(entry.url).host}`.replaceAll('&', '&&'),
-      click: () => {
-        if (this.mayUse() && partition === this.deps.persona.partitionName()) this.deps.tabs.createTab(entry.url, true);
-      },
-    };
   }
   /** Confirmation cannot clear a different profile if the persona changes while it is open. */
   private async clear(): Promise<void> {

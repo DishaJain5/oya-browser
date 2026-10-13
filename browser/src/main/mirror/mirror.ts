@@ -13,7 +13,7 @@ import { readLibrary } from './library-read.ts';
 import { FULL_DISK_ACCESS } from './safari.ts';
 import { askToSwitch } from './switch-prompt.ts';
 import { personaPartition } from '../app/persona.ts';
-import { MIRROR_ANSWER_TIMEOUT_MS, IMPORTS_KEPT, FULL_DISK_ACCESS_PANE } from './constants.ts';
+import { MIRROR_ANSWER_TIMEOUT_MS, IMPORTS_KEPT, FULL_DISK_ACCESS_PANE, DEFAULT_PROFILE_NAME } from './constants.ts';
 
 /** What the mirror uses of the app: settings, the socket, the shell, and Electron. */
 type Deps = Pick<AppServices, 'config' | 'socket' | 'shell' | 'electron' | 'library'>;
@@ -205,17 +205,25 @@ export class Mirror {
 
   /** What the import screen adds to the tally: the profile kept, and any warnings. */
   private outcome(captured: Capture, moved: boolean): Status {
-    const kept = moved ? {} : { kept: this.ctx.config.values.profileName || 'your current profile' };
+    const kept = moved ? {} : { kept: this.currentName() };
     return { ...kept, ...(captured.warnings?.length ? { warnings: captured.warnings } : {}) };
   }
 
-  /** Moves without asking from no profile, or to the same one; asks before leaving another profile's logins. */
+  /**
+   * Refreshes the profile in use without asking; asks before moving off any
+   * other, the Default one included. Moving is a change of logins the person
+   * never asked for when they clicked Import, so it is never a side effect.
+   */
   private chooseProfile(captured: Capture, msg: MirrorOk): Promise<boolean> {
-    const current = this.ctx.config.values.persona;
-    if (!current || current === 'default' || current === msg.defaultPersonaId) return Promise.resolve(true);
+    if (this.ctx.config.values.persona === msg.defaultPersonaId) return Promise.resolve(true);
     const profile = captured.profiles[(msg.personaIds || []).indexOf(msg.defaultPersonaId)];
     const to = profile ? `${captured.name} · ${profile.name}` : captured.name;
-    return askToSwitch(this.ctx, { from: this.ctx.config.values.profileName || 'your current profile', to });
+    return askToSwitch(this.ctx, { from: this.currentName(), to });
+  }
+
+  /** The profile in use by the name the profile menu shows; the Default one has no server name. */
+  private currentName(): string {
+    return this.ctx.config.values.profileName || DEFAULT_PROFILE_NAME;
   }
 
   /** Puts this import at the top of the history the account page shows; answers its record. */

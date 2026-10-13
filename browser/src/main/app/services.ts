@@ -50,6 +50,14 @@ export interface AppServices {
   passkeys: import('./passkeys.ts').Passkeys;
   /** Explicit microphone and camera permission prompts. */
   mediaPermissions: import('./media-permissions.ts').MediaPermissions;
+  /** Explicit screen-share prompts, through the same gate. */
+  screenShare?: import('./screen-share.ts').ScreenShare;
+  /** Native tab/window/display previews and an explicit source choice on each share. */
+  screenPicker: import('../screen-share/index.ts').ScreenPicker;
+  /** The sites each profile allowed a device on, on disk. */
+  sitePermissions: import('./site-permissions.ts').SitePermissionStore;
+  /** The tabs open at quit, brought back at the next sign-in. */
+  sessionTabs?: import('../tabs/session-tabs.ts').SessionTabs;
   /** Human-approved desktop app protocol handoff. */
   externalApps: import('./external-apps.ts').ExternalApps;
   /** Session-only alert inbox. */

@@ -138,7 +138,7 @@ export class ToolbarViewModel extends ViewModel<ToolbarState> {
   /** A newly selected start page is ready for an address, not an agent task. */
   private tabsChanged(tabs: readonly ActiveTab[]): void {
     const active = tabs.find((tab) => tab.active);
-    const focus = active?.home && active.id !== this.activeId;
+    const focus = active?.home && !active.collection && active.id !== this.activeId;
     if (active?.id !== this.activeId) this.completion.dismiss();
     this.activeId = active?.id;
     this.set({ nav: navOf(tabs) });
@@ -158,8 +158,8 @@ export class ToolbarViewModel extends ViewModel<ToolbarState> {
   }
 
   /** Opens the native history and bookmarks menu above the page. */
-  showLibrary(): void {
-    void this.bridge.showLibrary();
+  showLibrary(kind: 'bookmarks' | 'history' = 'history'): void {
+    void this.bridge.showLibrary(kind);
   }
 
   /** Back in the active tab. */

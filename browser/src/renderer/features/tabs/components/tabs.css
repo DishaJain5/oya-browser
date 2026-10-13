@@ -234,13 +234,13 @@ body.mode-browsing .tab-bar {
 .tab-close:active {
   background: var(--tab-press);
 }
-/* ── Narrow tabs: no close on quiet ones, then the icon alone (the active one keeps its close) ── */
+/* ── Narrow tabs: close on hover only for quiet ones, then the icon alone (the active one keeps its close) ── */
 .tab-list[data-size='small'] .tab-item,
 .tab-list[data-size='tiny'] .tab-item {
   gap: 6px;
   padding: 0 4px 0 8px;
 }
-.tab-list[data-size='small'] .tab-item:not(.active) .tab-close,
+.tab-list[data-size='small'] .tab-item:not(.active):not(:hover) .tab-close,
 .tab-list[data-size='tiny'] .tab-item:not(.active) .tab-close {
   display: none;
 }

@@ -27,6 +27,8 @@ export class TabDragPreview {
   private timer?: ReturnType<typeof setInterval>;
   /** Deadline for a lost pointer release. */
   private deadline = 0;
+  /** The tab being dragged; a claim on it by an agent ends the card. */
+  private id = 0;
   /** Only show the card after its local document is ready. */
   private ready = false;
   /** Source closure cancels any pending capture and destroys the card. */
@@ -37,6 +39,7 @@ export class TabDragPreview {
     const tab = source.tabs.find(id);
     if (!tab || tab.window) throw new Error('Tab is not in this window');
     const win = this.start(source);
+    this.id = id;
     void this.load(source, win, tab).catch(() => {
       if (this.win === win) this.stop();
     });
@@ -101,9 +104,9 @@ export class TabDragPreview {
     if (inTabStrip(point, source.shell.window!.getContentBounds())) win.hide();
     else if (!win.isVisible()) win.showInactive();
   }
-  /** Loss of source/control ends feedback even if the renderer missed a release. */
+  /** Loss of the source, or of the person's right to this tab, ends feedback even if the renderer missed a release. Per tab: agents driving other tabs do not end it. */
   private expired(source: AppServices): boolean {
-    return !source.shell.alive() || !source.control.snapshot().interactive || Date.now() > this.deadline;
+    return !source.shell.alive() || !source.agentTab.humanMay(this.id) || Date.now() > this.deadline;
   }
   /** Invalidate outstanding asynchronous captures before destroying their destination. */
   private reset(): void {

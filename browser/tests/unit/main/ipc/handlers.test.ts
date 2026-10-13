@@ -192,6 +192,33 @@ describe('IPC handlers', () => {
     assert.equal(answer.state.mode, 'human');
   });
 
+  it('includes per-tab permissions in initial and changed control states while agents work', async () => {
+    ctx.control.state = { interactive: false, mode: 'agent', mine: true };
+    ctx.tabs.activeTabId = 7;
+    ctx.agentTab.humanMay = (id) => id !== 7;
+    ctx.control.change = async () => ctx.control.state;
+    const initial = call('get-control-state');
+    const changed = (await call('change-control', 'release')).state;
+    for (const state of [initial, changed]) {
+      assert.equal(state.pageInteractive, false);
+      assert.equal(state.newTabInteractive, true);
+    }
+    ctx.agentTab.humanMay = () => true;
+    assert.equal(call('get-control-state').pageInteractive, true);
+  });
+
+  it('keeps per-tab permissions when a control change fails', async () => {
+    ctx.tabs.activeTabId = 7;
+    ctx.agentTab.humanMay = (id) => id === null;
+    ctx.control.change = async () => {
+      throw new Error('Control unavailable');
+    };
+    const answer = await call('change-control', 'acquire');
+    assert.equal(answer.error, 'Control unavailable');
+    assert.equal(answer.state.pageInteractive, false);
+    assert.equal(answer.state.newTabInteractive, true);
+  });
+
   it('keeps only known themes, and no pane: launch always opens on Ask', () => {
     assert.equal(call('save-ui-preferences', null), false);
     call('save-ui-preferences', { theme: 'dark', pane: 'record', pageFormat: 'xml' });

@@ -90,7 +90,7 @@ export function pairingServer(server: string): URL | null {
   return parsed;
 }
 
-/** The confirmation dialog, less the host it names. Cancel is the default. */
+/** The confirmation dialog, less the host it names and the import box. Cancel is the default. */
 const PAIRING_PROMPT: Omit<MessageBoxOptions, 'message'> = {
   type: 'warning',
   buttons: ['Cancel', 'Connect'],
@@ -99,16 +99,36 @@ const PAIRING_PROMPT: Omit<MessageBoxOptions, 'message'> = {
   title: 'Connect this browser?',
   detail:
     'This browser will sign in to that control plane and share its cookies and ' +
-    'logged-in sessions with it, so remote browsers can act as you.\n\n' +
+    'logged-in sessions with it, so remote browsers can act as you. With the box below ticked, ' +
+    'the logins in your usual browser are read and sent to that host too.\n\n' +
     'Only continue if you started this from that dashboard or your agent. Cancel if a web page opened it.',
-  // An agent pairs the app to use the person's own logins, so bringing them over is the default.
-  checkboxLabel: 'Also import my logins from my usual browser',
-  checkboxChecked: true,
 };
 
+/**
+ * The import box. An agent pairs the app to use the person's own logins, so
+ * the first pairing offers to bring them over; once they are imported, a later
+ * pairing gets the profile that already holds them, and importing again is opt-in.
+ */
+function importBox(imported: boolean): Pick<MessageBoxOptions, 'checkboxLabel' | 'checkboxChecked'> {
+  return {
+    checkboxLabel: imported
+      ? 'Import my logins from my usual browser again'
+      : 'Also import my logins from my usual browser',
+    checkboxChecked: !imported,
+  };
+}
+
+/** The whole dialog for a browser that has, or has not, imported logins before. */
+function pairingPrompt(imported: boolean): Omit<MessageBoxOptions, 'message'> {
+  return { ...PAIRING_PROMPT, ...importBox(imported) };
+}
+
 /** Asks the person to confirm, naming the host: `{ importLogins }` for Connect, null otherwise. */
-async function confirmPairing(ask: Ask, parsed: URL): Promise<Confirmed | null> {
-  const { response, checkboxChecked } = await ask({ ...PAIRING_PROMPT, message: `Connect to ${parsed.host}?` });
+async function confirmPairing(ask: Ask, parsed: URL, imported: boolean): Promise<Confirmed | null> {
+  const { response, checkboxChecked } = await ask({
+    ...pairingPrompt(imported),
+    message: `Connect to ${parsed.host}?`,
+  });
   return response === 1 ? { importLogins: !!checkboxChecked } : null;
 }
 
@@ -140,10 +160,13 @@ function tryClaimPairingCode(parsed: URL, code: string): Promise<ClaimOutcome> {
   );
 }
 
-/** Pairs from an oya:// link: `{ apiKey, persona, serverUrl, importLogins }`, or false when refused or failed. */
-export async function pairFromLink(rawUrl: string, ask: Ask): Promise<Paired | false> {
+/**
+ * Pairs from an oya:// link: `{ apiKey, persona, serverUrl, importLogins }`, or false when refused or failed.
+ * `imported` says whether this browser already holds imported logins, which turns the import box off.
+ */
+export async function pairFromLink(rawUrl: string, ask: Ask, imported = false): Promise<Paired | false> {
   const link = parsePairingLink(rawUrl);
-  const confirmed = link && (await confirmPairing(ask, link.parsed));
+  const confirmed = link && (await confirmPairing(ask, link.parsed, imported));
   if (!link || !confirmed) return false;
   const claim = await tryClaimPairingCode(link.parsed, link.code);
   if (claim.ok) return { ...claim.ok, serverUrl: link.parsed.href, ...confirmed };

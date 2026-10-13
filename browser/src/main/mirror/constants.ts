@@ -77,5 +77,9 @@ export const SAFARI_PAGE_HEADER = 4;
 export const SAFARI_TABLE_START = 8;
 /** System Settings' Full Disk Access pane, where a person lets Oya read Safari's files. */
 export const FULL_DISK_ACCESS_PANE = 'x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles';
-/** The switch-profile question's answer that moves to the imported profile; the other keeps the current one. */
-export const SWITCH_TO_IMPORTED = 0;
+/** What the switch question calls the profile with no server name, as the Ask box's profile menu does. */
+export const DEFAULT_PROFILE_NAME = 'Default profile';
+/** The switch-profile question's answer that keeps the current profile: the default, and what Escape picks. */
+export const STAY_ON_CURRENT = 0;
+/** The switch-profile question's answer that moves to the imported profile; a deliberate click, never Enter. */
+export const SWITCH_TO_IMPORTED = 1;

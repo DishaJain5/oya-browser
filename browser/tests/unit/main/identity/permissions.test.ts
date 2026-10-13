@@ -84,3 +84,41 @@ it('routes media requests and checks through the explicit consent service', asyn
   };
   assert.equal(await new Promise((resolve) => ses.request(contents, 'media', resolve, details)), false);
 });
+
+it('permits display capture only after installing the display-media consent handler', async () => {
+  const ses = fakeSession();
+  const installed = [];
+  const screen = { install: (session) => installed.push(session), request: async () => true };
+  const request = () => new Promise((resolve) => ses.request({}, 'display-capture', resolve, {}));
+  installPermissions(ses);
+  assert.equal(await request(), false);
+  installPermissions(ses, undefined, undefined, screen as any);
+  assert.equal(await request(), false, 'a session without the display-media hook cannot share');
+  assert.deepEqual(installed, []);
+  ses.setDisplayMediaRequestHandler = () => {};
+  installPermissions(ses, undefined, undefined, screen as any);
+  assert.deepEqual(installed, [ses]);
+  assert.equal(await request(), true);
+});
+
+it('routes native empty-device preflights to screen consent and keeps camera requests separate', async () => {
+  const ses = fakeSession();
+  const calls = [];
+  const contents = {};
+  const media = { request: async (_contents, details) => (calls.push(['device', details]), false) };
+  const screen = { install: () => {}, request: async (_contents, details) => (calls.push(['screen', details]), true) };
+  const ask = (details) => new Promise((resolve) => ses.request(contents, 'media', resolve, details));
+  const display = { mediaTypes: [], isMainFrame: true, securityOrigin: 'https://call.test/' };
+  installPermissions(ses, undefined, media as any, screen as any);
+  assert.equal(await ask(display), false, 'without a display handler the preflight is refused');
+  ses.setDisplayMediaRequestHandler = () => {};
+  installPermissions(ses, undefined, media as any, screen as any);
+  assert.equal(await ask(display), true);
+  assert.deepEqual(calls.pop(), ['screen', display]);
+  for (const details of [{ mediaTypes: ['audio'] }, { mediaTypes: ['video'] }, {}]) {
+    assert.equal(await ask(details), false);
+    assert.deepEqual(calls.pop(), ['device', details]);
+  }
+  screen.request = async () => false;
+  assert.equal(await ask(display), false, 'a refused screen decision is preserved');
+});

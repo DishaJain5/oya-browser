@@ -194,13 +194,44 @@ describe('tab tear-off gestures', () => {
   });
 });
 
-it('lifts native feedback once per gesture and cancels it on Escape', () => {
-  const { fake, vm } = pressed();
-  vm.move(7, 70);
-  vm.move(7, 90);
+/** A drag over a measured strip, pressed inside its tab row, with an optional gate and bridge answers. */
+function measured(gate?: { movable(agent: boolean): boolean; refuse(): void }, answers = {}) {
+  const fake = fakeBridge(answers);
+  const vm = new TabDragViewModel({ bridge: fake.bridge, frames: manualFrames(), card: new TabCardViewModel(), gate });
+  vm.start(
+    { id: 1, pointerId: 7, x: 50, y: 20, slots: SLOTS, index: 0 },
+    { ...port().port, edges: () => ({ left: 0, right: 300, top: 0, bottom: 44 }) },
+  );
+  return { fake, vm };
+}
+it('asks for native feedback only once the pointer leaves the strip, once per gesture, and cancels it on Escape', () => {
+  const { fake, vm } = measured();
+  vm.move(7, 70, 20);
+  vm.move(7, 90, 20);
+  assert.deepEqual(fake.called('beginTabDrag'), [], 'still in the strip');
+  vm.move(7, 90, 140);
+  vm.move(7, 95, 150);
   assert.deepEqual(fake.called('beginTabDrag'), [[1]]);
   assert.equal(vm.cancel(), true);
   assert.deepEqual(fake.called('endTabDrag'), [[]]);
+});
+it('a reorder inside the strip never creates the native drag surface', () => {
+  const { fake, vm } = measured();
+  vm.move(7, 160, 20);
+  assert.deepEqual(vm.release(7), { id: 1, to: 1, offset: 10 });
+  assert.deepEqual(fake.called('beginTabDrag'), []);
+});
+it('a refused cosmetic preview ends the press without blaming agent control', async () => {
+  let refused = 0;
+  const gate = { movable: () => true, refuse: () => void refused++ };
+  const { fake, vm } = measured(gate, { beginTabDrag: () => Promise.reject(new Error('Tab is not in this window')) });
+  vm.move(7, 90, 140);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(vm.state.id, null);
+  assert.equal(vm.state.lifted, false);
+  assert.equal(refused, 0);
+  assert.deepEqual(fake.called('endTabDrag'), [[]]);
+  assert.equal(vm.release(7), null, 'nothing drops after');
 });
 it('keeps native feedback through a detached drop until main-process handoff finishes', () => {
   const { fake, vm } = pressed();

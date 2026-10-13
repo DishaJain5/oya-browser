@@ -121,6 +121,22 @@ describe('Persona', () => {
     assert.equal(ctx.shell.sentOn('fingerprint-changed')[0].id, 'p1');
   });
 
+  it('restores the last session only after the persona cookies are in the jar, and a switch restores none of its own', async () => {
+    ctx.sessionTabs = { calls: [], restore: () => order.push('restore') };
+    await ctx.persona.applyServerFingerprint(PROFILE, [{}], 9000);
+    assert.deepEqual(order.slice(-5), [
+      ['cookies', 1, 9000],
+      ['open', 'https://a.test/'],
+      ['open', 'about:blank'],
+      ['open', 'oya:home'],
+      'restore',
+    ]);
+    order.splice(0);
+    await ctx.persona.applyServerFingerprint(PROFILE, [{}], 9001);
+    assert.ok(order.indexOf('restore') > order.findIndex((step) => step[0] === 'cookies'), 'cookies first');
+    assert.equal(order.filter((step) => step[0] === 'open').length, 0, 'the same persona reopens nothing itself');
+  });
+
   it('a switch that fails reopens the closed pages under the previous persona instead of leaving no tab', async () => {
     ctx.cookies.applyCookieSync = async () => {
       throw Error('Cookie sync incomplete: {"EXCLUDE_FAILURE_TO_STORE":1}');

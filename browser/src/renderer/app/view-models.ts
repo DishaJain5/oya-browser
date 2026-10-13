@@ -179,7 +179,7 @@ function chromeModels({ bridge, frames }: PageEnvironment): ChromeModels {
     theme: new ThemeViewModel({ bridge, frames, systemDark: systemDarkAtStart() }),
     activity: new AgentActivityViewModel(bridge),
     backdrop: new BackdropViewModel({ bridge, frames }),
-    launch: new LaunchViewModel(reducedMotion()),
+    launch: new LaunchViewModel(reducedMotion() || document.documentElement.dataset.secondary === 'true'),
   };
 }
 
@@ -197,7 +197,8 @@ export interface TabModels {
 function tabModels({ bridge, frames }: PageEnvironment, gate: TabDragGate): TabModels {
   const card = new TabCardViewModel();
   const drag = new TabDragViewModel({ bridge, frames, card, gate });
-  return { card, drag, strip: new TabStripViewModel({ bridge, card, drag, reducedMotion }) };
+  const strip = new TabStripViewModel({ bridge, card, drag, reducedMotion, refused: gate.refuse });
+  return { card, drag, strip };
 }
 
 /** The Inspect panes. */

@@ -50,6 +50,8 @@ export class ShellWindow {
   stagedTab?: Tab;
   /** Settles when the trusted shell document is loaded. */
   private loaded: Promise<unknown> = Promise.resolve();
+  /** Secondary shells skip the app-start animation before their first paint. */
+  private secondary = false;
   /** Wait for this window's real tab and toolbar, not an arbitrary animation delay. */
   painted(id: number): Promise<void> {
     return waitForChrome(this.window!, this.loaded, id);
@@ -88,7 +90,8 @@ export class ShellWindow {
   }
 
   /** Loads the shell page in its theme, then readies the control shield. */
-  private loadShellPage(win: BrowserWindow): void {
+  private loadShellPage(win: BrowserWindow, secondary: boolean): void {
+    this.secondary = secondary;
     void holdStill(win, inContainer()); // before the page loads, so its loops never start
     if (!inContainer()) stillWhileAway(win);
     const page = path.join(this.deps.appDir, 'out', 'renderer', 'index.html');
@@ -105,7 +108,9 @@ export class ShellWindow {
 
   /** The shell page's address options: its theme rides in the query so the very first paint is already in it (src/renderer/public/first-paint.js). */
   private firstPaint(): LoadFileOptions {
-    return { query: { theme: this.dark() ? 'dark' : 'light', still: String(inContainer()) } };
+    return {
+      query: { theme: this.dark() ? 'dark' : 'light', still: String(inContainer()), secondary: String(this.secondary) },
+    };
   }
 
   /** Whether the shell is dark: chosen so, or following a dark system. */
@@ -119,7 +124,7 @@ export class ShellWindow {
     this.deps.layout.width = Number(this.deps.config.values.ui?.panelWidth) || PANEL_WIDTH;
     const win = (this.window = new this.deps.electron.BrowserWindow({ ...this.options(), show: !hidden }));
     this.deps.windows?.watch(this.deps as AppServices);
-    this.loadShellPage(win);
+    this.loadShellPage(win, hidden);
     this.deps.shortcuts.install(win.webContents);
     this.lockToShellPage(win);
     this.followTheme();

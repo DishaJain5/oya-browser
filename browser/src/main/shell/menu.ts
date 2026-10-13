@@ -13,7 +13,17 @@ import { ZOOM_STEP } from './constants.ts';
 /** The services the menu uses. */
 type Deps = Pick<
   AppServices,
-  'electron' | 'tabs' | 'control' | 'library' | 'persona' | 'shell' | 'windows' | 'agentTab' | 'config'
+  | 'appDir'
+  | 'electron'
+  | 'tabs'
+  | 'control'
+  | 'library'
+  | 'persona'
+  | 'shell'
+  | 'windows'
+  | 'agentTab'
+  | 'config'
+  | 'sitePermissions'
 >;
 
 /** A menu item's id, label and keys. */
@@ -113,15 +123,20 @@ function viewMenu(deps: Deps): MenuItemConstructorOptions {
 }
 
 /** Library is reachable from the native menu and keyboard, not just the toolbar. */
-function libraryMenu(deps: Deps): MenuItemConstructorOptions {
+function libraryMenus(deps: Deps): MenuItemConstructorOptions[] {
   const menu = new LibraryMenu(deps);
-  return {
-    label: 'Library',
-    submenu: [
-      humanItem(deps, 'browser-library', 'History and Bookmarks', 'CmdOrCtrl+Y', () => menu.show()),
-      humanItem(deps, 'browser-bookmark', 'Toggle Bookmark', 'CmdOrCtrl+D', () => menu.toggle()),
-    ],
-  };
+  const history = humanItem(deps, 'browser-library', 'Show History', 'CmdOrCtrl+Y', () => menu.show('history'));
+  const bookmarks = bookmarksItem(deps, menu);
+  const save = humanItem(deps, 'browser-bookmark', 'Toggle Bookmark', 'CmdOrCtrl+D', () => menu.toggle());
+  return [
+    { label: 'Bookmarks', submenu: [bookmarks, save] },
+    { label: 'History', submenu: [history] },
+  ];
+}
+
+/** The bookmark manager has its own native shortcut and menu. */
+function bookmarksItem(deps: Deps, menu: LibraryMenu): MenuItemConstructorOptions {
+  return humanItem(deps, 'browser-bookmarks', 'Show Bookmarks', 'CmdOrCtrl+Shift+O', () => menu.show('bookmarks'));
 }
 
 /** Builds and installs the menu. */
@@ -130,9 +145,8 @@ export function installApplicationMenu(deps: Deps): void {
   const mac = process.platform === 'darwin';
   app.setAboutPanelOptions({ applicationName: 'Oya Browser', applicationVersion: app.getVersion() });
   const template = [...(mac ? [macAppMenu(deps)] : []), fileMenu(deps, mac), { role: 'editMenu' as const }];
-  Menu.setApplicationMenu(
-    Menu.buildFromTemplate([...template, libraryMenu(deps), viewMenu(deps), { role: 'windowMenu' }, defaultMenu(deps)]),
-  );
+  const trailing: MenuItemConstructorOptions[] = [viewMenu(deps), { role: 'windowMenu' }, defaultMenu(deps)];
+  Menu.setApplicationMenu(Menu.buildFromTemplate([...template, ...libraryMenus(deps), ...trailing]));
 }
 
 /** A persistent route after the welcome screen is dismissed. */

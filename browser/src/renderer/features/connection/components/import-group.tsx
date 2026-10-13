@@ -49,15 +49,20 @@ function Latest({ vm }: ViewProps<ImportViewModel>) {
 function Earlier({ vm }: ViewProps<ImportViewModel>) {
   const records = earlierImports(useViewModel(vm));
   return (
-    <ol className="import-history quiet" id="import-history" aria-label="Earlier imports" hidden={!records.length}>
-      {records.map((r) => (
-        <li key={`${r.source}-${r.at}`}>
-          {`${r.source} · `}
-          <TimeAgo at={r.at} />
-          {` · ${importAmount(r)}`}
-        </li>
-      ))}
-    </ol>
+    <details className="import-history-disclosure" hidden={!records.length}>
+      <summary>
+        Previous imports <span>{records.length}</span>
+      </summary>
+      <ol className="import-history quiet" id="import-history" aria-label="Earlier imports">
+        {records.map((r) => (
+          <li key={`${r.source}-${r.at}`}>
+            {`${r.source} · `}
+            <TimeAgo at={r.at} />
+            {` · ${importAmount(r)}`}
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }
 

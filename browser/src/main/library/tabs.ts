@@ -1,0 +1,59 @@
+/** Private library tabs use shell content; their ordinary blank web views never contain browsing data. */
+import type { AppServices } from '../app/services.ts';
+import type { Tab } from '../tabs/types.ts';
+import { HOME_URL } from '../tabs/constants.ts';
+import { LibraryMenu } from './menu.ts';
+import type { LibraryKind, LibraryAction, LibraryPresentation } from '../../shared/library.ts';
+/** Window-scoped services keep a collection attached to its owning tab after transfers. */
+/** Full services are needed only for native maintenance menus. */
+type MenuDeps = ConstructorParameters<typeof LibraryMenu>[0];
+/** Read and saved-page operations need no native window services. */
+type Deps = Pick<AppServices, 'tabs' | 'library' | 'persona' | 'agentTab'>;
+/** Open once per collection per window, then use normal selection, close and transfer behavior. */
+export function showLibrary(deps: Deps, kind: LibraryKind): void {
+  deps.agentTab.requireFor(null);
+  const existing = deps.tabs.list.find((tab) => tab.collection === kind);
+  if (existing) return deps.tabs.activateTab(existing.id);
+  const id = deps.tabs.createTab(HOME_URL, false);
+  const tab = deps.tabs.find(id)!;
+  describeTab(deps, tab, kind);
+  deps.tabs.activateTab(id);
+}
+/** Exact-shell IPC additionally checks active tab, profile and ownership before returning private data. */
+export function readLibrary(deps: Deps, id: number): LibraryPresentation {
+  const tab = deps.tabs.find(id);
+  deps.agentTab.requireFor(id);
+  if (!tab?.collection || id !== deps.tabs.activeTabId || tab.libraryPartition !== deps.persona.partitionName())
+    throw Error('This library is no longer available');
+  return { ...deps.library.snapshot(), kind: tab.collection };
+}
+/** Fixed renderer command arguments after the shell sender has been checked. */
+type LibraryCommand = [id: number, action: LibraryAction, url?: string];
+/** Actions can only name an existing library page, never an arbitrary renderer-supplied URL. */
+export function changeLibrary(deps: MenuDeps, ...args: LibraryCommand): LibraryPresentation | void {
+  const [id, action, url] = args;
+  const snapshot = readLibrary(deps, id);
+  if (action === 'manage') return new LibraryMenu(deps).manage(snapshot.kind);
+  changeEntry(deps, snapshot, action, url);
+  return action === 'open' ? undefined : readLibrary(deps, id);
+}
+
+/** Collection identity is native metadata, not a URL any website can impersonate. */
+function describeTab(deps: Deps, tab: Tab, kind: LibraryKind): void {
+  Object.assign(tab, {
+    collection: kind,
+    libraryPartition: deps.persona.partitionName(),
+    title: kind === 'history' ? 'History' : 'Bookmarks',
+    url: `oya://${kind}`,
+  });
+}
+
+/** Validate and apply a single idempotent saved-page action. */
+function changeEntry(deps: Deps, snapshot: LibraryPresentation, action: LibraryAction, url?: string): void {
+  const entry = [...snapshot.bookmarks, ...snapshot.history].find((page) => page.url === url);
+  if (!entry) throw Error('This page is no longer in your library');
+  if (action === 'bookmark') deps.library.addBookmark(entry.url, entry.title);
+  else if (action === 'remove') deps.library.removeBookmark(entry.url);
+  else if (action === 'open') return void deps.tabs.createTab(entry.url, true);
+  else throw Error('Unknown library action');
+}

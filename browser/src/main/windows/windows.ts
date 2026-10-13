@@ -96,6 +96,8 @@ export class BrowserWindows {
   private beforeClose(scope: AppServices, event: Event): void {
     if (!this.quitting && scope.tabs.list.some((tab) => !this.root.agentTab.humanMay(tab.id)))
       return event.preventDefault();
+    // The red button closes the window before 'before-quit' fires, and closing empties the strip: save first.
+    this.root.sessionTabs?.flush();
     closeWindowTabs(scope);
   }
   /** Open a full browser shell; never create a second profile or duplicate the server connection. */

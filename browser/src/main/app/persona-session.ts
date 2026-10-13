@@ -15,6 +15,7 @@ type Deps = Pick<
   | 'observer'
   | 'governance'
   | 'mediaPermissions'
+  | 'screenShare'
   | 'externalApps'
   | 'protection'
   | 'passkeys'
@@ -64,16 +65,13 @@ export class PersonaSessionSetup {
     this.deps = deps;
     this.zone = new ExitZone({ net: deps.electron.net });
   }
+  /** A denied external protocol is offered to the human-confirmed handoff. */
+  private readonly externalApp: SessionExtras['externalApp'] = (url, contents) =>
+    void this.deps.externalApps.request(url, contents);
   /** Keep protocol prompting injected through the persona session boundary. */
   private sessionExtras(): SessionExtras {
-    const { observer, governance, mediaPermissions: media } = this.deps;
-    return {
-      nativeBrowsing: this.deps.nativeBrowsing,
-      observer,
-      governance,
-      media,
-      externalApp: (url, contents) => void this.deps.externalApps.request(url, contents),
-    };
+    const { nativeBrowsing, observer, governance, mediaPermissions: media, screenShare } = this.deps;
+    return { nativeBrowsing, observer, governance, media, screenShare, externalApp: this.externalApp };
   }
 
   /** Configure the persistent browser session, user-agent, cookies, privacy. */

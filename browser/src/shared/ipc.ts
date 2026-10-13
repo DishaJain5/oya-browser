@@ -6,6 +6,8 @@
  * `OyaBrowser`, so a channel missing on either side is a compile error.
  */
 
+import type { LibraryAction, LibraryPresentation } from './library.ts';
+
 /** A value the main process sends as it is; its shape is owned by the feature that reads it. */
 export type Payload = Record<string, unknown>;
 
@@ -31,6 +33,8 @@ export interface TabSummary {
   url: string;
   /** Whether the tab shows the start page. */
   home: boolean;
+  /** Local collection drawn by the shell, never inside the website view. */
+  collection?: 'bookmarks' | 'history';
   /** The page's icon as a data URL, once fetched. */
   favicon: string | null;
   /** Whether this is the tab on screen. */
@@ -236,7 +240,11 @@ export interface ShellCalls {
   /** Opens the page where the person turns this browser's key into an Oya account. */
   openClaim(): Promise<void>;
   /** Opens local bookmarks and browsing history. */
-  showLibrary(): Promise<void>;
+  showLibrary(kind?: 'bookmarks' | 'history'): Promise<void>;
+  /** Reads only the active local collection in the current profile. */
+  readLibrary(tabId: number): Promise<LibraryPresentation>;
+  /** Changes an existing saved page after checking this tab and profile. */
+  libraryAction(tabId: number, action: LibraryAction, url?: string): Promise<LibraryPresentation | void>;
   /** The bookmarks bar: whether it shows, and the bookmarks on it. */
   bookmarksBar(): Promise<Payload>;
   /** Shows or hides the bookmarks bar. */
@@ -261,6 +269,8 @@ export interface ShellCalls {
   /** Saves settings and reconnects. */
   saveConfig(changes: Payload): Promise<boolean>;
   /** Opens the server's console in the system browser; answers its address. */
+  /** Opens only the connected workspace’s billing page. */
+  openBilling(): Promise<void>;
   openConsole(serverUrl?: string): Promise<string | null>;
   /** Forgets the key and goes back to the welcome screen. */
   signOut(): Promise<void>;
@@ -467,6 +477,8 @@ export const CALL_CHANNELS = {
   saveConfig: 'save-config',
   /** Opens the server's console in the system browser; answers its address. */
   openConsole: 'open-console',
+  /** The current workspace’s own billing destination. */
+  openBilling: 'open-billing',
   /** Forgets the key and goes back to the welcome screen. */
   signOut: 'sign-out',
   /** The signed-in account, or the last one known. */
@@ -513,6 +525,8 @@ export const CALL_CHANNELS = {
   toggleDevPanel: 'toggle-dev-panel',
   /** Opens a tab; answers its id. */
   showLibrary: 'show-library',
+  readLibrary: 'read-library',
+  libraryAction: 'library-action',
   /** The bookmarks bar: whether it shows, and the bookmarks on it. */
   bookmarksBar: 'bookmarks-bar-state',
   /** Shows or hides the bookmarks bar. */

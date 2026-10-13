@@ -5,7 +5,7 @@
  */
 import type { MessageBoxOptions } from 'electron';
 import type { AppServices } from '../app/services.ts';
-import { SWITCH_TO_IMPORTED } from './constants.ts';
+import { STAY_ON_CURRENT, SWITCH_TO_IMPORTED } from './constants.ts';
 
 /** The window to ask over, and the native dialog. */
 type Deps = Pick<AppServices, 'electron' | 'shell'>;
@@ -18,14 +18,14 @@ export interface SwitchNames {
   to: string;
 }
 
-/** The question; switching is offered first, staying is what Escape picks. */
+/** The question; staying is the default and what Enter and Escape pick, so moving takes a deliberate click. */
 function question({ from, to }: SwitchNames): MessageBoxOptions {
   return {
     type: 'question',
-    message: `Browse with your ${to} logins now?`,
-    detail: `Oya is browsing as ${from}, whose logins stay as they are. You can switch any time from the profile menu.`,
-    buttons: [`Switch to ${to}`, `Stay on ${from}`],
-    ...{ defaultId: SWITCH_TO_IMPORTED, cancelId: SWITCH_TO_IMPORTED + 1, noLink: true },
+    message: `Browse as ${to} now?`,
+    detail: `Your ${to} logins are imported. Switching reopens your tabs signed in as ${to}; staying keeps everything as it is. You can switch any time from the profile menu.`,
+    buttons: [`Stay on ${from}`, `Switch to ${to}`],
+    ...{ defaultId: STAY_ON_CURRENT, cancelId: STAY_ON_CURRENT, noLink: true },
   };
 }
 

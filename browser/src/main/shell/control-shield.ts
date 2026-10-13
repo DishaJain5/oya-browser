@@ -38,8 +38,13 @@ type Deps = Pick<
 /** What each window's shell was last told about its shown tab. */
 const announced = new WeakMap<object, boolean>();
 
-/** The control state as this window's shell reads it, with whether the person may use the tab it shows. */
-function shellState(deps: Deps, state: ControlSnapshot): ControlSnapshot {
+/**
+ * The control state as this window's shell reads it, with whether the person
+ * may use the tab it shows and open new ones. Every state the shell is ever
+ * handed goes through here, the IPC answers included: a raw snapshot lacks the
+ * per-tab flags, and the shell then treats agent mode as "nothing allowed".
+ */
+export function shellState(deps: Pick<Deps, 'agentTab' | 'tabs' | 'shell'>, state: ControlSnapshot): ControlSnapshot {
   const pageInteractive = deps.agentTab.humanMay(deps.tabs.activeTabId);
   announced.set(deps.shell, pageInteractive);
   return { ...state, pageInteractive, newTabInteractive: deps.agentTab.humanMay(null) };

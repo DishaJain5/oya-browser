@@ -17,12 +17,17 @@ import type { ProfileViewModel } from './profile-view-model.ts';
 /** The dialog's pages. */
 export type DialogPage = 'commands' | 'profile' | 'shortcuts';
 
+/** Independent sections within Settings. */
+export type SettingsPage = 'general' | 'logins' | 'account';
+
 /** What the dialog shows. */
 export interface ShellDialogState {
   /** The dialog is open. */
   open: boolean;
   /** The page in view. */
   page: DialogPage;
+  /** The selected Settings section. */
+  settingsPage: SettingsPage;
   /** The saved server address ('' when none). */
   server: string;
   /** This browser's id on the server ('' while offline). */
@@ -81,6 +86,17 @@ export function pageLabels(page: DialogPage): PageLabels {
     : { title: 'Commands', label: 'Commands and settings' };
 }
 
+/** Initial settings navigation is independent of account and connection data. */
+const INITIAL_STATE: ShellDialogState = {
+  open: false,
+  page: 'commands',
+  settingsPage: 'general',
+  server: '',
+  browserId: '',
+  advanced: false,
+  copyStatus: '',
+};
+
 /** The commands and account dialog. */
 export class ShellDialogViewModel extends ViewModel<ShellDialogState> {
   /** The main process. */
@@ -92,7 +108,7 @@ export class ShellDialogViewModel extends ViewModel<ShellDialogState> {
 
   /** Closed, then fills the account page from the settings and status at start. */
   constructor(deps: ShellDialogDeps) {
-    super({ open: false, page: 'commands', server: '', browserId: '', advanced: false, copyStatus: '' });
+    super(INITIAL_STATE);
     this.bridge = deps.bridge;
     this.clipboard = deps.clipboard;
     this.parts = deps;
@@ -111,10 +127,10 @@ export class ShellDialogViewModel extends ViewModel<ShellDialogState> {
   }
 
   /** Opens the dialog on the account page, or on the command palette. */
-  async open(profile = false): Promise<void> {
+  async open(profile = false, settingsPage: SettingsPage = 'general'): Promise<void> {
     if (profile) await this.refresh().catch(() => {}); // the page still opens, with what it last knew
     await this.bridge.showOverlay(OVERLAYS.shell);
-    this.set({ open: true, page: profile ? 'profile' : 'commands' });
+    this.set({ open: true, page: profile ? 'profile' : 'commands', settingsPage });
     this.parts.account.setVisible(profile);
   }
 
@@ -131,6 +147,11 @@ export class ShellDialogViewModel extends ViewModel<ShellDialogState> {
     this.set({ open: false });
     this.parts.account.setVisible(false);
     void this.bridge.hideOverlay(OVERLAYS.shell);
+  }
+
+  /** Changes Settings sections without reloading data or closing the overlay. */
+  chooseSettings(settingsPage: SettingsPage): void {
+    this.set({ settingsPage });
   }
 
   /** Advanced was folded or unfolded. */

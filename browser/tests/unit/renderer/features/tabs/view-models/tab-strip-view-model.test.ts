@@ -27,12 +27,12 @@ const tab = (id: number, extra = {}) => ({
 });
 
 /** A strip over a fake bridge, with its drag and card. */
-function strip({ reduced = false, answers = {} } = {}) {
+function strip({ reduced = false, answers = {}, refused = undefined as (() => void) | undefined } = {}) {
   const fake = fakeBridge(answers);
   const frames = manualFrames();
   const card = new TabCardViewModel();
   const drag = new TabDragViewModel({ bridge: fake.bridge, frames, card });
-  const vm = new TabStripViewModel({ bridge: fake.bridge, card, drag, reducedMotion: () => reduced });
+  const vm = new TabStripViewModel({ bridge: fake.bridge, card, drag, reducedMotion: () => reduced, refused });
   fake.emit('onTabsUpdated', [tab(1, { active: true }), tab(2), tab(3)]);
   return { fake, frames, card, drag, vm };
 }
@@ -172,13 +172,31 @@ describe('TabStripViewModel', () => {
     assert.deepEqual(vm.state.drop, { id: 1, to: 1, offset: 10 });
   });
 
-  it("goes back to the main process's order when it refuses the move", async () => {
-    const { drag, vm } = strip({ answers: { moveTab: () => Promise.reject(new Error('agent drives')) } });
+  it("goes back to the main process's order when it refuses the move, and says so", async () => {
+    let refused = 0;
+    const answers = { moveTab: () => Promise.reject(new Error('agent drives')) };
+    const { drag, vm } = strip({ answers, refused: () => void refused++ });
     drag.start({ id: 1, pointerId: 1, x: 0, slots: SLOTS, index: 0 }, PORT);
     drag.move(1, 110);
     vm.endPress(1);
     await settle();
     assert.deepEqual(ids(vm), [1, 2, 3]);
+    assert.equal(refused, 1);
+  });
+
+  it('restores a refused tear-off without blaming agent control for an open dialog', async () => {
+    let refused = 0;
+    const answers = {
+      detachTab: () => Promise.reject(new Error('Close the open menu or dialog before moving this tab')),
+    };
+    const { drag, vm } = strip({ answers, refused: () => void refused++ });
+    const measured = { ...PORT, edges: () => ({ left: 0, right: 1000, top: 0, bottom: 44 }) };
+    drag.start({ id: 1, pointerId: 1, x: 0, y: 20, slots: SLOTS, index: 0 }, measured);
+    drag.move(1, 50, 200);
+    vm.endPress(1);
+    await settle();
+    assert.deepEqual(ids(vm), [1, 2, 3]);
+    assert.equal(refused, 0);
   });
 
   it('only shows a tab on a plain click, never reordering', () => {

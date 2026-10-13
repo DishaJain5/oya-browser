@@ -7,6 +7,9 @@ import './icon.css';
 /** SVG path data by icon name. */
 export const ICON_PATHS = {
   bell: 'M18 8a6 6 0 0 0-12 0v5l-2 4h16l-2-4ZM10 21h4',
+  settings: 'M4 7h16M4 17h16M8 4v6M16 14v6',
+  key: 'M14 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM10 11v10m0-4h4m-4-3h3',
+  history: 'M3 11a9 9 0 1 1 2.6 7.1M3 4v7h7M12 7v5l3 2',
   back: 'm14 5-7 7 7 7M7 12h13',
   forward: 'm10 5 7 7-7 7M4 12h13',
   reload: 'M20 7v5h-5M19 12a7 7 0 1 1-2-5l3 3',

@@ -7,20 +7,20 @@
 export const TEXT = {
   /** The toolbar's name. */
   toolbar: 'Browser navigation',
-  library: 'Library',
+  library: 'History',
   /** The bookmarks bar's name. */
   bookmarks: 'Bookmarks',
   /** What the bar says before any bookmark. */
   bookmarksEmpty: 'Bookmark a page to keep it here.',
   /** The bar's way to every bookmark and the history. */
-  allBookmarks: 'All bookmarks',
+  allBookmarks: 'Bookmarks',
   /** The star's name when the page is not saved. */
   bookmarkPage: 'Bookmark this page',
   /** The star's name when it is. */
   unbookmarkPage: 'Remove bookmark',
   /** The bar's hide button. */
   hideBookmarks: 'Hide bookmarks bar',
-  libraryTitle: 'History and bookmarks (⌘/Ctrl Y)',
+  libraryTitle: 'History (⌘/Ctrl Y)',
   back: 'Back',
   forward: 'Forward',
   reload: 'Reload page',
@@ -34,8 +34,8 @@ export const TEXT = {
   app: 'Oya Browser',
   titleJoin: ', ',
   /** The Ask button's label and titles. */
-  ask: 'Oya Assistant',
-  askTitle: 'Open Oya Assistant (⌘/Ctrl Shift D)',
+  ask: 'Assistant',
+  askTitle: 'Open Assistant (⌘/Ctrl Shift D)',
   askRecordingTitle: 'Oya Agent · recording',
 } as const;
 

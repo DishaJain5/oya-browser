@@ -15,7 +15,16 @@ import { LAST_TAB_DIGIT, ZOOM_STEP } from './constants.ts';
 /** The services the shortcuts use. */
 type Deps = Pick<
   AppServices,
-  'shell' | 'control' | 'tabs' | 'library' | 'electron' | 'persona' | 'windows' | 'agentTab'
+  | 'appDir'
+  | 'shell'
+  | 'control'
+  | 'tabs'
+  | 'library'
+  | 'electron'
+  | 'persona'
+  | 'windows'
+  | 'agentTab'
+  | 'sitePermissions'
 >;
 
 /** A command the main process runs itself. */
@@ -41,7 +50,7 @@ function goToTab(deps: Deps, n: number): void {
 
 /** Moves the active tab one place along the strip (Ctrl+Shift+PageUp/PageDown, like Chrome). */
 function moveActive(deps: Deps, offset: number): void {
-  if (!deps.control.snapshot().interactive) return;
+  if (!deps.agentTab.humanMay(deps.tabs.activeTabId)) return;
   const index = deps.tabs.list.findIndex((t: TabRef) => t.id === deps.tabs.activeTabId);
   if (index !== -1 && index + offset >= 0) moveTabTo(deps.tabs, deps.tabs.activeTabId!, index + offset);
 }
@@ -61,8 +70,8 @@ function zoomPage(deps: Deps, offset: number | null): void {
 /** Commands the main process runs itself; any other goes to the shell page. */
 const LOCAL_COMMANDS: Record<string, LocalCommand> = {
   ...DIGIT_COMMANDS,
-  'new-window': (deps) => deps.control.snapshot().interactive && deps.windows?.newWindow(),
-  'detach-tab': (deps) => deps.control.snapshot().interactive && deps.windows?.detach(deps.tabs.activeTabId!),
+  'new-window': (deps) => deps.agentTab.humanMay(null) && deps.windows?.newWindow(),
+  'detach-tab': (deps) => deps.agentTab.humanMay(deps.tabs.activeTabId) && deps.windows?.detach(deps.tabs.activeTabId!),
   'zoom-in': (deps) => zoomPage(deps, ZOOM_STEP),
   'zoom-out': (deps) => zoomPage(deps, -ZOOM_STEP),
   'zoom-reset': (deps) => zoomPage(deps, null),

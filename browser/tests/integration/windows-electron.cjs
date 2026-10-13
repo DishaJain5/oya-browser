@@ -19,7 +19,14 @@ const handlers = new Map();
 const handle = ipcMain.handle.bind(ipcMain);
 ipcMain.handle = (channel, listener) => {
   handlers.set(channel, listener);
-  handle(channel, listener);
+  handle(channel, async (event, ...args) => {
+    try {
+      return await listener(event, ...args);
+    } catch (error) {
+      if (channel.includes('tab')) console.error(channel, error);
+      throw error;
+    }
+  });
 };
 const timer = setTimeout(() => {
   console.error('Window regression timed out');
@@ -43,7 +50,7 @@ app.on('browser-window-created', (_event, win) => {
       firstShows.set(
         win.id,
         win.webContents.executeJavaScript(
-          `({ ready: document.documentElement.dataset.ready, tab: !!document.querySelector('.tab-item [aria-selected="true"]'), address: !!document.querySelector('#url-bar')?.getBoundingClientRect().height })`,
+          `({ ready: document.documentElement.dataset.ready, tab: !!document.querySelector('.tab-item [aria-selected="true"]'), address: !!document.querySelector('#url-bar')?.getBoundingClientRect().height, launchHidden: !!document.querySelector('#launch')?.hidden })`,
         ),
       );
     }
@@ -157,7 +164,12 @@ app
     await until(() => secondary.isVisible());
     await ready(secondary);
     await until(() => preview.isDestroyed());
-    assert.deepEqual(await firstShows.get(secondary.id), { ready: 'true', tab: true, address: true });
+    assert.deepEqual(await firstShows.get(secondary.id), {
+      ready: 'true',
+      tab: true,
+      address: true,
+      launchHidden: true,
+    });
     assert.equal(
       await secondary.webContents.executeJavaScript(
         `!!document.querySelector('.tab-item[data-id="${id}"] [aria-selected="true"]') && document.querySelector('#url-bar').getBoundingClientRect().height > 0`,
@@ -215,7 +227,7 @@ app
     const third = await until(() => shells().find((win) => win !== primary));
     await until(() => third.isVisible());
     await ready(third);
-    assert.deepEqual(await firstShows.get(third.id), { ready: 'true', tab: true, address: true });
+    assert.deepEqual(await firstShows.get(third.id), { ready: 'true', tab: true, address: true, launchHidden: true });
     const otherId = await call(third, 'newTab', url.replace('/one', '/two'));
     assert.notEqual(otherId, id);
     const other = await until(() => pageAt(url.replace('/one', '/two')));

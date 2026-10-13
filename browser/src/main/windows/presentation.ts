@@ -8,7 +8,7 @@ export function chromePaintScript(id: number): string {
   return `(async () => {
     await document.fonts.ready; const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
     const ready = () => document.documentElement.dataset.ready === 'true' &&
-      document.body.classList.contains('mode-browsing') &&
+      document.body.classList.contains('mode-browsing') && document.querySelector('#launch')?.hidden &&
       document.querySelector('.tab-item[data-id="${id}"] [aria-selected="true"]')?.getBoundingClientRect().width > 0 &&
       document.querySelector('#url-bar')?.getBoundingClientRect().height > 0;
     while (!ready()) await frame(); await frame(); await frame(); return true;

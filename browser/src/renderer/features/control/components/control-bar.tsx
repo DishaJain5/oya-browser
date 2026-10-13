@@ -1,5 +1,5 @@
 /**
- * The toolbar's OyaAI Mode / Human Mode switch (index.html's #control-status):
+ * The toolbar's AI Mode / Human Mode switch (index.html's #control-status):
  * who drives, and choosing the other side hands control over (or resumes the
  * agent after a pause). It also installs
  * the watch-only guard and gate over the toolbar's page actions, which other
@@ -18,7 +18,7 @@ export interface ControlBarProps {
   vm: ControlViewModel;
 }
 
-/** The OyaAI Mode / Human Mode switch, with a status beside it while control changes hands or cannot. */
+/** The AI Mode / Human Mode switch, with a status beside it while control changes hands or cannot. */
 export function ControlBar({ vm }: ControlBarProps) {
   const state = useViewModel(vm);
   useControlGuard(vm);

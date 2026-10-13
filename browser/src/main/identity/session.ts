@@ -3,6 +3,7 @@
  * identity (identity.ts), the persona's proxy, and governance.
  */
 import type { MediaPermissions } from '../app/media-permissions.ts';
+import type { ScreenShare } from '../app/screen-share.ts';
 import type { App, Session } from 'electron';
 import { configureProxy, type LoginApp, type ProxyConfig } from '../../anonymity/proxy.ts';
 import { watchSession } from '../observe/install.ts';
@@ -26,6 +27,8 @@ export interface SessionExtras {
   nativeBrowsing?: boolean;
   /** Site and operating-system consent for microphone and camera. */
   media?: MediaPermissions;
+  /** Site consent for sharing the screen. */
+  screenShare?: ScreenShare;
   /** Explicit human-confirmed native app handoff, while permission itself stays denied. */
   externalApp?: ExternalAppRequest;
   /** Collects what pages say and fetch, for the agent to read back. */
@@ -53,9 +56,9 @@ async function routeTraffic(
   app: LoginApp,
   ses: Session,
   activeProfile: SessionProfile | null,
-  { governance = null, externalApp, media }: SessionExtras,
+  { governance = null, externalApp, media, screenShare }: SessionExtras,
 ): Promise<void> {
-  installPermissions(ses, externalApp, media);
+  installPermissions(ses, externalApp, media, screenShare);
   await configureProxy(ses, governance?.configuration?.proxy || activeProfile?.proxy, app);
   governance?.install(ses);
 }

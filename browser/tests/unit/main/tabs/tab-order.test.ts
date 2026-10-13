@@ -9,7 +9,19 @@ import { TabManager } from '../../../../src/main/tabs/tabs.ts';
 import * as order from '../../../../src/main/tabs/tab-order.ts';
 import { mainCtx } from '../../support/main-ctx.cjs';
 
-const { ClosedTabs, reorder, moveTabTo, openBeside, closeOthers, closeToRight, reopenClosed } = order;
+const { ClosedTabs, reorder, moveTabTo, openBeside, closeOthers, closeToRight, reopenClosed, reopenable } = order;
+
+describe('reopenable', () => {
+  it('excludes the start page, popups, blank tabs and tabs with no address', () => {
+    const page = { url: 'https://a.test/', view: { webContents: { session: {} } } };
+    assert.equal(reopenable(page as any), true);
+    assert.equal(reopenable({ ...page, home: true } as any), false);
+    assert.equal(reopenable({ ...page, window: {} } as any), false);
+    assert.equal(reopenable({ ...page, url: 'about:blank' } as any), false);
+    assert.equal(reopenable({ ...page, url: '' } as any), false);
+    assert.equal(reopenable({ url: 'https://a.test/', view: {} } as any), true, 'a tab with no session yet');
+  });
+});
 
 describe('reorder', () => {
   it('moves one item and keeps the rest in order, clamping the target', () => {

@@ -1,0 +1,85 @@
+/** Account limits use Oya's quiet surface, clear hierarchy and one billing action. */
+.plan-notice {
+  margin: 16px 0;
+  padding: 22px;
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 3px 16px #00000006;
+}
+.plan-notice-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--secondary);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.4px;
+}
+.plan-notice-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: color-mix(in srgb, #80a950 14%, var(--surface));
+  color: #658d37;
+}
+.plan-notice-mark .icon {
+  width: 16px;
+  height: 16px;
+}
+.plan-notice h2 {
+  margin: 17px 0 10px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  line-height: 1.25;
+}
+.plan-notice p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--secondary);
+}
+.plan-notice .plan-notice-usage {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+.plan-notice-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  margin: 20px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid #71984a;
+  border-radius: 9px;
+  background: #d4ecb9;
+  color: #263c12;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.plan-notice-action:hover {
+  background: #c7e8a4;
+}
+.plan-notice-action:focus-visible {
+  outline: 2px solid #80a950;
+  outline-offset: 3px;
+}
+.plan-notice .plan-notice-footnote {
+  font-size: 10px;
+  line-height: 1.6;
+}
+@media (max-width: 340px) {
+  .plan-notice {
+    padding: 16px;
+  }
+}

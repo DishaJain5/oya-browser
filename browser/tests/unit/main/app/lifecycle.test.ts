@@ -42,6 +42,11 @@ describe('Lifecycle', () => {
     assert.equal(quit(), false, 'the third goes through');
   });
 
+  it('writes the open tabs before quitting', () => {
+    quit();
+    assert.deepEqual(ctx.sessionTabs.calls, ['flush']);
+  });
+
   it('holds the quit until the cookies and storage are on disk, then quits', async () => {
     const steps = [];
     ctx.persona.flushJar = async () => steps.push('jar');

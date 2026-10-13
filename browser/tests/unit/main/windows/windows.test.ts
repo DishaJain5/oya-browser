@@ -207,6 +207,16 @@ it('a native window close cannot destroy an agent target, but application quit c
   assert.equal(primary.shell.window.isDestroyed(), true);
 });
 
+it('a window close writes its tabs before closing them', async (t) => {
+  const { root, primary } = setup(t);
+  primary.tabs.createTab('https://one.test/');
+  let seen = -1;
+  root.sessionTabs.flush = () => (seen = root.tabs.list.length);
+  primary.shell.window.close();
+  assert.equal(seen, 1, 'the tab was still open at the save');
+  assert.equal(root.tabs.list.length, 0);
+});
+
 it('a window without an agent tab closes while agents work in their own tabs', async (t) => {
   const { root, primary } = setup(t);
   primary.tabs.createTab('https://one.test/');
@@ -268,4 +278,17 @@ it('failed chrome preparation destroys only the hidden destination and retains t
   assert.equal(tab.view.webContents.isDestroyed(), false);
   assert.equal(target.shell.window.isDestroyed(), true);
   assert.equal(root.windows.current, primary);
+});
+
+it('detaches a human-owned tab in agent mode while retaining the agent tab and its ownership', async (t) => {
+  const { root, primary } = setup(t);
+  const agent = primary.tabs.createTab('https://agent.test/');
+  const human = primary.tabs.createTab('https://human.test/');
+  root.control.snapshot = () => ({ connected: true, mode: 'agent', interactive: false, localClients: 0 });
+  root.agentTab.claim(agent);
+  await root.windows.detach(human);
+  assert.notEqual(root.windows.owner(human), primary);
+  assert.equal(root.windows.owner(agent), primary);
+  assert.equal(root.agentTab.humanMay(agent), false);
+  await assert.rejects(() => root.windows.detach(agent), /Switch to Human Mode/);
 });

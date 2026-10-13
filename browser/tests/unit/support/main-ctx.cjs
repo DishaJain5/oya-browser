@@ -10,6 +10,15 @@ const { FakeWebContents } = require('./fakes.cjs');
 const { DesktopDialogs } = require('../../../src/main/dialogs/index.ts');
 const { Governance } = require('../../../src/main/identity/governance.ts');
 const { AgentTab } = require('../../../src/main/control/agent-tab.ts');
+const { SitePermissionStore } = require('../../../src/main/app/site-permissions.ts');
+
+/** A JSON file that lives in memory: what the on-disk stores are tested over. */
+function memoryFile(value = null) {
+  return {
+    read: () => value,
+    write: (next) => void (value = JSON.parse(JSON.stringify(next))),
+  };
+}
 
 /** A tab's webContents: loads, history and handlers a BrowserView's page has. */
 class FakePageContents extends FakeWebContents {
@@ -469,6 +478,19 @@ function mainCtx(real = {}) {
     chatRuns: new Map(),
     // No tabs until a test gives some.
     tabs: { list: [], activeTabId: null, getActiveView: () => null, getShownView: () => null, find: () => undefined },
+    // The real store over a file in memory, so grants are per partition as in the app.
+    sitePermissions: new SitePermissionStore(memoryFile()),
+    // Records what the session store was asked; no file.
+    sessionTabs: {
+      calls: [],
+      changed() {},
+      flush() {
+        this.calls.push('flush');
+      },
+      restore() {
+        this.calls.push('restore');
+      },
+    },
   };
   // The real claim: it reads the faked control and tabs, so control fakes keep their old meaning.
   ctx.agentTab = new AgentTab(ctx);
@@ -478,6 +500,7 @@ function mainCtx(real = {}) {
 
 module.exports = {
   mainCtx,
+  memoryFile,
   fakeElectron,
   fakeControl,
   fakeSocket,

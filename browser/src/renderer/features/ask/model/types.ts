@@ -22,6 +22,14 @@ export interface ChatAnswer {
   error?: string;
   /** A machine code for the failure (`llm_unconfigured`, `llm_rejected`). */
   code?: string;
+  /** Plan associated with a structured billing refusal. */
+  plan?: string;
+  /** Usage counter whose allowance was exhausted. */
+  resource?: string;
+  /** Usage in the same units as the allowance. */
+  used?: number;
+  /** Current allowance, including any support credits. */
+  limit?: number;
   /** The tools the run called. */
   toolCalls?: ToolCall[];
   /** Whether the server recorded steps a playbook can replay (absent on an older server). */

@@ -2,7 +2,7 @@
 import { bookmarksBar, setBookmarksBar } from '../shell/bookmarks-bar.ts';
 import type { AppServices } from '../app/services.ts';
 import type { HandlersOf } from './handle.ts';
-import { LibraryMenu, addressSuggestions } from '../library/index.ts';
+import { LibraryMenu, addressSuggestions, readLibrary, changeLibrary } from '../library/index.ts';
 import { HOME_URL } from '../tabs/constants.ts';
 import { moveTabTo } from '../tabs/tab-order.ts';
 import { TabMenu } from '../tabs/tab-menu.ts';
@@ -10,6 +10,7 @@ import { TabMenu } from '../tabs/tab-menu.ts';
 /** The services navigation uses. */
 type Deps = Pick<
   AppServices,
+  | 'appDir'
   | 'externalApps'
   | 'shield'
   | 'shell'
@@ -18,6 +19,7 @@ type Deps = Pick<
   | 'control'
   | 'electron'
   | 'library'
+  | 'sitePermissions'
   | 'persona'
   | 'windows'
   | 'agentTab'
@@ -27,6 +29,8 @@ type Deps = Pick<
 type Channel =
   | 'address-suggestions'
   | 'show-library'
+  | 'read-library'
+  | 'library-action'
   | 'bookmarks-bar-state'
   | 'set-bookmarks-bar'
   | 'toggle-bookmark'
@@ -50,7 +54,9 @@ export class NavigationHandlers {
   /** Channel → handler. */
   readonly handlers: HandlersOf<Channel> = {
     'address-suggestions': (_e, query) => addressSuggestions(this.deps.library, query),
-    'show-library': () => new LibraryMenu(this.deps).show(),
+    'show-library': (_e, kind) => new LibraryMenu(this.deps).show(kind),
+    'read-library': (_e, id) => readLibrary(this.deps, id),
+    'library-action': (_e, id, action, url) => changeLibrary(this.deps, id, action, url),
     'bookmarks-bar-state': () => bookmarksBar(this.deps as AppServices),
     'set-bookmarks-bar': (_e, shown) => setBookmarksBar(this.deps as AppServices, shown === true),
     'toggle-bookmark': () => new LibraryMenu(this.deps).toggle(),

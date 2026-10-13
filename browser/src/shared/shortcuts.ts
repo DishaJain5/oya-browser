@@ -20,7 +20,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   ['inspect', 'Inspect this page', 'Workspace', 'primary-alt', 'I', 'KeyI'],
   ['network', 'Network activity', 'Workspace', 'primary-alt', 'N', 'KeyN'],
   ['source', 'Page source', 'Workspace', 'primary-alt', 'S', 'KeyS'],
-  ['library', 'History and bookmarks', 'Library', 'primary', 'Y'],
+  ['library', 'History', 'History', 'primary', 'Y'],
   ['bookmark', 'Toggle bookmark', 'Library', 'primary', 'D'],
   ['new-window', 'New window', 'Windows', 'primary', 'N'],
   ['detach-tab', 'Move tab to a new window', 'Windows', 'primary-alt', 'W', 'KeyW'],

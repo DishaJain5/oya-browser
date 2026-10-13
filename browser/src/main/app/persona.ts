@@ -29,6 +29,7 @@ type Deps = Pick<
   | 'socket'
   | 'shell'
   | 'tabs'
+  | 'sessionTabs'
   | 'cookies'
   | 'protection'
   | 'governance'
@@ -348,6 +349,8 @@ export class Persona {
     await this.deps.cookies.applyCookieSync(cookies, { now });
     assertCurrent();
     for (const url of reopen) this.deps.tabs.createTab(url);
+    // The cookies are in the jar now, so the last session's pages can load signed in; a switch reopened its own above.
+    this.deps.sessionTabs?.restore();
   }
 
   /** Same immutable persona: verify protection on every live surface. */

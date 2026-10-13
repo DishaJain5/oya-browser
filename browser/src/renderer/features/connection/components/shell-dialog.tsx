@@ -41,10 +41,12 @@ export interface ShellDialogProps extends AccountModels {
   palette: PaletteViewModel;
   /** The footer's controls (theme and page format from their features, then <AppVersion>). */
   footer: ReactNode;
+  /** Live appearance controls rendered in General settings. */
+  preferences?: ReactNode;
 }
 
 /** The commands and account dialog. */
-export function ShellDialog({ palette, footer, ...models }: ShellDialogProps) {
+export function ShellDialog({ palette, footer, preferences, ...models }: ShellDialogProps) {
   const { dialog } = models;
   const s = useViewModel(dialog);
   const profile = s.page === 'profile';
@@ -64,7 +66,7 @@ export function ShellDialog({ palette, footer, ...models }: ShellDialogProps) {
       onClose={close}
       focusId={s.page === 'shortcuts' ? 'shortcut-search' : profile ? 'shell-dialog-close' : 'command-search'}
     >
-      <div className="shell-dialog">
+      <div className="shell-dialog" data-page={s.page}>
         <header>
           <h2 id="shell-dialog-title">{offer ? 'Import your logins' : labels.title}</h2>
           <IconButton
@@ -78,7 +80,7 @@ export function ShellDialog({ palette, footer, ...models }: ShellDialogProps) {
         </header>
         <CommandPalette vm={palette} hidden={s.page !== 'commands'} />
         {s.open && s.page === 'shortcuts' && <ShortcutGuide platform={palette.platform} />}
-        <AccountPage {...models} hidden={!profile} />
+        <AccountPage {...models} preferences={preferences} hidden={!profile} />
         {!offer && <footer>{footer}</footer>}
       </div>
     </Dialog>

@@ -34,6 +34,12 @@ export const AUTH_POPUP_SIZE = { width: 500, height: 700 } as const;
 export const PAGE_BACKGROUND = '#ffffff';
 /** How many closed tabs Reopen closed tab (Cmd/Ctrl+Shift+T) remembers, as Chrome does. */
 export const CLOSED_TABS_MAX = 25;
+/** The file in the user-data folder the last session's tabs live in. */
+export const SESSION_TABS_FILE = 'session-tabs.json';
+/** How long after the strip last changed its tabs are written, so a crash loses little and a burst writes once. */
+export const SESSION_SAVE_DELAY_MS = 1000;
+/** The most tabs a relaunch brings back: the file is an input, not a trusted one. */
+export const RESTORED_TABS_MAX = 50;
 /** The largest favicon the strip fetches (256 KiB); anything bigger is not an icon. */
 export const FAVICON_MAX_BYTES = 262_144;
 /** Favicon addresses the strip fetches through the tab's own session. */

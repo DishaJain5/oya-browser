@@ -1,0 +1,57 @@
+/** Collection navigation has one quiet group; the address and control switch remain the primary toolbar actions. */
+.library-buttons {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  padding: 0 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+.library-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--secondary);
+  font: 500 var(--text-sm) / 1 var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition:
+    background-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+.library-button .icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.library-button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.library-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.bookmarks-bar .library-buttons {
+  margin-left: 8px;
+}
+.toolbar .library-buttons {
+  padding: 3px 2px;
+}
+@media (max-width: 959px) {
+  .toolbar .library-button {
+    gap: 4px;
+    padding: 0 6px;
+  }
+  .toolbar .library-button .icon {
+    display: none;
+  }
+}

@@ -389,7 +389,7 @@ src/
     app/                 services.ts (AppServices), config-store, persona, deep-links, boot (start-up stages), lifecycle (quit), updater
     ipc/                 the shell's channels: one handler class per area, typed against shared/ipc.ts, behind the shell-only guard (handle.ts)
     shell/               the window, menu, shortcuts, panel layout (layout.ts, shell-layout.ts), overlays, the control shield and its narration
-    library/             local history and bookmarks, scoped by persona partition, plus the native Library menu
+    library/             local history and bookmarks, scoped by persona partition, plus private searchable collection tabs
     tabs/                TabManager, TabEvents, TabProtector (a tab's bounded first-page protection), TabWindows, Protection, AddressBar, context menu, page source, tab order and menu, favicons, workers
     recording/           Recorder, RecordingStart (the stages of a start), channels, moves, PageChecks, FrameSessions, tab names, RecordingPublisher
     connection/          ControlSocket, ServerMessages (the server message map), CommandRunner and TAB_COMMANDS, ServerApi, Chat (Ask), CdpRelay, LiveStream, pairing
@@ -532,17 +532,30 @@ account dialog.
   not its neighbor in strip order. Closing a background tab does not move focus.
 - Selecting a new start-page tab focuses the shell and address bar; the agent
   task box no longer takes focus on arrival.
-- **Library** in the toolbar or native menu opens local bookmarks and recent
-  history. Cmd/Ctrl+D toggles the active page's bookmark; Cmd/Ctrl+Y opens the
-  library. Selecting a saved page opens a new tab.
+- **Bookmarks** and **History** are adjacent buttons at the end of the bookmarks
+  row, moving beside the address bar when that row is hidden. They also have
+  separate native-menu commands. Each opens or selects its own regular tab.
+  Cmd/Ctrl+D bookmarks the active website; Cmd/Ctrl+Y opens History and
+  Cmd/Ctrl+Shift+O opens Bookmarks. A saved page opens a new website tab.
+- Collections render inside the trusted shell and inherit its light, dark or
+  system theme. Their underlying protected website views remain blank: saved
+  browsing data never enters an agent-accessible page. Exact-shell IPC checks
+  the selected tab, opening profile and human ownership on every read/action.
+  Navigating the underlying view removes its collection marker. Tab transfer
+  preserves the collection identity and uses the destination window's IPC scope.
 - `library/BrowsingLibrary` persists through `ConfigStore`, keyed by the persona's
   session partition. There is no background library sync; authorized agent tool
   calls return only the requested results through the normal command transport. History keeps the latest
   2,000 distinct HTTP(S) addresses; bookmarks remain until explicitly removed.
   Internal pages and URLs containing credentials are excluded. Clearing history
   requires confirmation and does not clear bookmarks or website logins.
-- This first native library has paginated menus, not full-text search, folders,
-  or import/export. Passkey behavior is unchanged by these browsing changes.
+- Search matches every word against titles and URLs across the whole collection.
+  Website filters, recent/title/site sorting, date headings in History and bounded
+  batches keep long lists usable. Bookmark removal stays on each row; clearing
+  history retains native confirmation. Folder editing is not implemented.
+  `npm run test:desktop-library` exercises the real Oya shell, native input,
+  separate tabs, search beyond the first batch, light/dark themes, literal titles,
+  adjacent buttons, transfer and shell-only authorization in a disposable profile.
 
 ### Agent access to browser features
 
@@ -698,13 +711,57 @@ HTTP(S) allowlist is unchanged. No meeting credentials enter logs or prompt text
 ### Call media permissions
 
 Microphone/camera requests use `app/media-permissions.ts`: explicit native site
-consent, then macOS device consent. Grants are in-memory and document-scoped;
-checks reject other origins, navigation, agent control and governed runtimes.
-Only active HTTPS same-origin requesters can ask. Media capture is never globally
-granted. Existing streams remain under the site's stop/mute controls; these
-checks govern new access, not forced termination of existing calls. Ordinary
-playback/autoplay policy is unchanged. Direct unmanaged desktop personas retain
-native WebRTC ICE; proxies and managed sessions keep the leak-prevention wrapper.
+consent, then macOS device consent (asked every time; it answers at once once
+granted). Allow is remembered per profile and site on disk in
+`site-permissions.json` (`app/site-permissions.ts`, over `app/json-file.ts`),
+as Chrome does, so a meeting asks once; Block is never written. Site consent is
+saved before asking macOS, so an OS denial does not repeat the site's Allow
+dialog. Permission checks still require macOS to report the device as granted.
+Every check and
+request still passes `app/media-gate.ts` before the store is read and again
+after each prompt: it rejects other origins, agent-driven tabs, background tabs
+and governed runtimes, and a document replaced during a prompt. "Forget site
+permissions" in the library menu clears the current profile's grants. Screen
+sharing (`app/screen-share.ts`) goes through the same gate and site consent.
+Every getDisplayMedia request then opens Oya's source picker (`main/screen-share/`):
+Oya tabs, application windows and entire screens have native previews, with no
+default selection. Cancel or Escape returns no stream. A remembered site grant
+never selects a source. The picker is a private sandboxed sheet with exact-frame
+IPC; opaque choice tokens resolve to native sources only in the main process.
+Tabs must belong to the requesting profile and remain human-owned; navigation,
+closure or an agent claim invalidates their preview. The requester's document,
+profile and control are rechecked while the picker is open and before delivery.
+Sharing is video only. The OS picker is not used because Electron skips the
+handler when it is, so no gate would run. Electron's empty-device
+media preflight requires screen consent too: both getDisplayMedia and legacy
+desktop constraints use that preflight. Camera and microphone requests retain
+their separate consent path. Only active HTTPS
+same-origin requesters can ask. Media capture is never globally granted. Existing
+streams remain under the site's stop/mute controls; these checks govern new
+access, not forced termination of existing calls. Ordinary playback/autoplay
+policy is unchanged. Direct unmanaged desktop personas retain native WebRTC ICE;
+proxies and managed sessions keep the leak-prevention wrapper.
+`npm run test:desktop-media` exercises actual getUserMedia callbacks in Oya's
+stock desktop runtime, with fake devices, scripted OS consent and a disposable
+profile. It covers OS refusal and recovery, persistence, reload, agent refusal,
+and native display-media handoff using only the isolated test page as the capture
+source. Native pointer input verifies all three picker categories, disabled Share
+before selection, repeat selection, cancellation and ownership revocation. OS
+window/display enumeration is stubbed in this hermetic test. It does not validate
+real hardware or macOS privacy dialogs.
+
+### Session restore
+
+`tabs/session-tabs.ts` writes the open tabs (not the start page, popups, private
+or blank tabs) and the active one to `session-tabs.json` once the strip settles,
+on a window close and before quit; a strip with no tabs at all is never written,
+since a person cannot reach zero and an empty list is always a bulk close. The
+tabs come back once per launch, from `Persona.enterJar` after the persona's
+cookies are in the jar (never at boot, where a page would mint logged-out
+cookies), only for the same partition, only into a window still on the start
+page, and never in a governed browser. The startup page cannot overwrite the saved
+session while waiting for cookies; after restoration or a real page is saved,
+closing back to the start page deliberately saves an empty session.
 
 ### Native passkeys
 

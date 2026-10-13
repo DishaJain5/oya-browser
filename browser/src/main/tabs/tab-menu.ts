@@ -10,7 +10,7 @@ import { openBeside, closeOthers, closeToRight, reopenClosed } from './tab-order
 import type { Tab } from './types.ts';
 
 /** The services the menu uses. */
-type Deps = Pick<AppServices, 'tabs' | 'control' | 'electron' | 'shell' | 'windows'>;
+type Deps = Pick<AppServices, 'agentTab' | 'tabs' | 'control' | 'electron' | 'shell' | 'windows'>;
 
 /** The strip's right-click menu for one tab. */
 export class TabMenu {
@@ -49,8 +49,17 @@ export class TabMenu {
       { type: 'separator' },
       this.item('Reload', () => tabs.reloadTab(tab), !tab.home),
       this.item('Duplicate', () => openBeside(tabs, tab.id, tab.url || HOME_URL)),
-      this.item('Move Tab to New Window', () => this.deps.windows?.detach(tab.id), !!this.deps.windows && !tab.window),
+      this.moveItem(tab),
     ];
+  }
+
+  /** Moving a person's tab does not interrupt an agent working in another one. */
+  private moveItem(tab: Tab): MenuItemConstructorOptions {
+    return {
+      label: 'Move Tab to New Window',
+      enabled: !!this.deps.windows && !tab.window && this.deps.agentTab.humanMay(tab.id),
+      click: () => this.deps.agentTab.humanMay(tab.id) && this.deps.windows?.detach(tab.id),
+    };
   }
 
   /** The items that close, and Reopen closed tab. */

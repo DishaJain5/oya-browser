@@ -50,7 +50,12 @@ const renderer = {
 export default defineConfig({
   main: entry({ index: 'src/main/main.ts' }, 'out/main'),
   preload: entry(
-    { index: 'src/preload/index.ts', recording: 'src/preload/recording.ts', dialog: 'src/preload/dialog.ts' },
+    {
+      index: 'src/preload/index.ts',
+      recording: 'src/preload/recording.ts',
+      dialog: 'src/preload/dialog.ts',
+      'share-picker': 'src/preload/share-picker.ts',
+    },
     'out/preload',
   ),
   renderer,

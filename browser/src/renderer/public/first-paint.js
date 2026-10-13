@@ -11,3 +11,6 @@ if (FIRST_THEME === 'dark' || FIRST_THEME === 'light') document.documentElement.
 
 /** Shell-only motion policy is established before styles or application code run. */
 document.documentElement.dataset.oyaStill = String(new URLSearchParams(location.search).get('still') === 'true');
+
+/** A detached or new window is already part of a running app; it never replays launch. */
+document.documentElement.dataset.secondary = String(new URLSearchParams(location.search).get('secondary') === 'true');

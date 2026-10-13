@@ -7,7 +7,10 @@ import type { Event } from 'electron';
 import type { AppServices } from './services.ts';
 
 /** The services quitting uses. */
-type Deps = Pick<AppServices, 'electron' | 'persona' | 'cookies' | 'socket' | 'recorder' | 'workspace' | 'layout'>;
+type Deps = Pick<
+  AppServices,
+  'electron' | 'persona' | 'cookies' | 'socket' | 'recorder' | 'workspace' | 'layout' | 'sessionTabs'
+>;
 
 /** The workspace, as far as an interrupted validation goes. */
 type RunningWorkspace = NonNullable<AppServices['workspace']>;
@@ -58,6 +61,7 @@ export class Lifecycle {
     if (this.deps.workspace?.busy()) interruptValidation(this.deps.workspace);
     this.deps.cookies.flushCookieChanges();
     this.deps.layout.flush();
+    this.deps.sessionTabs?.flush();
     if (!this.jarFlushed) this.holdForJar(event);
   }
 

@@ -19,6 +19,7 @@ import { HOME_URL } from '../tabs/constants.ts';
 /** The services start-up uses. */
 type Deps = Pick<
   AppServices,
+  | 'appDir'
   | 'agentTab'
   | 'electron'
   | 'library'
@@ -38,6 +39,7 @@ type Deps = Pick<
   | 'governance'
   | 'actions'
   | 'nativeBrowsing'
+  | 'sitePermissions'
 >;
 
 /** What a validation run is started with: the draft, its options and where its events go. */

@@ -16,64 +16,76 @@ function setup() {
     items = template;
     return { popup() {} };
   };
-  return { ctx, opened, menu: new LibraryMenu(ctx), items: () => items };
+  const item = (start: string) => items.find((entry) => entry.label?.startsWith(start));
+  return { ctx, opened, menu: new LibraryMenu(ctx), items: () => items, item };
 }
 describe('LibraryMenu', () => {
-  it('opens saved pages in a new tab and toggles the active bookmark', () => {
-    const { menu, ctx, items, opened } = setup();
+  it('keeps history maintenance out of the bookmarks menu', () => {
+    const { menu, ctx, items } = setup();
     menu.toggle();
-    menu.show();
-    assert.equal(items()[0].label, 'Remove bookmark for this page');
-    items()[1].submenu[0].click();
-    assert.deepEqual(opened, ['https://a.test/']);
-    items()[0].click();
+    assert.equal(ctx.library.snapshot().bookmarks.length, 1);
+    menu.manage('bookmarks');
+    assert.equal(
+      items().some((item) => item.label?.includes('history')),
+      false,
+    );
+    menu.toggle();
     assert.deepEqual(ctx.library.snapshot().bookmarks, []);
   });
-  it('does not reopen a previous persona’s menu entry after switching profiles', () => {
-    const { menu, ctx, items, opened } = setup();
-    menu.toggle();
-    menu.show();
-    ctx.persona.partitionName = () => 'another';
-    items()[1].submenu[0].click();
-    assert.deepEqual(opened, []);
-  });
-  it('refuses page actions while an agent has control', () => {
-    const { menu, ctx, items, opened } = setup();
-    menu.toggle();
-    menu.show();
+  it('refuses bookmarking while an agent owns the page', () => {
+    const { menu, ctx } = setup();
     ctx.control.snapshot = () => ({ interactive: false });
-    items()[1].submenu[0].click();
     menu.toggle();
-    assert.deepEqual(opened, []);
-    assert.equal(ctx.library.snapshot().bookmarks.length, 1);
+    assert.deepEqual(ctx.library.snapshot().bookmarks, []);
   });
   it('requires confirmation before clearing history', async () => {
-    const { menu, ctx, items } = setup();
+    const { menu, ctx, item } = setup();
     ctx.library.visit('https://a.test/', 'A');
-    menu.show();
+    menu.manage();
     ctx.electron.dialog.showMessageBox = async () => ({ response: 0 });
-    items().at(-1).click();
+    item('Clear browsing history').click();
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(ctx.library.snapshot().history.length, 1);
     ctx.electron.dialog.showMessageBox = async () => ({ response: 1 });
-    items().at(-1).click();
+    item('Clear browsing history').click();
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(ctx.library.snapshot().history.length, 0);
   });
   it('does not clear another persona when a confirmation completes late', async () => {
-    const { menu, ctx, items } = setup();
+    const { menu, ctx, item } = setup();
     ctx.library.visit('https://a.test/', 'A');
-    menu.show();
+    menu.manage();
     let answer;
     ctx.electron.dialog.showMessageBox = () =>
       new Promise((resolve) => {
         answer = resolve;
       });
-    items().at(-1).click();
+    item('Clear browsing history').click();
     ctx.persona.partitionName = () => 'second';
     ctx.library.visit('https://b.test/', 'B');
     answer({ response: 1 });
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(ctx.library.snapshot().history.length, 1);
+  });
+  it('offers Forget site permissions with the count, disabled when none, and forgets without a confirmation', () => {
+    const { menu, ctx, item } = setup();
+    menu.manage();
+    assert.equal(item('Forget site permissions').label, 'Forget site permissions');
+    assert.equal(item('Forget site permissions').enabled, false);
+    ctx.sitePermissions.grant(ctx.persona.partitionName(), 'https://call.test', ['audio']);
+    ctx.sitePermissions.grant(ctx.persona.partitionName(), 'https://meet.test', ['screen']);
+    menu.manage();
+    assert.equal(item('Forget site permissions').label, 'Forget site permissions (2 sites)');
+    item('Forget site permissions').click();
+    assert.deepEqual(ctx.sitePermissions.origins(ctx.persona.partitionName()), []);
+  });
+  it('does not forget another profile switched to while the menu was open', () => {
+    const { menu, ctx, item } = setup();
+    const first = ctx.persona.partitionName();
+    ctx.sitePermissions.grant(first, 'https://call.test', ['audio']);
+    menu.manage();
+    ctx.persona.partitionName = () => 'second';
+    item('Forget site permissions').click();
+    assert.deepEqual(ctx.sitePermissions.origins(first), ['https://call.test']);
   });
 });

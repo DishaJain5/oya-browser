@@ -5,6 +5,9 @@
  * passwords, sync); this browser (make it the default, the profile it browses
  * as, its name); and the server and browser id folded under Advanced.
  */
+import type { ReactNode } from 'react';
+import { SettingsNavigation, SettingsHeading } from './settings-navigation.tsx';
+import type { SettingsPage } from '../view-models/shell-dialog-view-model.ts';
 import { useViewModel } from '../../../hooks/index.ts';
 import { TEXT } from '../model/constants.ts';
 import type { AccountModels } from './shell-dialog.tsx';
@@ -14,6 +17,7 @@ import { SettingsSection } from './settings-list.tsx';
 import { accountCard } from '../view-models/account-view-model.ts';
 import { Button, StatusLine } from '../../../ui/index.ts';
 import './account-page.css';
+import './settings-layout.css';
 
 /** The server and browser id with their Copy buttons, and Connection settings…; folded until asked for. */
 function Advanced({ dialog, reconnect }: Pick<AccountModels, 'dialog' | 'reconnect'>) {
@@ -76,11 +80,63 @@ function Actions({ account }: Pick<AccountModels, 'account'>) {
 interface AccountPageProps extends AccountModels {
   /** The command palette is in view instead. */
   hidden: boolean;
+  /** Appearance and page format keep their existing ViewModels. */
+  preferences?: ReactNode;
 }
 
-/** The account page. */
-export function AccountPage({ hidden, ...m }: AccountPageProps) {
+/** General settings keep appearance, default-browser and device controls together. */
+function General({
+  preferences,
+  ...m
+}: AccountModels & {
+  /** Existing live theme and page-format controls. */
+  preferences?: ReactNode;
+}) {
+  return (
+    <>
+      <div className="settings-preferences">{preferences}</div>
+      <SettingsSection id="browser-label" label="Browser">
+        <DefaultBrowserRow vm={m.imports} />
+        <PersonaRow vm={m.profile} />
+        <DeviceRow vm={m.profile} />
+      </SettingsSection>
+    </>
+  );
+}
+/** Each section keeps its controls mounted while only the chosen section is visible. */
+function SettingsContents({
+  page,
+  preferences,
+  ...m
+}: AccountModels & {
+  /** Selected section. */
+  page: SettingsPage;
+  /** Existing appearance controls. */
+  preferences?: ReactNode;
+}) {
+  return (
+    <div className="settings-content">
+      <SettingsHeading page={page} />
+      <div id="settings-general" hidden={page !== 'general'}>
+        <General {...m} preferences={preferences} />
+      </div>
+      <div id="settings-logins" hidden={page !== 'logins'}>
+        <SettingsSection id="logins-label" label="Import & sync">
+          <ImportRows vm={m.imports} />
+          <SyncRow vm={m.sync} />
+        </SettingsSection>
+      </div>
+      <div id="settings-account" hidden={page !== 'account'}>
+        <AccountCardView vm={m.account} actions={<Actions account={m.account} />} />
+        <Advanced dialog={m.dialog} reconnect={m.reconnect} />
+      </div>
+    </div>
+  );
+}
+/** Settings navigation separates everyday preferences from logins and account maintenance. */
+export function AccountPage({ hidden, preferences, ...m }: AccountPageProps) {
   const { offer } = useViewModel(m.imports);
+  const { settingsPage: page } = useViewModel(m.dialog);
   if (offer)
     return (
       <section id="profile-section" hidden={hidden}>
@@ -88,18 +144,11 @@ export function AccountPage({ hidden, ...m }: AccountPageProps) {
       </section>
     );
   return (
-    <section id="profile-section" hidden={hidden} aria-labelledby="account-name">
-      <AccountCardView vm={m.account} actions={<Actions account={m.account} />} />
-      <SettingsSection id="logins-label" label="Logins">
-        <ImportRows vm={m.imports} />
-        <SyncRow vm={m.sync} />
-      </SettingsSection>
-      <SettingsSection id="browser-label" label="This browser">
-        <DefaultBrowserRow vm={m.imports} />
-        <PersonaRow vm={m.profile} />
-        <DeviceRow vm={m.profile} />
-      </SettingsSection>
-      <Advanced dialog={m.dialog} reconnect={m.reconnect} />
+    <section id="profile-section" hidden={hidden} aria-label="Browser settings">
+      <div className="settings-layout">
+        <SettingsNavigation page={page} choose={(page) => m.dialog.chooseSettings(page)} account={m.account} />
+        <SettingsContents {...m} page={page} preferences={preferences} />
+      </div>
     </section>
   );
 }

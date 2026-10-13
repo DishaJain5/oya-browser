@@ -13,8 +13,7 @@ import { loadInTab, isUnprotected } from './load.ts';
 import { isHome, shownViewOf } from './home.ts';
 import { initialTab, mountTab, updateTabTitle, updateTabUrl } from './tab-lifecycle.ts';
 import { TabSelection } from './tab-selection.ts';
-import { ClosedTabs } from './tab-order.ts';
-import { privateSession } from '../native-contexts/index.ts';
+import { ClosedTabs, reopenable } from './tab-order.ts';
 import { recordingPreferences } from '../recording/preload.ts';
 import { isNativeEngine } from '../native-policy/index.ts';
 import type { Tab, TabView } from './types.ts';
@@ -47,6 +46,8 @@ export interface TabSummary {
   url: string;
   /** Whether it is on the start page. */
   home: boolean;
+  /** Local collection drawn by the shell, never inside the website view. */
+  collection?: 'bookmarks' | 'history';
   /** Its icon as a data: URL, or null. */
   favicon: string | null;
   /** Whether it is the one on screen. */
@@ -76,10 +77,11 @@ function tabSummary(t: Tab, activeTabId: number | null, agentTabs: Array<number 
 }
 
 /** Where the tab is: its title, address and icon, and whether it is on the start page. */
-const placeSummary = (t: Tab): Pick<TabSummary, 'title' | 'url' | 'home' | 'favicon'> => ({
+const placeSummary = (t: Tab): Pick<TabSummary, 'title' | 'url' | 'home' | 'favicon' | 'collection'> => ({
   title: t.title,
   url: t.url,
   home: !!t.home,
+  ...(t.collection ? { collection: t.collection } : {}),
   favicon: t.favicon || null,
 });
 
@@ -150,7 +152,7 @@ const tabPreferences = (partition: string, appDir: string, owner: Session): WebP
 function rememberClosed(tabs: TabManager, idx: number, keepOne: boolean): void {
   const tab = tabs.list[idx];
   if (!keepOne) return tabs.closed.clear();
-  if (!tab.home && !tab.window && !privateSession(tab.view.webContents.session)) tabs.closed.push(tab.url, idx);
+  if (reopenable(tab)) tabs.closed.push(tab.url, idx);
 }
 
 /** Stops a load and forgets the navigation it was for. */

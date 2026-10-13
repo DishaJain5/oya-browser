@@ -6,6 +6,7 @@ import type { ControlChange, PersonaList, ShellStatus } from '../../shared/ipc.t
 import type { HandlersOf } from './handle.ts';
 import { ServerApi } from '../connection/server-api.ts';
 import { pairingServer } from '../connection/pairing.ts';
+import { shellState } from '../shell/control-shield.ts';
 import { PasswordImport } from '../mirror/passwords.ts';
 import { rememberAccount, listAccounts, openAccount, forgetAccount } from '../app/saved-accounts.ts';
 
@@ -19,6 +20,7 @@ type Deps = Pick<
   | 'tabs'
   | 'shell'
   | 'control'
+  | 'agentTab'
   | 'mirror'
   | 'electron'
   | 'windows'
@@ -31,6 +33,7 @@ type Channel =
   | 'change-control'
   | 'get-config'
   | 'open-console'
+  | 'open-billing'
   | 'save-config'
   | 'get-status'
   | 'save-profile'
@@ -101,9 +104,10 @@ function checkedServer(changes: Partial<ConfigValues>): Partial<ConfigValues> {
 export class SessionHandlers {
   /** Channel → handler. */
   readonly handlers: HandlersOf<Channel> = {
-    'get-control-state': () => this.deps.control.snapshot(),
+    'get-control-state': () => shellState(this.deps, this.deps.control.snapshot()),
     'change-control': (_e, action) => this.changeControl(action),
     'get-config': () => this.deps.config.values,
+    'open-billing': () => this.openBilling(),
     'open-console': (_e, serverUrl) => this.openConsole(serverUrl),
     'save-config': (_e, changes) => this.saveConfig(checkedServer(changes)),
     'get-status': () => this.status(),
@@ -131,15 +135,22 @@ export class SessionHandlers {
     this.api = new ServerApi(deps);
   }
 
-  /** Takes or hands back control; a refusal answers why, with the state as it stands. */
+  /** Takes or hands back control; a refusal answers why, with the state as it stands. Either way the shell gets its per-tab flags. */
   private async changeControl(action: string): Promise<ControlChange> {
     try {
-      return { state: await this.deps.control.change(action) };
+      return { state: shellState(this.deps, await this.deps.control.change(action)) };
     } catch (error) {
-      return { error: (error as Error).message, state: this.deps.control.snapshot() };
+      return { error: (error as Error).message, state: shellState(this.deps, this.deps.control.snapshot()) };
     }
   }
 
+  /** Billing links are derived from the configured connection, never chat text or renderer URLs. */
+  private async openBilling(): Promise<void> {
+    const console = consoleUrl(this.deps.config.values.serverUrl);
+    if (!console) throw Error('No billing page is available for this connection');
+    const url = new URL('/dashboard/billing', console).href;
+    await this.deps.electron.shell.openExternal(url);
+  }
   /** Opens the server's console in the system browser; answers its address, or null for a server that has none. */
   private async openConsole(serverUrl: string | undefined): Promise<string | null> {
     const url = consoleUrl(serverUrl || this.deps.config.values.serverUrl);

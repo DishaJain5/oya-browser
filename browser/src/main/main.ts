@@ -27,6 +27,12 @@ import { startLocalMcp } from './local-mcp/index.ts';
 /** Signing-bound WebAuthn group embedded by the build, empty for unsigned development. */
 declare const __OYA_WEBAUTHN_GROUP__: string;
 import { MediaPermissions } from './app/media-permissions.ts';
+import { ScreenShare } from './app/screen-share.ts';
+import { ScreenPicker } from './screen-share/index.ts';
+import { SitePermissionStore } from './app/site-permissions.ts';
+import { JsonFile } from './app/json-file.ts';
+import { SessionTabs } from './tabs/session-tabs.ts';
+import { SESSION_TABS_FILE } from './tabs/constants.ts';
 import { ExternalApps } from './app/external-apps.ts';
 import { Notifications } from './notifications/index.ts';
 import type { AppServices } from './app/services.ts';
@@ -36,7 +42,12 @@ import { DeepLinks } from './app/deep-links.ts';
 import { Boot } from './app/boot.ts';
 import { Lifecycle } from './app/lifecycle.ts';
 import { Updater } from './app/updater.ts';
-import { KEEP_RENDERING_SWITCHES, RELAY_TOKEN_BYTES, WORLD_NAME_BYTES } from './app/constants.ts';
+import {
+  KEEP_RENDERING_SWITCHES,
+  RELAY_TOKEN_BYTES,
+  WORLD_NAME_BYTES,
+  SITE_PERMISSIONS_FILE,
+} from './app/constants.ts';
 import { DesktopDialogs, dialogPresenter } from './dialogs/index.ts';
 import { World, useFramePages, useStockWorld } from './native/index.ts';
 import { Observer } from './observe/observer.ts';
@@ -141,7 +152,15 @@ const ctx = {
 ctx.config = new ConfigStore({ dir: () => app.getPath('userData'), safe: electron.safeStorage });
 ctx.windows = new BrowserWindows(ctx);
 ctx.passkeys = new Passkeys(ctx);
+// Small per-state files beside config.json, named lazily: userData is reset before the app is ready.
+const userFile = (name: string) => () => path.join(app.getPath('userData'), name);
+ctx.sitePermissions = new SitePermissionStore(new JsonFile(userFile(SITE_PERMISSIONS_FILE)));
 ctx.mediaPermissions = new MediaPermissions(ctx);
+ctx.screenPicker = new ScreenPicker(ctx);
+ctx.screenShare = new ScreenShare(ctx);
+ctx.sessionTabs = new SessionTabs(ctx, new JsonFile(userFile(SESSION_TABS_FILE)));
+// Every strip change, from any window, schedules a save of the session.
+ctx.windows.tabEvents.subscribe(() => ctx.sessionTabs!.changed());
 ctx.externalApps = new ExternalApps(ctx);
 ctx.notifications = new Notifications({
   partition: () => ctx.persona.partitionName(),

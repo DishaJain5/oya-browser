@@ -49,6 +49,8 @@ export const OPEN_EXTERNAL_APP_CHOICE = 1;
 
 /** Explicit approval, with Block as the default media permission response. */
 export const ALLOW_MEDIA_CHOICE = 1;
+/** The file in the user-data folder the remembered site permissions live in. */
+export const SITE_PERMISSIONS_FILE = 'site-permissions.json';
 /** Bound native passkey chooser size and untrusted account labels. */
 export const PASSKEY_ACCOUNT_LIMIT = 20;
 /** Keep account buttons readable without control characters. */

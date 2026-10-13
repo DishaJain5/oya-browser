@@ -6,6 +6,7 @@
  * error. Its collaborators are the live run, the attachments, the profile
  * picker and the setup cards, each its own ViewModel.
  */
+import { planNotice, type PlanNotice } from '../model/plan-notice.ts';
 import { ViewModel } from '../../../core/view-model.ts';
 import { RendererConstants as C } from '../../../core/constants.ts';
 import type { RendererServices } from '../../../app/services.ts';
@@ -41,6 +42,8 @@ export interface ChatMessage {
   content: string;
   /** The Save as playbook offer under the newest reply, or a saved one; null for none. */
   offer: PlaybookOfferViewModel | null;
+  /** A structured account notice with a native billing action. */
+  notice?: PlanNotice;
 }
 
 /** A finished run's card in the conversation. */
@@ -224,10 +227,21 @@ export class AskViewModel extends ViewModel<AskState> {
   /** Shows an answer: stopped, an error, or the reply. */
   private show(data: ChatAnswer): void {
     if (data.error === ASK_TEXT.stoppedError) this.say('assistant', ASK_TEXT.stopped);
-    else if (data.error) this.say('assistant', ASK_TEXT.errorPrefix + data.error);
+    else if (data.error) this.failure(data);
     else this.reply(data.text || ASK_TEXT.noResponse, data.toolCalls, data.replayable);
   }
 
+  /** Keep original error context in the transcript, with structured presentation for plan refusals. */
+  private failure(data: ChatAnswer): void {
+    const item = failedMessage(this.nextId++, data);
+    this.set({ items: [...this.state.items, item] });
+  }
+  /** Open this connected workspace's billing page; server-supplied URLs are never trusted. */
+  openBilling(): void {
+    void this.services.bridge
+      .openBilling()
+      .catch(() => this.say('assistant', 'Could not open billing. Try again from your account settings.'));
+  }
   /** The free trial is used up: the card that offers a free account takes over from the error text. */
   private claim(_reason: string): void {
     this.set({ trialSpent: true });
@@ -270,4 +284,10 @@ export class AskViewModel extends ViewModel<AskState> {
     clearTimeout(this.copyTimer);
     for (const part of [this.run, this.files, this.persona, this.model]) part.dispose();
   }
+}
+
+/** A failure keeps its original transcript text while attaching a safe, structured presentation. */
+function failedMessage(id: number, data: ChatAnswer): ChatMessage {
+  const content = ASK_TEXT.errorPrefix + data.error;
+  return { kind: 'message', id, role: 'assistant', content, offer: null, notice: planNotice(data) };
 }

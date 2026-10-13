@@ -1,0 +1,280 @@
+<!-- Oya's private capture picker. Only the sandboxed preload can populate or answer it. -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; form-action 'none'; base-uri 'none'"
+    />
+    <title>Oya · Choose what to share</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #eeefe9;
+        background: #10120f;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        height: 100vh;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+      header {
+        padding: 25px 28px 21px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #a7af9c;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+      .mark {
+        width: 12px;
+        height: 12px;
+        border: 3px solid #32ed26;
+        border-radius: 50%;
+      }
+      h1 {
+        margin: 13px 0 7px;
+        font-size: 25px;
+        font-weight: 550;
+        letter-spacing: -0.7px;
+      }
+      .recipient {
+        margin: 0;
+        font-size: 13px;
+        color: #a7af9c;
+      }
+      #origin {
+        color: #eeefe9;
+        font-weight: 500;
+      }
+      nav {
+        display: flex;
+        margin: 0 28px;
+        border-bottom: 1px solid #30362b;
+        gap: 24px;
+      }
+      nav button {
+        padding: 11px 0 13px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        border-radius: 0;
+        background: transparent;
+        color: #a7af9c;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      nav button[aria-selected='true'] {
+        color: #eeefe9;
+        border-bottom-color: #32ed26;
+      }
+      .count {
+        font-size: 10px;
+        font-weight: 500;
+        margin-left: 6px;
+        color: #909985;
+      }
+      .catalog {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 20px 28px;
+      }
+      #sources {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 19px 14px;
+      }
+      .source {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        cursor: pointer;
+        border: 1px solid #3b4234;
+        border-radius: 9px;
+        background: #191d16;
+        padding: 5px 5px 11px;
+      }
+      .source:hover {
+        border-color: #8c987e;
+      }
+      .source:has(input:checked) {
+        border-color: #32ed26;
+        box-shadow: 0 0 0 1px #32ed26;
+        background: #202b1a;
+      }
+      .source:has(input:focus-visible) {
+        outline: 2px solid #b4efa5;
+        outline-offset: 4px;
+      }
+      .source input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+      }
+      .source:has(input:checked)::after {
+        content: '✓';
+        position: absolute;
+        top: 11px;
+        right: 11px;
+        display: grid;
+        place-items: center;
+        width: 21px;
+        height: 21px;
+        border-radius: 50%;
+        background: #32ed26;
+        color: #10120f;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .preview {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 16 / 9;
+        width: 100%;
+        overflow: hidden;
+        background: #0b0e09;
+        border-radius: 5px;
+      }
+      .preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .placeholder {
+        font-size: 11px;
+        color: #849078;
+      }
+      .name,
+      .detail {
+        display: block;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        padding: 0 6px;
+      }
+      .name {
+        margin-top: 10px;
+        font-size: 12px;
+        font-weight: 550;
+      }
+      .detail {
+        margin-top: 4px;
+        font-size: 10px;
+        color: #a7af9c;
+      }
+      #empty {
+        max-width: 400px;
+        margin: 56px auto;
+        text-align: center;
+        color: #a7af9c;
+        line-height: 1.7;
+        font-size: 14px;
+      }
+      footer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 18px 28px 22px;
+        border-top: 1px solid #30362b;
+      }
+      .summary {
+        flex: 1;
+        min-width: 0;
+        padding-right: 15px;
+      }
+      #selection {
+        margin: 0 0 5px;
+        color: #cbd2c3;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .note {
+        margin: 0;
+        font-size: 11px;
+        color: #849078;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border-radius: 7px;
+      }
+      footer button {
+        border: 1px solid #46503b;
+        background: transparent;
+        color: #eeefe9;
+        padding: 10px 20px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      #share {
+        background: #32ed26;
+        border-color: #32ed26;
+        color: #101c0c;
+      }
+      #share:disabled {
+        cursor: default;
+        background: #293023;
+        color: #78836c;
+        border-color: #343d2d;
+      }
+      button:focus-visible {
+        outline: 2px solid #b4efa5;
+        outline-offset: 4px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="content" hidden>
+      <header>
+        <div class="brand"><span class="mark" aria-hidden="true"></span>Oya Browser</div>
+        <h1>Choose what to share</h1>
+        <p class="recipient">Share with <span id="origin"></span></p>
+      </header>
+      <nav role="tablist" aria-label="Source type">
+        <button type="button" role="tab" id="tab" aria-controls="sources">
+          Oya tab<span class="count" id="tab-count"></span>
+        </button>
+        <button type="button" role="tab" id="window" aria-controls="sources">
+          Window<span class="count" id="window-count"></span>
+        </button>
+        <button type="button" role="tab" id="screen" aria-controls="sources">
+          Entire screen<span class="count" id="screen-count"></span>
+        </button>
+      </nav>
+      <main class="catalog">
+        <div id="sources" role="tabpanel" aria-labelledby="tab"></div>
+        <p id="empty" hidden></p>
+      </main>
+      <footer>
+        <div class="summary">
+          <p id="selection" aria-live="polite"></p>
+          <p class="note">Video only · Audio is not shared</p>
+        </div>
+        <button type="button" id="cancel">Cancel</button><button type="submit" id="share" disabled>Share</button>
+      </footer>
+    </form>
+  </body>
+</html>

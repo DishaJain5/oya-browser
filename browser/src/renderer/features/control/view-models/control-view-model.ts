@@ -136,7 +136,7 @@ export function controlLook({ control: c, error, pending }: ControlState): Contr
   return { mode, label: error || controlLabel(c, mode), title, action: actionLook(c, pending), resume };
 }
 
-/** One side of the OyaAI Mode / Human Mode switch. */
+/** One side of the AI Mode / Human Mode switch. */
 export interface SwitchSide {
   /** This side is the one in effect. */
   on: boolean;
@@ -146,11 +146,11 @@ export interface SwitchSide {
   title: string;
 }
 
-/** The OyaAI Mode / Human Mode switch: its sides, and a status for the moments neither side says it all. */
+/** The AI Mode / Human Mode switch: its sides, and a status for the moments neither side says it all. */
 export interface ModeSwitch {
   /** No handoff is possible here (another operator, or no agent to hand to): only the status shows. */
   hidden: boolean;
-  /** OyaAI Mode: the agent drives. Choosing it hands back, or resumes after a pause. */
+  /** AI Mode: the agent drives. Choosing it hands back, or resumes after a pause. */
   agent: SwitchSide;
   /** Human Mode: you drive. Choosing it takes control. */
   human: SwitchSide;
@@ -168,7 +168,7 @@ export function modeSwitch(state: ControlState): ModeSwitch {
 }
 
 /**
- * OyaAI Mode: in effect while the agent drives; never while control is still yours,
+ * AI Mode: in effect while the agent drives; never while control is still yours,
  * as during a hand-back (the agent's next command must find it returned). Chosen, it
  * hands back (yours) or resumes (paused).
  */

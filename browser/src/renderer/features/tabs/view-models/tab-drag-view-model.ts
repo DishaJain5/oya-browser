@@ -105,6 +105,8 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
   private to = 0;
   /** The frame that scrolls the strip under a lifted tab. */
   private frame: number | null = null;
+  /** The native drag card has been asked for this gesture (once the pointer first left the strip). */
+  private previewing = false;
 
   /** At rest; a running frame is cancelled on dispose. */
   constructor(deps: TabDragDeps) {
@@ -131,6 +133,7 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
     if (!this.state.lifted && this.deps.gate?.movable(!!this.press.agent) === false) return this.refuse();
     if (!this.state.lifted) this.lift();
     this.follow();
+    if (!this.previewing && this.outside()) this.preview();
   }
 
   /** The button came up: a drag answers where the tab lands (null for a plain click, or no move). */
@@ -160,22 +163,33 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
     if (!transferring) void this.deps.bridge.endTabDrag?.().catch(() => {});
     this.press = null;
     this.strip = null;
+    this.previewing = false;
     this.stopFrames();
     this.set(REST);
   }
 
-  /** An agent holds control: the press ends at once, so the page is not left mid-drag. */
+  /** The drag is refused (an agent holds the tab): the press ends at once and the person is told why, never a silent snap-back. */
   private refuse(): void {
     this.end();
-    this.deps.gate!.refuse();
+    this.deps.gate?.refuse();
   }
 
   /** The press becomes a drag: the card goes and the strip starts following the pointer near its edges. */
   private lift(): void {
-    void this.deps.bridge.beginTabDrag?.(this.press!.id).catch(() => this.end());
     this.deps.card.hide();
     this.set({ lifted: true });
     this.frame = this.deps.frames.request(() => this.scroll());
+  }
+
+  /**
+   * The pointer first left the strip: now the native card is worth having. A
+   * reorder inside the strip never asks for it, so no window appears under a
+   * captured pointer, which on macOS can cancel the gesture.
+   */
+  private preview(): void {
+    this.previewing = true;
+    // The card is cosmetic: a refusal (a popup's tab, a dialog open) ends the press quietly; the move itself says why at the drop.
+    void this.deps.bridge.beginTabDrag?.(this.press!.id).catch(() => this.end());
   }
 
   /** Puts the dragged tab under the pointer and slides the others to make room where it would land. */

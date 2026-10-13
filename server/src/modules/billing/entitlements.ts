@@ -155,15 +155,20 @@ export class Entitlements {
     const plan = includedFor(standing, credits);
     if (plan.overage) return;
     const used = (await this.deps.usageSince(standing.userId, standing.since))[field] || 0;
-    if (used >= plan[allowance])
-      throw this.refuse('plan_limit', `This month's ${what} on the ${standing.plan} plan is used up.`);
+    if (used >= plan[allowance]) throw this.allowanceRefusal(standing, field, what, used, plan[allowance]);
+  }
+
+  /** Machine-readable usage lets clients show the actual exhausted allowance instead of a raw error paragraph. */
+  allowanceRefusal(standing: Standing, resource: string, what: string, used: number, limit: number) {
+    const why = `Your ${standing.plan} plan's ${what} allowance is used up for this billing period.`;
+    return this.refuse('plan_limit', why, { plan: standing.plan, resource, used, limit });
   }
 
   /** The 402 a plan refusal answers with: what ran out, where to upgrade, and who to write to for more. */
-  refuse(code: string, why: string) {
+  refuse(code: string, why: string, details: Record<string, unknown> = {}) {
     const upgrade_url = this.deps.upgradeUrl();
     const message = `${why} Upgrade at ${upgrade_url}, or write to ${SALES_EMAIL} for more.`;
-    return new HttpError(Status.PAYMENT_REQUIRED, message, { code, upgrade_url, contact: SALES_EMAIL });
+    return new HttpError(Status.PAYMENT_REQUIRED, message, { ...details, code, upgrade_url, contact: SALES_EMAIL });
   }
 }
 

@@ -40,7 +40,7 @@ describe('ToolbarViewModel', () => {
   it('opens the native library through the shell bridge', () => {
     const { fake, vm } = toolbar();
     vm.showLibrary();
-    assert.deepEqual(fake.called('showLibrary'), [[]]);
+    assert.deepEqual(fake.called('showLibrary'), [['history']]);
   });
 
   it("starts from the main process's address", async () => {

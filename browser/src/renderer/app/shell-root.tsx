@@ -23,6 +23,7 @@ import { ControlBar, blockedActions } from '../features/control/index.ts';
 import { BrandMark, ThemeSelect, PageBackdrop, Launch, useChromeRoot } from '../features/chrome/index.ts';
 import { TabBar, TabCard } from '../features/tabs/index.ts';
 import { BookmarksBar, Toolbar } from '../features/toolbar/index.ts';
+import { LibraryPage } from '../features/library/index.tsx';
 import { StartPage } from '../features/start/index.ts';
 import { PlaybooksPane } from '../features/playbooks/index.ts';
 import { AskPane } from '../features/ask/index.ts';
@@ -124,19 +125,24 @@ function useRecordBlocked(vms: ShellViewModels): boolean {
 /** The commands and account dialog, with the appearance and format settings in its footer. */
 function Dialogs({ vms }: ShellRootProps) {
   const c = vms.connection;
-  const footer = (
+  const preferences = (
     <>
-      <ThemeSelect vm={vms.chrome.theme} />
-      <PageFormatSelect source={vms.inspect.source} />
-      <AppVersion vm={c.updates} />
+      <div className="settings-preference">
+        <ThemeSelect vm={vms.chrome.theme} />
+      </div>
+      <div className="settings-preference">
+        <PageFormatSelect source={vms.inspect.source} />
+        <p>How your agents read web pages.</p>
+      </div>
     </>
   );
+  const footer = <AppVersion vm={c.updates} />;
   const models = { dialog: c.dialog, account: c.account, sync: c.sync, imports: c.imports, profile: c.profile };
   return (
     <>
       <NotificationsCenter vm={vms.notifications} />
       <ReconnectOverlay vm={c.reconnect} />
-      <ShellDialog palette={c.palette} reconnect={c.reconnect} footer={footer} {...models} />
+      <ShellDialog palette={c.palette} reconnect={c.reconnect} footer={footer} preferences={preferences} {...models} />
     </>
   );
 }
@@ -151,6 +157,7 @@ export function ShellRoot({ vms }: ShellRootProps) {
       <BrowserChrome vms={vms} />
       <PageBackdrop vm={vms.chrome.backdrop} />
       <StartPage vm={vms.start} />
+      <LibraryPage vms={vms} />
       <Launch vm={vms.chrome.launch} />
       <Workspace vms={vms} />
       <BrowserFooter vms={vms} />

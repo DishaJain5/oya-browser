@@ -15,6 +15,7 @@ import type { RendererServices } from '../../../app/services.ts';
 import { navLook, type ToolbarViewModel } from '../view-models/toolbar-view-model.ts';
 import { AddressBar } from './address-bar.tsx';
 import { AskButton } from './ask-button.tsx';
+import { LibraryButtons } from './library-buttons.tsx';
 import { TEXT } from '../model/constants.ts';
 
 /** What the toolbar is given. */
@@ -60,10 +61,17 @@ export function Toolbar({ vm, panel, shell, children, trailing }: ToolbarProps) 
         icon={look.reloadIcon}
       />
       <AddressBar vm={vm} />
+      <ToolbarLibrary vm={vm} />
       {children}
       <AskButton panel={panel} shell={shell} />
       {trailing}
       <div id="navigation-progress" hidden={!nav.loading} aria-hidden="true"></div>
     </nav>
   );
+}
+
+/** When the bookmarks row is hidden, keep its collection buttons accessible beside the address. */
+function ToolbarLibrary({ vm }: Pick<ToolbarProps, 'vm'>) {
+  const { shown } = useViewModel(vm.bookmarks);
+  return shown ? null : <LibraryButtons vm={vm.bookmarks} />;
 }

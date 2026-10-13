@@ -12,6 +12,7 @@ import { ASK_TEXT, EXAMPLE_TASKS } from '../model/constants.ts';
 import { isErrorReply, replyHtml } from '../model/reply.ts';
 import type { AskViewModel, ChatMessage } from '../view-models/ask-view-model.ts';
 import { FinishedRunCard, LiveRun } from './run-card.tsx';
+import { PlanNoticeCard } from './plan-notice.tsx';
 import { SaveOffer } from './save-offer.tsx';
 
 /** What the conversation's parts are given. */
@@ -113,6 +114,8 @@ export function Messages({ ask, onViewPlaybook }: AskProps) {
           <div key={item.id} className="chat-msg user">
             {item.content}
           </div>
+        ) : item.notice ? (
+          <PlanNoticeCard key={item.id} notice={item.notice} open={() => ask.openBilling()} />
         ) : (
           <AgentMessage key={item.id} ask={ask} message={item} onViewPlaybook={onViewPlaybook} />
         ),

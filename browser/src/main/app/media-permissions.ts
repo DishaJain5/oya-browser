@@ -1,143 +1,121 @@
-/** Human-approved microphone/camera access, scoped to the requesting document. */
-import type {
-  WebContents,
-  MediaAccessPermissionRequest,
-  PermissionCheckHandlerHandlerDetails,
-  MessageBoxOptions,
-} from 'electron';
+/**
+ * Human-approved microphone and camera access. A site asks once per profile;
+ * Allow is remembered on disk (site-permissions.ts), so a meeting is not a new
+ * prompt every time. The gate (media-gate.ts) still runs on every check and
+ * request, so a remembered grant never reaches a tab an agent drives, a
+ * governed browser or a background tab, and macOS consent is confirmed each time.
+ */
+import type { WebContents, MediaAccessPermissionRequest, PermissionCheckHandlerHandlerDetails } from 'electron';
 import type { AppServices } from './services.ts';
+import { MediaGate } from './media-gate.ts';
+import { allowDevicesPrompt, type DeviceKind } from './media-prompts.ts';
 import { ALLOW_MEDIA_CHOICE } from './constants.ts';
-/** Sensitive access uses native dialogs and the normal control boundary. */
-type Deps = Pick<AppServices, 'electron' | 'shell' | 'tabs' | 'agentTab' | 'governance'>;
-/** Only these two media kinds may be requested. */
-type MediaKind = 'audio' | 'video';
-/** HTTPS origins are displayed rather than private paths and query strings. */
-function mediaOrigin(raw: string): string | null {
-  const url = URL.parse(raw);
-  return url?.protocol === 'https:' && !url.username && !url.password ? url.origin : null;
-}
+
+/** The gate's services, the profile the grants are keyed by, and where they are kept. */
+type Deps = Pick<
+  AppServices,
+  'electron' | 'shell' | 'tabs' | 'agentTab' | 'governance' | 'persona' | 'sitePermissions'
+>;
+
+/** Whether `type` is a device a site can ask for. */
+const isDevice = (type: unknown): type is DeviceKind => type === 'audio' || type === 'video';
+
 /** Empty or unknown media types must not turn into permission for everything. */
-function requestedMedia(details: MediaAccessPermissionRequest): MediaKind[] {
+function requestedMedia(details: MediaAccessPermissionRequest): DeviceKind[] {
   const types = details.mediaTypes;
-  return types?.length && types.every((type) => type === 'audio' || type === 'video') ? [...new Set(types)] : [];
+  return types?.length && types.every(isDevice) ? [...new Set(types)] : [];
 }
-/** No permanent grants: reload, navigation and tab destruction revoke checks. */
+
+/** Site consent, remembered per profile, then OS consent, every time. */
 export class MediaPermissions {
-  /** Native APIs, active tab and control policy. */
+  /** The rules and the dialog, shared with screen sharing. */
+  readonly gate: MediaGate;
+  /** The profile and the remembered grants. */
   private readonly deps: Deps;
   /** Testable platform branch for macOS privacy consent. */
   private readonly platform: string;
-  /** Device types approved for each tab's current document; never on disk or in another profile. */
-  private readonly grants = new WeakMap<WebContents, Set<MediaKind>>();
-  /** Navigation generations fence reloads even when the URL does not change. */
-  private readonly generations = new WeakMap<WebContents, number>();
-  /** Prevent a page from stacking permission dialogs. */
-  private pending = false;
+
   /** Native OS consent is requested only after site consent. */
   constructor(deps: Deps, platform = process.platform) {
     this.deps = deps;
     this.platform = platform;
+    this.gate = new MediaGate(deps);
   }
-  /** Refuse background tabs, a tab an agent drives, and managed runtimes. Per tab: with agents connected, the person still owns the tabs no agent claimed. */
-  private allowed(contents: WebContents | null): contents is WebContents {
+
+  /** The profile whose grants apply right now. */
+  private partition(): string {
+    return this.deps.persona.partitionName();
+  }
+
+  /** Permission checks grant only what this profile remembered for this site, and only to a tab the person may use now. Never prompts. */
+  check(contents: WebContents | null, origin: string, details: PermissionCheckHandlerHandlerDetails): boolean {
+    const site = details && this.gate.eligible(contents, details.securityOrigin || origin);
+    const type = details?.mediaType;
     return (
-      !!contents &&
-      !contents.isDestroyed() &&
-      !this.deps.governance.configuration &&
-      this.deps.agentTab.humanMay(this.deps.tabs.activeTabId) &&
-      this.deps.tabs.getActiveView()?.webContents === contents
+      !!site && isDevice(type) && this.deps.sitePermissions.has(this.partition(), site, type) && this.osGranted(type)
     );
   }
-  /** A same-origin secure document is the only eligible requester. */
-  private origin(contents: WebContents, raw: string): string | null {
-    const origin = mediaOrigin(raw);
-    return origin && origin === mediaOrigin(contents.getURL()) ? origin : null;
+
+  /** A remembered site decision cannot report a device as available while macOS blocks it. */
+  private osGranted(type: DeviceKind): boolean {
+    return (
+      this.platform !== 'darwin' ||
+      this.deps.electron.systemPreferences.getMediaAccessStatus(type === 'audio' ? 'microphone' : 'camera') ===
+        'granted'
+    );
   }
+
   /** Async permission requests always settle to a boolean, including OS/dialog failures. */
-  async request(contents: WebContents, details: MediaAccessPermissionRequest): Promise<boolean> {
-    if (!this.allowed(contents) || this.pending || !details) return false;
-    const origin = this.origin(contents, details.securityOrigin || details.requestingUrl);
-    const types = requestedMedia(details);
-    if (!origin || !types.length) return false;
-    this.pending = true;
-    return this.approve(contents, origin, types)
-      .catch(() => false)
-      .finally(() => this.settled());
+  request(contents: WebContents, details: MediaAccessPermissionRequest): Promise<boolean> {
+    const origin = details && this.gate.eligible(contents, details.securityOrigin || details.requestingUrl);
+    const types = details ? requestedMedia(details) : [];
+    if (!origin || !types.length) return Promise.resolve(false);
+    return this.gate.locked(() => this.approve(contents, origin, types));
   }
-  /** Always release the prompt lock, including exceptions and denials. */
-  private settled(): void {
-    this.pending = false;
+
+  /**
+   * Site consent, then OS consent, with control and the document rechecked after
+   * each wait. The person's Allow is remembered as soon as it is given, before
+   * the OS is asked: site and OS consent are separate decisions (as in Chrome),
+   * and a device macOS blocks must not turn into the Allow box on every retry.
+   */
+  private async approve(contents: WebContents, origin: string, types: DeviceKind[]): Promise<boolean> {
+    const generation = this.gate.watch(contents);
+    const partition = this.partition();
+    const remembered = this.remembered(origin, types);
+    if (!remembered && !(await this.gate.allowedBy(allowDevicesPrompt(origin, types), ALLOW_MEDIA_CHOICE)))
+      return false;
+    if (!this.gate.current(contents, generation) || this.partition() !== partition) return false;
+    if (!remembered) this.deps.sitePermissions.grant(partition, origin, types);
+    return this.confirmDevices(contents, generation, partition, types);
   }
-  /** Permission checks cannot grant devices that have not been explicitly approved. */
-  check(contents: WebContents | null, origin: string, details: PermissionCheckHandlerHandlerDetails): boolean {
-    if (!this.allowed(contents) || !details || !this.origin(contents, details.securityOrigin || origin)) return false;
-    const type = details.mediaType;
-    return (type === 'audio' || type === 'video') && !!this.grants.get(contents)?.has(type);
+
+  /** OS consent cannot grant a replacement document or profile, even after the site decision was saved. */
+  private async confirmDevices(
+    contents: WebContents,
+    generation: number,
+    partition: string,
+    types: DeviceKind[],
+  ): Promise<boolean> {
+    const allowed = await this.osConsent(types);
+    if (!this.gate.current(contents, generation) || this.partition() !== partition) return false;
+    return allowed || this.gate.osDenied(contents, generation);
   }
-  /** Recheck source and control after every OS prompt before granting capture. */
-  private async approve(contents: WebContents, origin: string, types: MediaKind[]): Promise<boolean> {
-    const generation = this.watch(contents);
-    const result = await this.ask(this.options(origin, types));
-    if (result.response !== ALLOW_MEDIA_CHOICE || !this.current(contents, generation)) return false;
-    if (!(await this.osConsent(types)) || !this.current(contents, generation)) return false;
-    this.remember(contents, types);
-    return true;
+
+  /** Whether this profile already allowed every requested device on this site. */
+  private remembered(origin: string, types: DeviceKind[]): boolean {
+    return types.every((type) => this.deps.sitePermissions.has(this.partition(), origin, type));
   }
-  /** Keep a single navigation listener per tab, not one per repeated request. Only a new top document revokes: a pushState or an iframe loading keeps it. */
-  private watch(contents: WebContents): number {
-    if (!this.generations.has(contents)) {
-      this.generations.set(contents, 0);
-      contents.on('did-start-navigation', (e) => e.isMainFrame && !e.isSameDocument && this.revoke(contents));
-    }
-    return this.generations.get(contents)!;
-  }
-  /** Forget permissions on navigation, including same-URL reloads. */
-  private revoke(contents: WebContents): void {
-    this.generations.set(contents, this.generations.get(contents)! + 1);
-    this.grants.delete(contents);
-  }
-  /** Prompts cannot grant a replacement document or a browser now controlled by an agent. */
-  private current(contents: WebContents, generation: number): boolean {
-    return this.allowed(contents) && this.generations.get(contents) === generation;
-  }
-  /** Separate microphone and camera approvals accumulate only for this document. */
-  private remember(contents: WebContents, types: MediaKind[]): void {
-    this.grants.set(contents, new Set([...(this.grants.get(contents) || []), ...types]));
-  }
-  /** Tell the person exactly which devices the website requested. */
-  private options(origin: string, types: MediaKind[]): MessageBoxOptions {
-    const devices = types.map((type) => (type === 'audio' ? 'microphone' : 'camera')).join(' and ');
-    return {
-      message: `Allow ${devices}?`,
-      detail: `${origin} wants to use your ${devices}. Allow only if you trust this site. This approval lasts for this page.`,
-      buttons: ['Block', 'Allow'],
-      defaultId: 0,
-      cancelId: 0,
-    };
-  }
-  /** macOS also requires system-level permission; other platforms enforce it themselves. */
-  private async osConsent(types: MediaKind[]): Promise<boolean> {
+
+  /** macOS also requires system-level permission (answered at once when already granted); other platforms enforce it themselves. */
+  private async osConsent(types: DeviceKind[]): Promise<boolean> {
     if (this.platform !== 'darwin') return true;
     for (const type of types) {
       const device = type === 'audio' ? 'microphone' : 'camera';
-      if (!(await this.deps.electron.systemPreferences.askForMediaAccess(device))) return this.osDenied();
+      if (await this.deps.electron.systemPreferences.askForMediaAccess(device)) continue;
+      console.log(`[oya] media: macOS refused the ${device}; allow Oya Browser in System Settings`);
+      return false;
     }
     return true;
-  }
-  /** Explain OS denial rather than leaving a call silently without a microphone. */
-  private async osDenied(): Promise<false> {
-    await this.ask({
-      message: 'Device access is blocked in macOS',
-      detail: 'Allow Oya Browser in System Settings → Privacy & Security → Microphone or Camera, then retry the call.',
-      buttons: ['OK'],
-    });
-    return false;
-  }
-  /** Parent to Oya when possible; never pass Electron a null window. */
-  private ask(options: MessageBoxOptions) {
-    const window = this.deps.shell.window;
-    return window && !window.isDestroyed()
-      ? this.deps.electron.dialog.showMessageBox(window, options)
-      : this.deps.electron.dialog.showMessageBox(options);
   }
 }

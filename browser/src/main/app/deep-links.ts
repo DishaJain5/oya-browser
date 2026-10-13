@@ -32,7 +32,7 @@ export class DeepLinks {
   /** Pair from an oya:// link (see src/main/connection/pairing.ts), then reconnect as the paired browser. */
   async applyDeepLink(rawUrl: string): Promise<boolean> {
     if (/^https?:\/\//i.test(rawUrl)) return this.openWebLink(rawUrl);
-    const paired = await pairFromLink(rawUrl, (opts) => this.ask(opts));
+    const paired = await pairFromLink(rawUrl, (opts) => this.ask(opts), !!this.deps.config.values.mirroredFrom);
     if (!paired) return false;
     this.retarget(paired);
     // The import needs the new connection, so it runs once that signs in.

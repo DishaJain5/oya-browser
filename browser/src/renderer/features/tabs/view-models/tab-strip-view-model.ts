@@ -55,6 +55,8 @@ export interface TabStripDeps {
   drag: Pick<TabDragViewModel, 'state' | 'release'>;
   /** Whether the person asked for less motion (no folding or growing). */
   reducedMotion: () => boolean;
+  /** Says why a drop did nothing when the main process refused it (an agent took the tab mid-drag). */
+  refused?: () => void;
 }
 
 /** The layout for `state`: a held width, or an even share of the room. */
@@ -150,10 +152,16 @@ export class TabStripViewModel extends ViewModel<TabStripState> {
   endPress(pointerId: number): void {
     const drop = this.deps.drag.release(pointerId);
     if (!drop) return;
+    // A tear-off main refuses (a dialog open, a popup's tab) is not an agent's doing: the strip just goes back.
     if (drop.detached) return void this.deps.bridge.detachTab(drop.id).catch(() => this.update(this.state.tabs));
     this.set({ items: moveItem(this.state.items, drop.id, drop.to), drop });
-    // Refused (an agent took control): the strip goes back to the main process's order.
-    this.deps.bridge.moveTab(drop.id, drop.to).catch(() => this.update(this.state.tabs));
+    this.deps.bridge.moveTab(drop.id, drop.to).catch(() => this.revert());
+  }
+
+  /** Refused (an agent took control mid-drag): the strip goes back to the main process's order, and says why. */
+  private revert(): void {
+    this.update(this.state.tabs);
+    this.deps.refused?.();
   }
 
   /** Takes a folded tab away once its fold has played. */

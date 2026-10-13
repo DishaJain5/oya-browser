@@ -72,8 +72,8 @@ export class BookmarksBarViewModel extends ViewModel<BookmarksBarState> {
     void this.bridge.setBookmarksBar(false);
   }
 
-  /** Opens every bookmark and the history. */
-  showAll(): void {
-    void this.bridge.showLibrary();
+  /** Opens or selects a collection tab. */
+  showAll(kind: 'bookmarks' | 'history' = 'bookmarks'): void {
+    void this.bridge.showLibrary(kind);
   }
 }
