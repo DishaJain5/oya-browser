@@ -1,11 +1,11 @@
 /**
- * The windows in the veil, as state: each opens over a found element, glides
- * when the element moves, closes when it is gone and opens again if it comes
+ * The windows in the veil, as state: each opens over a found element, follows
+ * its current bounds without lag, hides when it is gone and opens again if it comes
  * back. A frame asks where each one is and how open, at a given time; the
  * Veil paints the answer. No canvas here, so it is tested on its own.
  */
 import { RendererConstants as C } from '../core/constants.ts';
-import { between, eased } from './geometry.ts';
+import { eased } from './geometry.ts';
 import type { Rect } from './types.ts';
 
 /** A box with the id of the element it covers. */
@@ -18,14 +18,8 @@ interface Keyed extends Rect {
 interface Hole {
   /** Where its element is. */
   box: Rect;
-  /** Where it glides from. */
-  from: Rect;
-  /** Where it was last drawn, or null before its first frame. */
-  drawn: Rect | null;
   /** When it began to open. */
   at: number | null;
-  /** When it began its glide. */
-  movedAt: number | null;
   /** Whether its element has gone, so it is closing. */
   closing: boolean;
   /** When it began to close. */
@@ -55,14 +49,14 @@ export class VeilWindows {
 
   /** Opens a window over one element; it grows in from its middle over the next frames. */
   open(box: Keyed): void {
-    const shut = { drawn: null, at: null, movedAt: null, closing: false, closedAt: null };
-    this.holes.set(String(box.id), { box, from: box, ...shut });
+    const shut = { at: null, closing: false, closedAt: null };
+    this.holes.set(String(box.id), { box, ...shut });
   }
 
-  /** The elements moved: each window glides to where its element is, closes when it is gone, and opens again if it is back. */
-  move(boxes: readonly Keyed[]): void {
+  /** The elements moved: each window follows its element exactly; only an intentional dismissal fades. */
+  move(boxes: readonly Keyed[], dismiss = false): void {
     const at = new Map(boxes.map((box) => [String(box.id), box]));
-    for (const [id, hole] of this.holes) follow(hole, at.get(id));
+    for (const [id, hole] of this.holes) follow(hole, at.get(id), dismiss);
   }
 
   /** Closes every window at once. */
@@ -70,7 +64,7 @@ export class VeilWindows {
     this.holes.clear();
   }
 
-  /** Where every window is at `now`, and whether any is still opening, gliding or closing. */
+  /** Where every window is at `now`, and whether any is still opening or closing. */
   frame(now: number): VeilFrame {
     const frame: VeilFrame = { shapes: [], moving: false };
     for (const hole of this.holes.values()) frame.moving = step(hole, now, frame.shapes) || frame.moving;
@@ -78,30 +72,27 @@ export class VeilWindows {
   }
 }
 
-/** One window follows its element: it glides to where the element is now, closes when it is gone, and reopens if it returns. */
-function follow(hole: Hole, box: Rect | undefined): void {
+/** One window follows its element: it tracks the real geometry and never leaves light over a vanished element. */
+function follow(hole: Hole, box: Rect | undefined, dismiss: boolean): void {
   if (!box) {
-    if (!hole.closing) Object.assign(hole, { closing: true, closedAt: null });
+    if (!hole.closing) Object.assign(hole, { closing: true, closedAt: dismiss ? null : -Infinity });
     return;
   }
   if (hole.closing) Object.assign(hole, { closing: false, closedAt: null, at: null });
-  Object.assign(hole, { from: hole.drawn || hole.box, box, movedAt: null });
+  hole.box = box;
 }
 
 /** Moves one window on to `now`, adds it to `shapes` while it is open at all, and says whether it is still moving. */
 function step(hole: Hole, now: number, shapes: VeilShape[]): boolean {
   stamp(hole, now);
-  const glide = eased((now - (hole.movedAt ?? now)) / C.SHIELD_VEIL_GLIDE_MS);
   const open = strength(hole, now);
-  hole.drawn = between(hole.from, hole.box, glide);
-  if (open > 0) shapes.push({ box: hole.drawn, open });
-  return hole.closing ? open > 0 : open < 1 || glide < 1;
+  if (open > 0) shapes.push({ box: { x: hole.box.x, y: hole.box.y, w: hole.box.w, h: hole.box.h }, open });
+  return hole.closing ? open > 0 : open < 1;
 }
 
-/** Notes, on a window's first frame since it opened, moved or began to close, when that began. */
+/** Notes, on a window's first frame since it opened or began to close, when that began. */
 function stamp(hole: Hole, now: number): void {
   hole.at ??= now;
-  hole.movedAt ??= now;
   if (hole.closing) hole.closedAt ??= now;
 }
 

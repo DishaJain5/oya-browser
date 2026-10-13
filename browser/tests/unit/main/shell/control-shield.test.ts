@@ -176,6 +176,15 @@ describe('ControlShield', () => {
       mock.method(ctx.shield.view.webContents, 'executeJavaScript', async (js) => told.push(js));
     };
 
+    it('cleans up safely when the shield web contents are destroyed before the page', () => {
+      cover();
+      ctx.shield.view.webContents.isDestroyed = () => true;
+      assert.doesNotThrow(() => page.webContents.emit('destroyed'));
+      assert.deepEqual(told, []);
+      ctx.shield.view.webContents = undefined;
+      assert.doesNotThrow(() => page.webContents.emit('destroyed'));
+    });
+
     it('tells its page a scan began while it covers the page', () => {
       cover();
       ctx.shield.analysisStarted(page);
@@ -231,7 +240,7 @@ describe('ControlShield', () => {
       assert.deepEqual(told, [`window.oyaShield?.(${JSON.stringify({ phase: 'found', boxes: [box] })})`]);
     });
 
-    it('checks once that the page really shows each element, then follows only those', async () => {
+    it('pins analysis elements once and follows the same capture without resolving selectors again', async () => {
       mock.timers.enable({ apis: ['setTimeout', 'Date'] });
       cover();
       const scripts = [];
@@ -247,8 +256,8 @@ describe('ControlShield', () => {
       await new Promise((resolve) => setImmediate(resolve));
       ctx.shield.stopTracking();
       mock.timers.reset();
-      assert.match(scripts[0], /\(true && !shows\(el\)\)/, 'the first measure checks what the page shows');
-      assert.match(scripts[1], /\(false && !shows\(el\)\)/, 'following does not');
+      assert.match(scripts[0], /const mode = "capture"/);
+      assert.match(scripts[1], /const mode = "follow"/);
       assert.doesNotMatch(scripts[1], /data-x=\\"2/, 'an element the page did not show is not followed');
     });
 
@@ -307,7 +316,7 @@ describe('ControlShield', () => {
         ctx.control.state.interactive = true;
         ctx.shield.sync();
         await step();
-        assert.deepEqual(phases(), ['found']);
+        assert.deepEqual(phases(), ['found', 'reset']);
       });
 
       it('stops once the show is over', async () => {
@@ -331,6 +340,35 @@ describe('ControlShield', () => {
         assert.equal(told.length, 2, 'no more measuring of a page that is gone');
       });
     });
+
+    for (const invalidate of ['new scan', 'run end', 'navigation', 'native navigation', 'tab switch', 'action']) {
+      it(`does not redraw an obsolete measurement after ${invalidate}`, async () => {
+        cover();
+        let finish;
+        ctx.world = worldOf(
+          () =>
+            new Promise((resolve) => {
+              finish = resolve;
+            }),
+        );
+        const pending = ctx.shield.analysisFinished(page, { data: { elements: [] } });
+        if (invalidate === 'new scan') ctx.shield.analysisStarted(page);
+        if (invalidate === 'run end') ctx.shield.runEnded();
+        if (invalidate === 'navigation')
+          page.webContents.emit('did-start-navigation', {}, 'https://new.test', false, true);
+        if (invalidate === 'native navigation') page.webContents.emit('did-start-navigation', { isMainFrame: true });
+        if (invalidate === 'tab switch') {
+          const other = new FakeBrowserView();
+          ctx.tabs.getActiveView = ctx.tabs.getShownView = () => other;
+          ctx.shield.sync();
+        }
+        if (invalidate === 'action') await ctx.shield.acting(page, 'navigate', { url: 'https://new.test' });
+        const before = [...told];
+        finish([{ id: 1, type: 'button', x: 10, y: 10, w: 50, h: 30 }]);
+        await pending;
+        assert.deepEqual(told, before, 'late geometry must not revive the previous page');
+      });
+    }
 
     it('outlines nothing when the page cannot be measured', async () => {
       cover();

@@ -77,6 +77,7 @@ function stageParts(at: Find): Omit<StageParts, 'document' | 'view'> {
 /** The handler of each update. */
 function handlers(show: Show, actor: Actor): Handlers {
   return {
+    reset: () => show.reset(),
     scan: () => show.scan(),
     found: (update) => show.finish(update),
     move: (update) => show.move(update),

@@ -34,6 +34,7 @@ export class Actor {
 
   /** One action: a change to the page dismisses the show; Oya says it, pulses, and targets the element when it was measured. */
   act({ text, box, changes }: ActUpdate): void {
+    this.parts.stage.clearTargets();
     if (changes) this.parts.show.dismiss();
     this.parts.companion.say('acting', String(text));
     this.parts.companion.pulse();

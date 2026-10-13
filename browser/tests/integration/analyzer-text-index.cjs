@@ -15,7 +15,7 @@ module.exports = async function textIndex(win, world, profile) {
   const view = { webContents: win.webContents };
   await world.evaluate(
     view,
-    `globalThis.indexPasses=0;const nativeTags=document.getElementsByTagName.bind(document);document.getElementsByTagName=function(tag){if(tag==='*')indexPasses++;return nativeTags(tag);}`,
+    `globalThis.indexPasses=0;const nativeTags=document.getElementsByTagName.bind(document);document.getElementsByTagName=function(tag){if(tag==='*')indexPasses++;return nativeTags(tag);};void 0`,
   );
   const read = async () => {
     const result = await world.evaluate(view, 'indexPasses=0;analyzePage()');

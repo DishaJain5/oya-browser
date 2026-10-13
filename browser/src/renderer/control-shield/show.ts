@@ -2,7 +2,7 @@
  * The show of one reading: while the agent reads, the beam sweeps the page;
  * when the reading is back, a pass of light crosses it and each element it
  * found locks on as the pass reaches it, while Oya counts them; then the
- * outlines hold, fade, and the companion rests. A move glides them, and an
+ * outlines hold, fade, and the companion rests. A move repositions them, and an
  * action that changes the page dismisses them at once.
  */
 import { RendererConstants as C } from '../core/constants.ts';
@@ -61,7 +61,7 @@ export class Show {
     this.parts.clock.later(this.parts.clock.untilReveal(), () => this.found(this.latest));
   }
 
-  /** The page moved under the outlines: each glides to where its element is now, and one whose element is gone fades. */
+  /** The page moved under the outlines: each follows its element now, and missing elements hide. */
   move({ boxes }: MoveUpdate): void {
     this.latest = boxes || [];
     this.parts.veil.move(this.latest);
@@ -76,6 +76,17 @@ export class Show {
     this.parts.stage.leave();
     body.classList.remove('scanning', 'lit');
     this.dismissing();
+  }
+
+  /** A different document or tab is beneath us: remove geometry without fading over unrelated content. */
+  reset(): void {
+    this.parts.clock.bump();
+    this.parts.clock.stop();
+    this.latest = [];
+    this.clear();
+    this.parts.stage.clearTargets();
+    this.parts.body.classList.remove('scanning', 'revealing', 'lit', 'dismissing');
+    this.parts.companion.say('', '');
   }
 
   /** The reading itself: the beam sweeps the page on a steady loop while the companion says so. */
@@ -137,7 +148,7 @@ export class Show {
   private letGo(): void {
     if (!this.parts.stage.count) return this.clear();
     this.parts.stage.leave();
-    this.parts.veil.move([]);
+    this.parts.veil.move([], true);
     this.dismissing();
   }
 

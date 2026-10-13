@@ -6,21 +6,24 @@
  * the page rather than into it, so the site never sees them.
  */
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { HighlightEpoch } from './highlight-epoch.ts';
+import { highlightMeasureJs } from './highlight-measure.ts';
 import { TakeoverPrompt } from './takeover-prompt.ts';
 import type { BrowserView, BrowserWindow, WebContents } from 'electron';
 import type { AppServices } from '../app/services.ts';
 import { drivenElsewhere, type ControlSnapshot } from '../control/control-state.ts';
-import {
-  TRANSPARENT,
-  HUMAN_MENU_ITEMS,
-  MAX_ANALYSIS_BOXES,
-  SHIELD_TRACK_MS,
-  SHIELD_TRACK_FOR_MS,
-} from './constants.ts';
+import { TRANSPARENT, HUMAN_MENU_ITEMS, SHIELD_TRACK_MS, SHIELD_TRACK_FOR_MS } from './constants.ts';
 import { lineFor, namesFrom, idOf, changesPage, type ActionParams, type AnalyzedElement } from './narration.ts';
-import { pageTone } from './page-tone.ts';
+import { HighlightReader } from './highlight-reader.ts';
 import { holdStill, inContainer } from './hold-still.ts';
 import { keepAgentRendering } from './view-stack.ts';
+
+/** A closing BrowserView may have already lost its web contents before the page's destruction event. */
+function liveContents(view: BrowserView | null): WebContents | null {
+  const contents = view?.webContents;
+  return contents && !contents.isDestroyed() ? contents : null;
+}
 
 /** Carry container motion policy to the shield before its first paint. */
 function loadShield(view: BrowserView, appDir: string): void {
@@ -74,6 +77,8 @@ export interface ShieldBox {
   id: number;
   /** Its kind, which colours its outline. */
   type: string;
+  /** Visible but unavailable controls keep an outline with a disabled state. */
+  disabled?: boolean;
   /** Left edge. */
   x: number;
   /** Top edge. */
@@ -90,14 +95,6 @@ export interface AnalysisData {
   elements?: AnalyzedElement[];
 }
 
-/** The element an action is aimed at. */
-interface Aim {
-  /** Its analysis id. */
-  id: number;
-  /** A selector that finds it, when the action named one. */
-  selector?: string;
-}
-
 /** An analysis result, as the page reader returns it. */
 export interface AnalysisResult {
   /** Whether the analysis ran. */
@@ -106,67 +103,10 @@ export interface AnalysisResult {
   data?: AnalysisData;
 }
 
-/** How an isolated-world read is run: `retry: false` gives up on a page that is gone instead of waiting for it. */
-interface EvalOptions {
-  /** Whether to retry while the page's world is being rebuilt. */
-  retry?: boolean;
-}
-
 /** One run of following the outlines; a newer run replaces it. */
 interface TrackingRun {
   /** The next re-measure. */
   timer?: NodeJS.Timeout;
-}
-
-/**
- * Measures elements in the isolated world; it only reads. Each is found as the
- * analyzer finds it (shadow roots and iframes included), placed through any
- * same-origin frames, and mapped into the visual viewport so a pinch-zoom still
- * lines up. `__WANTED__` becomes the `[id, type, selector]` list.
- */
-const MEASURE_JS = `(() => {
-  const vv = window.visualViewport || { offsetLeft: 0, offsetTop: 0, scale: 1 };
-  const find = (id, selector) =>
-    window.__acFindElement?.(id) || window.__acQueryShadow?.(selector) || document.querySelector(selector);
-  const place = (el) => {
-    const r = el.getBoundingClientRect();
-    let x = r.left, y = r.top;
-    for (let f = el.ownerDocument.defaultView?.frameElement; f; f = f.ownerDocument.defaultView?.frameElement) {
-      const fr = f.getBoundingClientRect();
-      x += fr.left + f.clientLeft;
-      y += fr.top + f.clientTop;
-    }
-    const k = vv.scale;
-    return { x: (x - vv.offsetLeft) * k, y: (y - vv.offsetTop) * k, w: r.width * k, h: r.height * k };
-  };
-  // Painted, and on top somewhere: not faded out, hidden, covered by something else, or clipped away.
-  const shows = (el) => {
-    if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
-    const r = el.getBoundingClientRect();
-    const root = el.getRootNode();
-    const lands = ([fx, fy]) => {
-      const hit = root.elementFromPoint?.(r.left + r.width * fx, r.top + r.height * fy);
-      return !!hit && (hit === el || el.contains(hit));
-    };
-    return [[0.5, 0.5], [0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]].some(lands);
-  };
-  return (__WANTED__).map(([id, type, selector]) => {
-    const el = find(id, selector);
-    if (!el || (__STRICT__ && !shows(el))) return null;
-    const box = place(el);
-    return box.w && box.h ? { id, type, ...box } : null;
-  }).filter(Boolean);
-})()`;
-
-/**
- * Measures the visible elements an analysis found. `strict` also leaves out any the
- * page does not actually show (faded, covered or clipped): worth it once per analysis,
- * not on every re-measure while the outlines follow the page.
- */
-function analysisBoxesJs(elements: readonly AnalyzedElement[], strict = false): string {
-  const wanted = elements.filter((e) => e.visible).slice(0, MAX_ANALYSIS_BOXES);
-  const list = JSON.stringify(wanted.map((e) => [e.id, e.type, e.selector]));
-  return MEASURE_JS.replace('__WANTED__', () => list).replace('__STRICT__', String(strict));
 }
 
 /** Whether an agent holds the page (`view`'s, under per-tab control): re-analyzing it would renumber the agent's element ids. */
@@ -174,9 +114,6 @@ export function agentDriving(ctx: Pick<AppServices, 'control' | 'agentTab' | 'ta
   if (!view || !ctx.agentTab.scoped()) return !ctx.control.snapshot().interactive;
   return ctx.agentTab.claimed().some((id) => ctx.tabs.find(id)?.view === view);
 }
-
-/** The colour a target ring takes for each action, by the kind of element it acts on; anything else is a click. */
-const ACT_TARGET_TYPES: Record<string, string> = { type: 'input', select: 'select' };
 
 /** What a read of the page answers while an agent holds it. */
 export const AGENT_HOLDS_PAGE = 'OyaAI is using this page. Switch to Human Mode to read it.';
@@ -189,6 +126,10 @@ export class ControlShield {
   readonly popups = new Map<BrowserWindow, boolean>();
   /** The outlines being followed right now, or null; a newer run replaces it. */
   private tracking: TrackingRun | null = null;
+  /** Rejects geometry measured before a navigation, tab switch or newer action. */
+  private readonly epoch = new HighlightEpoch(() => this.reset());
+  /** Native geometry reader shared by scans and action feedback. */
+  private readonly reader: HighlightReader;
   /** Analysis id to element name, from the last analysis, for the companion's lines. */
   private names: Map<number, string> = new Map();
   /** The main-process services. */
@@ -199,6 +140,7 @@ export class ControlShield {
   /** `deps` is the main-process context (see src/main/main.ts). */
   constructor(deps: Deps) {
     this.deps = deps;
+    this.reader = new HighlightReader(deps, () => this.view);
     this.takeover = new TakeoverPrompt(deps);
   }
 
@@ -209,11 +151,7 @@ export class ControlShield {
 
   /** A tab that takes focus while an agent drives hands it back to the shell. */
   keepFocusOnShell(): void {
-    const contents = this.deps.shell.window?.webContents;
-    if (!contents) return;
-    focusFencedShell(this.deps, contents);
-    // Aura ignores reentrant focus changes until its current focus callback returns.
-    setImmediate(() => focusFencedShell(this.deps, contents));
+    keepShellFocus(this.deps);
   }
 
   /** The control state changed: tell the shell, and fence the page accordingly. */
@@ -227,10 +165,7 @@ export class ControlShield {
 
   /** Greys out the page commands in the application menu. */
   enableMenus(interactive: boolean): void {
-    for (const id of HUMAN_MENU_ITEMS) {
-      const item = this.deps.electron.Menu.getApplicationMenu()?.getMenuItemById(id);
-      if (item) item.enabled = interactive;
-    }
+    updateMenus(this.deps, interactive);
   }
 
   /** A new sign-in popup: disabled only while someone else drives, unless it is the person's own; forgotten once closed. */
@@ -274,28 +209,27 @@ export class ControlShield {
 
   /** An agent began reading the page: the shield starts its scan, and stops following the last outlines. */
   analysisStarted(view: BrowserView): void {
+    if (!this.showing(view)) return;
     this.stopTracking();
     this.tell(view, { phase: 'scan' });
   }
 
   /** The analysis is back: outline what it found that the page really shows, then keep the outlines on their elements. A failed measurement outlines nothing. */
   async analysisFinished(view: BrowserView, raw: AnalysisResult | null | undefined): Promise<void> {
-    this.stopTracking();
     if (!this.showing(view)) return;
+    this.stopTracking();
+    const ticket = { revision: this.epoch.revision, key: randomUUID() };
     const elements = raw?.data?.elements || [];
     this.names = namesFrom(elements);
-    const boxes = await this.outline(view, elements);
-    const shown = new Set(boxes.map((b) => b.id));
-    this.track(view, analysisBoxesJs(elements.filter((e) => shown.has(e.id))), Date.now() + SHIELD_TRACK_FOR_MS);
+    const update = await this.reader.analysis(view, elements, ticket.key);
+    if (ticket.revision !== this.epoch.revision || !this.showing(view)) return;
+    this.publish(view, update, ticket.key);
   }
 
-  /** Measures what the page really shows of `elements`, and how dark the page is, and has the shield outline them; returns their boxes. */
-  private async outline(view: BrowserView, elements: readonly AnalyzedElement[]): Promise<ShieldBox[]> {
-    const read = (js: string): unknown => this.deps.world.evaluate(view, js, { retry: false });
-    const [measured, tone] = await Promise.all([this.measure(view, analysisBoxesJs(elements, true)), pageTone(read)]);
-    const boxes = measured || [];
-    this.tell(view, { phase: 'found', boxes, ...(tone && { tone }) });
-    return boxes;
+  /** Sends current geometry and follows the same captured DOM nodes for the duration of the show. */
+  private publish(view: BrowserView, update: object, key: string): void {
+    this.tell(view, update);
+    this.track(view, highlightMeasureJs([], 'follow', key), Date.now() + SHIELD_TRACK_FOR_MS);
   }
 
   /** A run from the panel ended: the shield lets go of what it was showing, so nothing claims the agent is still at work. */
@@ -309,27 +243,22 @@ export class ControlShield {
   async acting(view: BrowserView, action: string, params?: ActionParams): Promise<void> {
     const text = lineFor(action, params, this.names);
     if (!text || !this.showing(view)) return;
-    const id = idOf(params);
-    const box = id === null ? null : await this.target(view, { id, selector: params?.selector }, action);
-    this.tell(view, { phase: 'act', text, box, changes: changesPage(action) });
+    if (idOf(params) === null) return this.unaimed(view, text, action);
+    this.stopTracking();
+    const ticket = { revision: this.epoch.revision, key: randomUUID() };
+    const box = await this.reader.target(view, idOf(params)!, action, ticket.key);
+    if (ticket.revision !== this.epoch.revision || !this.showing(view)) return;
+    this.publish(view, { phase: 'act', text, box, changes: changesPage(action) }, ticket.key);
   }
 
-  /** Where the element an action is aimed at sits now, coloured for the action, or null when it cannot be found. */
-  private async target(view: BrowserView, aim: Aim, action: string): Promise<ShieldBox | null> {
-    const type = Object.hasOwn(ACT_TARGET_TYPES, action) ? ACT_TARGET_TYPES[action] : 'button';
-    const js = analysisBoxesJs([{ id: aim.id, type, selector: aim.selector, visible: true }]);
-    return (await this.measure(view, js, { retry: false }))?.[0] || null;
+  /** Scrolling keeps following the existing scan; a navigation or untargeted edit invalidates it. */
+  private unaimed(view: BrowserView, text: string, action: string): void {
+    const changes = changesPage(action);
+    if (changes) this.stopTracking();
+    this.tell(view, { phase: 'act', text, box: null, changes });
   }
 
-  /** Where the elements sit now, in the shield's pixels (the page may be zoomed, the shield is not); null when the page cannot be read. */
-  private async measure(view: BrowserView, js: string, options?: EvalOptions): Promise<ShieldBox[] | null> {
-    const boxes = await this.deps.world.evaluate<ShieldBox[] | null>(view, js, options).catch(() => null);
-    if (!boxes || !this.view) return null;
-    const k = view.webContents.getZoomFactor() / this.view.webContents.getZoomFactor();
-    return boxes.map((b) => ({ ...b, x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k }));
-  }
-
-  /** Re-measures every SHIELD_TRACK_MS until `until`, so the outlines glide with the page as it scrolls or reflows. */
+  /** Re-measures every SHIELD_TRACK_MS until `until`, so the outlines stay attached to the page as it scrolls or reflows. */
   private track(view: BrowserView, js: string, until: number): void {
     const run: TrackingRun = (this.tracking = {});
     run.timer = setTimeout(() => this.follow(run, view, js, until), SHIELD_TRACK_MS);
@@ -338,7 +267,7 @@ export class ControlShield {
   /** One re-measure of a tracking run; it tells the page, then schedules the next, unless the run was stopped or is over. A page that cannot be read has navigated away: its outlines fade and following stops. */
   private async follow(run: TrackingRun, view: BrowserView, js: string, until: number): Promise<void> {
     if (this.tracking !== run || !this.showing(view) || Date.now() > until) return;
-    const boxes = await this.measure(view, js, { retry: false });
+    const boxes = await this.reader.measure(view, js);
     if (this.tracking !== run) return;
     // The page could not be read: it has navigated, so these outlines belong to a page that is gone.
     if (!boxes) return this.tell(view, { phase: 'move', boxes: [] });
@@ -350,11 +279,21 @@ export class ControlShield {
   stopTracking(): void {
     clearTimeout(this.tracking?.timer);
     this.tracking = null;
+    this.epoch.bump();
+  }
+
+  /** Removes all geometry immediately when the underlying page is no longer the measured document. */
+  private reset(): void {
+    this.stopTracking();
+    this.names.clear();
+    liveContents(this.view)
+      ?.executeJavaScript('window.oyaShield?.({"phase":"reset"})')
+      .catch(() => {});
   }
 
   /** Whether the shield is over `view` right now. */
   private showing(view: BrowserView | null | undefined): boolean {
-    return !!this.view && this.shouldCover() && this.deps.tabs.getActiveView() === view;
+    return !!liveContents(this.view) && this.shouldCover() && this.deps.tabs.getActiveView() === view;
   }
 
   /** Hands the shield page one update, when it is over `view`. */
@@ -365,6 +304,7 @@ export class ControlShield {
 
   /** Takes the shield off the window. */
   private uncover(win: BrowserWindow): void {
+    this.epoch.watch(null);
     this.stopTracking();
     if (this.view) win.removeBrowserView(this.view);
     keepAgentRendering(this.deps, win);
@@ -372,9 +312,26 @@ export class ControlShield {
 
   /** Lays the shield exactly over `view`, on top, and keeps keyboard focus off the page. */
   private cover(win: BrowserWindow, view: BrowserView, shield: BrowserView): void {
+    this.epoch.watch(view.webContents);
     shield.setBounds(view.getBounds());
     if (!win.getBrowserViews().includes(shield)) win.addBrowserView(shield);
     win.setTopBrowserView(shield);
     if (view.webContents.isFocused()) win.webContents.focus();
+  }
+}
+
+/** Restore native focus after Aura completes its current focus callback, with the same ownership fence. */
+function keepShellFocus(deps: Deps): void {
+  const contents = deps.shell.window?.webContents;
+  if (!contents) return;
+  focusFencedShell(deps, contents);
+  setImmediate(() => focusFencedShell(deps, contents));
+}
+
+/** Keeps native page menu commands consistent with the control owner. */
+function updateMenus(deps: Deps, interactive: boolean): void {
+  for (const id of HUMAN_MENU_ITEMS) {
+    const item = deps.electron.Menu.getApplicationMenu()?.getMenuItemById(id);
+    if (item) item.enabled = interactive;
   }
 }

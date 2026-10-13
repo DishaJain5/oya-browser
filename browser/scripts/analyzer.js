@@ -226,7 +226,7 @@
         const left = rect.left + off.x,
           right = rect.right + off.x;
         el.visible = bottom > 0 && top < vh && right > 0 && left < vw && rect.width > 0 && rect.height > 0;
-        if (el.visible && !off.x && !off.y && isCovered(dom, rect)) {
+        if (el.visible && isCovered(dom, rect)) {
           el.covered = true;
           el.state = el.state ? el.state + ' covered' : 'covered';
         }
@@ -294,10 +294,20 @@
    * banner or an overlay. A click there lands on that instead.
    */
   function isCovered(dom, rect) {
-    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    if (!hit || dom.contains(hit)) return false;
-    for (let n = dom; n; n = n.parentNode || n.host) if (n === hit) return false;
-    return !isStickyHeader(hit);
+    let x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+    for (let target = dom; target;) {
+      const root = target.getRootNode();
+      const hit = root.elementFromPoint?.(x, y);
+      if (hit && hit !== target && !target.contains(hit) && !hit.contains(target) && !isStickyHeader(hit)) return true;
+      if (root.host) { target = root.host; continue; }
+      const frame = target.ownerDocument.defaultView?.frameElement;
+      if (!frame) return false;
+      const r = frame.getBoundingClientRect();
+      x = r.left + (x + frame.clientLeft) * (frame.offsetWidth ? r.width / frame.offsetWidth : 1);
+      y = r.top + (y + frame.clientTop) * (frame.offsetHeight ? r.height / frame.offsetHeight : 1);
+      target = frame;
+    }
+    return false;
   }
 
   /** Whether an element sits in a fixed or sticky strip across the top of the viewport. */
@@ -707,7 +717,7 @@
     return !!parent && window.getComputedStyle(parent).cursor !== 'pointer';
   }
 
-  function getInteractiveType(node) {
+  function getInteractiveType(node, allowPointer = true) {
     const tag = node.tagName;
     const hidden = hiddenControl(node);
     if (hidden) return hidden.type.toLowerCase();
@@ -767,7 +777,7 @@
 
     // cursor:pointer fallback, tighter constraints
     try {
-      if (pointerControl(node)) return 'button';
+      if (allowPointer && pointerControl(node)) return 'button';
     } catch {}
 
     // ── Site-specific interactive element detection ──
@@ -796,7 +806,10 @@
   }
 
   function hasInteractiveChild(node) {
-    for (const c of node.querySelectorAll(INTERACTIVE_CHILD_SELECTOR)) if (!isHardHidden(c)) return true;
+    // A test id alone is not a control. Decorative glyphs and text inherit the
+    // parent's pointer cursor; neither should hide their actual button/option.
+    for (const c of node.querySelectorAll(INTERACTIVE_CHILD_SELECTOR))
+      if (!SKIP_TAGS.has(c.tagName) && !isHardHidden(c) && getInteractiveType(c, false)) return true;
     return false;
   }
 

@@ -1,6 +1,6 @@
 /**
  * The dim over the page, with a soft window over each element the agent found.
- * It is one canvas, drawn only while a window is opening, gliding or closing,
+ * It is one canvas, drawn only while a window is opening or closing,
  * so a hundred windows cost one layer and no frame at rest. Where the windows
  * are comes from VeilWindows; this class only paints them.
  */
@@ -42,9 +42,9 @@ export class Veil {
     this.ask();
   }
 
-  /** The elements moved: each window glides after its element, and closes if it has gone. */
-  move(boxes: readonly ShieldBox[]): void {
-    this.windows.move(boxes);
+  /** The elements moved: each window follows its element without positional easing; missing elements hide. */
+  move(boxes: readonly ShieldBox[], dismiss = false): void {
+    this.windows.move(boxes, dismiss);
     this.ask();
   }
 

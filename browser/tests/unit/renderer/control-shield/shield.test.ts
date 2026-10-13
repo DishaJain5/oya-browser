@@ -35,6 +35,19 @@ describe('the control shield page', () => {
     mock.timers.tick(C.SHIELD_REVEAL_MS);
   };
 
+  it('shows disabled controls and updates their availability without dropping their outline', () => {
+    const box = { id: 38, type: 'button', x: 100, y: 100, w: 30, h: 28, disabled: true };
+    page.oyaShield({ phase: 'found', boxes: [box] });
+    reveal();
+    const outline = boxes()[0];
+    assert.ok(outline.classList.contains('disabled'));
+    assert.equal(outline.getAttribute('aria-label'), 'Element 38, disabled');
+    page.oyaShield({ phase: 'move', boxes: [{ ...box, disabled: false }] });
+    assert.equal(boxes()[0], outline);
+    assert.ok(!outline.classList.contains('disabled'));
+    assert.equal(outline.getAttribute('aria-label'), 'Element 38');
+  });
+
   it('scans and says so while the analysis runs', () => {
     page.oyaShield({ phase: 'scan' });
     assert.ok(page.document.body.classList.contains('scanning'));
@@ -189,7 +202,7 @@ describe('the control shield page', () => {
       assert.equal(lifts('light').length, 0);
     });
 
-    it('closes the window of an element that has gone, smoothly, and opens it again if it comes back', () => {
+    it('removes a missing element’s light immediately, and opens it again if it comes back', () => {
       const ctx = fakeContext();
       page.$('veil').getContext = () => ctx;
       const open = C.SHIELD_VEIL_OPEN_MS;
@@ -201,7 +214,7 @@ describe('the control shield page', () => {
       page.oyaShield({ phase: 'move', boxes: [] });
       frameAt(ctx, open);
       const closing = frameAt(ctx, open * 1.5).filter((c) => c.mode === 'destination-out');
-      assert.ok(closing.length && closing.at(-1).alpha < 1 && closing.at(-1).alpha > 0, 'it is closing');
+      assert.deepEqual(closing, [], 'it no longer illuminates where the element used to be');
       assert.deepEqual(frameAt(ctx, open * 3), [], 'it has closed');
       page.oyaShield({ phase: 'move', boxes: [one] });
       frameAt(ctx, open * 3);
@@ -455,6 +468,29 @@ describe('the control shield page', () => {
     drain();
     assert.equal(boxes().length, 0);
     assert.equal(said(), 'Reading the page');
+  });
+
+  it('resets outlines, action rings and pending reveals immediately for a different document', () => {
+    const box = { id: 1, type: 'link', x: 10, y: 0, w: 50, h: 20 };
+    page.oyaShield({ phase: 'found', boxes: [box] });
+    reveal();
+    page.oyaShield({ phase: 'act', text: 'Pointing', box });
+    page.oyaShield({ phase: 'reset' });
+    assert.equal(boxes().length, 0);
+    assert.equal(page.$('targets').children.length, 0);
+    drain();
+    assert.equal(boxes().length, 0);
+    assert.ok(!page.document.body.classList.contains('lit'));
+  });
+
+  it('moves an action target to its current bounds and hides it when its element is gone', () => {
+    const box = { id: 1, type: 'button', x: 10, y: 20, w: 50, h: 30 };
+    page.oyaShield({ phase: 'act', text: 'Clicking', box });
+    page.oyaShield({ phase: 'move', boxes: [{ ...box, y: 120 }] });
+    const ring = page.$('targets').children[0];
+    assert.equal(ring.style.transform, 'translate3d(10px, 120px, 0)');
+    page.oyaShield({ phase: 'move', boxes: [] });
+    assert.ok(ring.classList.contains('gone'));
   });
 
   it('says when there is nothing to click, and ignores an unknown update', () => {

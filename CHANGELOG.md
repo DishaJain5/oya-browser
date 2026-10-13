@@ -8,6 +8,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ### Fixed
 
+- Keep agent highlights aligned during page movement, clip them to visible controls and scaled frames, and discard stale highlights after navigation or element replacement.
+- Recognize custom app controls containing decorative test markers, highlight styled radio and checkbox labels, and correctly distinguish iframe contents from covering overlays. Avoid a highlight cleanup crash during window shutdown.
+- Keep visible disabled toolbar controls, such as iCloud Mail’s Reply and Trash, in the highlight scan with muted dashed outlines.
+
 - Links can open installed desktop apps, including Docker, Slack and Zoom, after confirmation. Human-owned tabs work in AI Mode and separate windows; callback parameters are preserved.
 
 ## [1.0.181](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.181) · 2026-10-13

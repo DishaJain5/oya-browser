@@ -327,13 +327,13 @@
     left: 0;
     top: 0;
     box-sizing: border-box;
-    /* Only the move glides, at the veil's pace: animating a size would lay the page out again on every frame. */
-    transition:
-      transform 320ms var(--ease),
-      opacity 700ms var(--ease);
+    /* Position follows the real element immediately; only the decorative entrance eases. */
+    transition: opacity 180ms var(--ease);
   }
-  .box.gone {
+  .box.gone,
+  .target.gone {
     opacity: 0;
+    transition: none;
   }
   /* At the window's top or left edge its number tucks just inside the corner, where it can be seen. */
   .box.tucked b {
@@ -426,6 +426,19 @@
   .stage.busy .box b {
     opacity: 0;
     animation: flash-tag 3200ms var(--ease) 420ms backwards;
+  }
+  /* Unavailable controls are still found; a quiet dashed rim distinguishes them from action targets. */
+  .box.disabled::before {
+    background: none;
+    mask: none;
+    border: 1px dashed #a3afb8;
+  }
+  .box.disabled::after {
+    box-shadow: none;
+  }
+  .box.disabled b {
+    color: #c4cdd3;
+    box-shadow: inset 0 0 0 0.5px #a3afb8;
   }
   /* The number rises into place, rather than popping. */
   @keyframes tag {

@@ -955,3 +955,34 @@ the governance request-blocking hook. URLs omit credentials, queries and fragmen
 headers, cookies and bodies are excluded. Elapsed time starts at request headers,
 not DNS or TLS. Console text remains untrusted page output. These hooks do not
 attach a debugger or inject tracing scripts; this is not an undetectability claim.
+
+### Agent highlight alignment
+
+The control shield measures visible geometry in the analyzer's native isolated
+world through `shell/highlight-measure.ts`. Each scan pins exact DOM nodes;
+tracking cannot recover an old selector onto a replacement element. Rectangles
+are clipped to scroll containers and frame viewports, mapped through frame
+borders and positive axis-aligned scales, then adjusted for visual viewport and
+page zoom. Rotated frame geometry is omitted rather than approximated.
+
+Highlights follow current bounds without positional easing, with measurements
+serialized at up to 30 Hz while feedback is visible. Decorative entrances retain
+the existing motion. Hidden, detached and covered elements lose their highlight;
+navigation, tab changes and newer activity invalidate pending measurements.
+`npm run test:desktop-highlights` exercises the production shield in the stock
+Oya desktop runtime with real DOM, isolated analysis, zoom and native rendering.
+
+Transparent native toggles retain their control identity while highlights use
+their associated visible label. Decorative test markers no longer suppress a
+semantic parent control in the analyzer; actual interactive children still win.
+Occlusion checks walk the target's shadow root and frame ancestry, including
+frames at the page origin. Analyzer DOM tests cover custom app controls and
+real overlays outside their iframe. Shutdown checks tolerate the shield's web
+contents being destroyed before its underlying tab.
+
+Disabled controls with `pointer-events: none` may hit their own ancestor while
+still being visibly painted. Highlight measurements accept that ancestry only
+for disabled controls, retain their own bounds, and still reject unrelated
+covering elements. Availability is re-read while tracking and shown with a
+muted dashed outline; native fixture tests cover both native and ARIA controls,
+real occlusion, state changes and the rendered disabled treatment.

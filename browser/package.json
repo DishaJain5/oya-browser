@@ -59,7 +59,8 @@
     "test:native-release": "node build/native-acceptance.mjs",
     "test:native-pre-scripts": "node tests/integration/native-pre-scripts.mjs",
     "test:native-app": "npm run build && node tests/integration/native-app.mjs",
-    "test:native-packaged-app": "node tests/integration/native-packaged-app.mjs"
+    "test:native-packaged-app": "node tests/integration/native-packaged-app.mjs",
+    "test:desktop-highlights": "node tests/integration/desktop-highlights.mjs"
   },
   "dependencies": {
     "@playwright/test": "^1.64.0",

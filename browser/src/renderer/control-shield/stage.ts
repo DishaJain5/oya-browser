@@ -8,7 +8,7 @@ import { RendererConstants as C } from '../core/constants.ts';
 import { DEFAULT_COLOR, TYPE_COLORS } from './constants.ts';
 import { middle, tucked } from './geometry.ts';
 import { TagLayout } from './tag-layout.ts';
-import type { Point, Rect, ShieldBox, ViewPort } from './types.ts';
+import type { Point, ShieldBox, ViewPort } from './types.ts';
 
 /** The stage's parts of the page. */
 export interface StageParts {
@@ -79,14 +79,22 @@ export class Stage {
     this.parts.stage.append(el);
   }
 
-  /** The page moved: each outline glides to its element, and one whose element is gone fades (and comes back if it returns). */
+  /** The page moved: outlines and action targets stay on their elements; absent elements hide immediately. */
   move(boxes: readonly ShieldBox[]): void {
     const at = new Map(boxes.map((box) => [String(box.id), box]));
-    for (const el of Array.from(this.parts.stage.children) as HTMLElement[]) {
+    const elements = [this.parts.stage, this.parts.targets].flatMap((part) => Array.from(part.children));
+    for (const el of elements as HTMLElement[]) {
+      if (!el.dataset.id) continue;
       const box = at.get(el.dataset.id ?? '');
       el.classList.toggle('gone', !box);
       if (box) this.place(el, box);
     }
+  }
+
+  /** Availability follows the real control without implying that a disabled element can be clicked. */
+  private availability(el: HTMLElement, box: ShieldBox): void {
+    el.classList.toggle('disabled', !!box.disabled);
+    el.setAttribute('aria-label', `Element ${box.id}${box.disabled ? ', disabled' : ''}`);
   }
 
   /** A spark leaves the middle of an element just after its outline locks on, and flies to the orb. */
@@ -95,9 +103,15 @@ export class Stage {
     if (orb) this.parts.sparks.append(this.flight(middle(box), orb, box.type, C.SHIELD_SPARK_LAG_MS));
   }
 
+  /** Old action feedback must never stay over a new document or a subsequent action. */
+  clearTargets(): void {
+    this.parts.targets.replaceChildren();
+  }
+
   /** Light flies from the orb to the element an action is aimed at, then a ring locks on to it; both go once played. */
   target(box: ShieldBox): void {
     const ring = this.make('div', ['target']);
+    ring.dataset.id = String(box.id);
     this.place(ring, box);
     ring.style.setProperty('--c', colorOf(box.type));
     const orb = this.orbCentre();
@@ -118,7 +132,8 @@ export class Stage {
   }
 
   /** Puts an element exactly over its box, snapped to device pixels so its hairline stays crisp, with its lock-on reach. */
-  private place(el: HTMLElement, box: Rect): void {
+  private place(el: HTMLElement, box: ShieldBox): void {
+    this.availability(el, box);
     const ratio = this.parts.view.devicePixelRatio || 1;
     const px = (v: number): string => `${Math.round(v * ratio) / ratio}px`;
     el.style.transform = `translate3d(${px(box.x)}, ${px(box.y)}, 0)`;

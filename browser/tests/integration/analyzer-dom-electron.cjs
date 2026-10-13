@@ -51,6 +51,38 @@ async function analyse(win) {
   await win.loadFile(file);
   return (await world.evaluate({ webContents: win.webContents }, 'analyzePage({highlight:false})')).data.elements;
 }
+/** Decorative test ids must not swallow semantic controls inside an app frame. */
+async function customControls(win) {
+  const file = path.join(profile, 'custom-controls.html');
+  fs.writeFileSync(
+    file,
+    `<iframe srcdoc='<style>ui-button,[role=option]{display:block;cursor:pointer}ui-button>button{display:none}</style>
+    <ui-button role="button" aria-label="Settings"><button tabindex="-1"></button><span data-testid="symbols-glyph"><svg></svg></span></ui-button>
+    <div role="option" aria-label="Inbox"><span data-testid="folder-label">Inbox</span></div>
+    <div role="treeitem" aria-label="Example message"><span data-testid="thread-subject">Example message</span></div>
+    <div role="button" aria-label="Wrapper"><button>Real child</button></div>
+    <div role="button" aria-label="Action wrapper"><span data-testid="reply">Reply action</span></div>'></iframe>`,
+  );
+  await win.loadFile(file);
+  const result = await world.evaluate({ webContents: win.webContents }, 'analyzePage({highlight:false})');
+
+  const names = result.data.elements.map((e) => e.text);
+  assert.ok(
+    result.data.elements.every((e) => !e.covered),
+    'A frame at the origin is not an overlay covering its children',
+  );
+  await win.webContents.executeJavaScript(
+    'document.body.insertAdjacentHTML("beforeend", `<div style="position:fixed;inset:0;background:white"></div>`);void 0',
+  );
+  const covered = await world.evaluate({ webContents: win.webContents }, 'analyzePage({highlight:false})');
+  assert.ok(
+    covered.data.elements.filter((e) => e.visible).every((e) => e.covered),
+    'A real overlay outside the frame covers its controls',
+  );
+  for (const name of ['Settings', 'Inbox', 'Example message', 'Real child', 'Reply action'])
+    assert.ok(names.includes(name), `Missing ${name}`);
+  assert.ok(!names.includes('Wrapper') && !names.includes('Action wrapper'), 'Real child controls still take priority');
+}
 /** Nested frames must be readable and their coordinates must reach the real target. */
 async function frames(win) {
   fs.writeFileSync(
@@ -203,6 +235,7 @@ async function run() {
 
   console.log(`Analyzer DOM checks passed: ${elements.length} elements across six portal widgets.`);
 
+  await customControls(win);
   await frames(win);
   await pointerTargets(win);
   await frameEditor(win);

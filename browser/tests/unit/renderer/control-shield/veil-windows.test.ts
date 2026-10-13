@@ -21,16 +21,14 @@ describe('the veil windows', () => {
     assert.deepEqual(windows.frame(OPEN), { shapes: [{ box: { x: 0, y: 0, w: 10, h: 10 }, open: 1 }], moving: false });
   });
 
-  it('glides a window to where its element moved', () => {
+  it('moves a window with its element immediately instead of illuminating the intervening space', () => {
     const windows = new VeilWindows();
     windows.open(box);
     windows.frame(0);
     windows.frame(OPEN);
     windows.move([{ ...box, x: 100 }]);
-    windows.frame(OPEN);
-    const mid = windows.frame(OPEN + C.SHIELD_VEIL_GLIDE_MS / 2).shapes[0].box.x;
-    assert.ok(mid > 0 && mid < 100);
-    assert.equal(windows.frame(OPEN + C.SHIELD_VEIL_GLIDE_MS).shapes[0].box.x, 100);
+    assert.equal(windows.frame(OPEN).shapes[0].box.x, 100);
+    assert.equal(windows.frame(OPEN).moving, false);
   });
 
   it('closes a window whose element is gone, and reopens it when it returns', () => {

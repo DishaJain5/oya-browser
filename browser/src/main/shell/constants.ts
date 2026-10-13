@@ -57,7 +57,7 @@ export const DEV_LOG_MAX_CHARS = 8000;
 /** The most elements the control shield outlines after an analysis. */
 export const MAX_ANALYSIS_BOXES = 150;
 /** How often the control shield re-measures its outlines, so they follow the page as it scrolls and reflows. */
-export const SHIELD_TRACK_MS = 100;
+export const SHIELD_TRACK_MS = 33;
 /** Below this average brightness (0 black, 1 white) a page is dark, and the shield dims it more deeply. */
 export const DARK_PAGE_LUMA = 0.4;
 /** The longest element name the companion quotes before it shortens it with an ellipsis. */

@@ -29,6 +29,8 @@ export interface ShieldBox extends Rect {
   id: number;
   /** Its kind: link, button, input, textarea, editable or select. */
   type: string;
+  /** Disabled controls remain visible with a muted outline. */
+  disabled?: boolean;
 }
 
 /** How light the page under the shield is, which sets the veil's smoke. */
@@ -76,8 +78,14 @@ export interface EndUpdate {
   phase: 'end';
 }
 
+/** A navigation or tab switch invalidated every measured rectangle. */
+export interface ResetUpdate {
+  /** Clears stale geometry immediately without announcing a completed run. */
+  phase: 'reset';
+}
+
 /** Every update the main process sends. */
-export type ShieldUpdate = ScanUpdate | FoundUpdate | MoveUpdate | ActUpdate | EndUpdate;
+export type ShieldUpdate = ScanUpdate | FoundUpdate | MoveUpdate | ActUpdate | EndUpdate | ResetUpdate;
 
 /** The name of an update. */
 export type Phase = ShieldUpdate['phase'];
