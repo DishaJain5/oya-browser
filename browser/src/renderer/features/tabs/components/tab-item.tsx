@@ -1,7 +1,8 @@
 /**
  * One tab on the strip: its icon (the page's favicon, a spinner while it
  * loads, the Oya mark on the start page, a globe otherwise), its title (the
- * role=tab button) and its close button. The agent's tab carries a small Oya
+ * role=tab button) and its close button, which a pinned tab, drawn as its
+ * icon alone, does not have. The agent's tab carries a small Oya
  * light while the agent works, wherever the person is. A folding tab is inert
  * and no longer a tab; during a drag it slides by the drag's transform.
  */
@@ -9,6 +10,7 @@ import { useState, type RefObject } from 'react';
 import { Icon, IconButton } from '../../../ui/index.ts';
 import { closeLabel, iconKind, loadError, tabTitle, type TabItemModel } from '../model/tab-model.ts';
 import { clickHandlers, pointerHandlers } from './tab-gestures.ts';
+import { TEXT } from '../model/constants.ts';
 import type { TabStripViewModel } from '../view-models/tab-strip-view-model.ts';
 import type { TabDragViewModel } from '../view-models/tab-drag-view-model.ts';
 import type { TabCardViewModel } from '../view-models/tab-card-view-model.ts';
@@ -67,6 +69,7 @@ function itemClass({ tab, closing, opening }: TabItemModel, dragging: boolean): 
   const flags = {
     active: !!tab.active && !closing,
     agent: !!tab.agent,
+    pinned: !!tab.pinned,
     failed: !!loadError(tab),
     closing,
     opening,
@@ -93,17 +96,28 @@ export function TabItem({ item, slide, dragging, strip, drag, card, list }: TabI
         role={closing ? undefined : 'tab'}
         aria-selected={!!tab.active}
         tabIndex={tab.active ? 0 : -1}
+        aria-description={tab.pinned ? TEXT.pinned : undefined}
         onClick={() => strip.activate(tab.id)}
       >
         {tabTitle(tab)}
       </button>
-      <IconButton
-        className="tab-close"
-        tabIndex={-1}
-        aria-label={closeLabel(tab)}
-        onClick={() => strip.closeByMouse(tab.id)}
-        icon="close"
-      />
+      {!tab.pinned && <TabClose tab={tab} strip={strip} />}
     </div>
+  );
+}
+
+/** A tab's close button. A pinned tab has none, so a stray click cannot lose it; Delete, middle-click and Cmd+W still close it. */
+function TabClose({
+  tab,
+  strip,
+}: Pick<TabItemProps, 'strip'> & { /** The tab it closes. */ tab: TabItemModel['tab'] }) {
+  return (
+    <IconButton
+      className="tab-close"
+      tabIndex={-1}
+      aria-label={closeLabel(tab)}
+      onClick={() => strip.closeByMouse(tab.id)}
+      icon="close"
+    />
   );
 }

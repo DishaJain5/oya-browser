@@ -27,6 +27,8 @@ export class BrowserWindows {
   private nextId = 1;
   /** An application quit may close windows even while automation owns the session. */
   private quitting = false;
+  /** Set once a quit saved the session: the windows close one by one, and a later save would keep only the last one's tabs. */
+  private quitSaved = false;
   /** Hidden preparation and transactional transfer lifetime. */
   private readonly opening: WindowOpening;
   /** Build the first local scope, then expose stable application-level routers. */
@@ -96,9 +98,19 @@ export class BrowserWindows {
   private beforeClose(scope: AppServices, event: Event): void {
     if (!this.quitting && scope.tabs.list.some((tab) => !this.root.agentTab.humanMay(tab.id)))
       return event.preventDefault();
-    // The red button closes the window before 'before-quit' fires, and closing empties the strip: save first.
-    this.root.sessionTabs?.flush();
+    this.saveSession();
     closeWindowTabs(scope);
+  }
+  /**
+   * Saves the session before a window's tabs close. The red button closes a
+   * window before 'before-quit' fires, so it saves each time; a quit (or an
+   * update restart, whose windows close first) saves once, while every
+   * window's tabs are still open.
+   */
+  private saveSession(): void {
+    if (this.quitting && this.quitSaved) return;
+    this.quitSaved = this.quitting;
+    this.root.sessionTabs?.flush();
   }
   /** Open a full browser shell; never create a second profile or duplicate the server connection. */
   create(point?: Point): AppServices {
@@ -140,13 +152,17 @@ export class BrowserWindows {
     if (!hit || hit === source) return undefined;
     return inTabStrip(point, hit.shell.window!.getContentBounds()) ? hit : undefined;
   }
-  /** The original tab object, webContents, history and renderer survive the transfer. */
+  /**
+   * The original tab object, webContents, history and renderer survive the
+   * transfer. The tab arrives unpinned: the target appends it, which is the
+   * unpinned end, so the pinned block stays leading in both windows.
+   */
   transfer(source: AppServices, target: AppServices, tab: Tab): void {
     this.assertMovable(source, tab.id);
     this.assertMovable(target, tab.id);
     this.assertSource(source, tab);
     source.tabs.releaseTab(tab.id);
-    target.tabs.receiveTab(tab);
+    target.tabs.receiveTab(Object.assign(tab, { pinned: false }));
     target.shell.stagedTab = undefined;
     this.present(target);
     if (!source.tabs.list.length) source.shell.window?.close();

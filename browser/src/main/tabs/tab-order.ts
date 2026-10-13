@@ -4,7 +4,7 @@
  * the right, and reopening what was closed. The main process owns the order;
  * the shell only asks.
  */
-import { CLOSED_TABS_MAX } from './constants.ts';
+import { CLOSED_TABS_MAX, WEB_URL } from './constants.ts';
 import type { Tab, TabStrip } from './types.ts';
 import { privateSession } from '../native-contexts/index.ts';
 
@@ -84,14 +84,50 @@ export function reorder<T>(list: readonly T[], from: number, to: number): T[] {
   return next;
 }
 
-/** Moves tab `id` to `toIndex` on the strip; false when there is no such tab or nothing moved. */
-export function moveTabTo(tabs: TabStrip, id: number, toIndex: unknown): boolean {
-  const from = tabs.list.findIndex((t) => t.id === id);
-  if (from === -1 || typeof toIndex !== 'number' || !Number.isInteger(toIndex)) return false;
-  const next = reorder(tabs.list, from, toIndex);
+/** How many tabs lead the strip pinned: the pinned block always comes first, so this is where it ends. */
+export function pinnedCount(list: readonly Tab[]): number {
+  const first = list.findIndex((t) => !t.pinned);
+  return first === -1 ? list.length : first;
+}
+
+/** Whether a person may pin the tab: only a web page the session file keeps, so a pin always comes back after a restart. */
+export function pinnable(tab: Tab): boolean {
+  return reopenable(tab) && !tab.collection && WEB_URL.test(tab.url);
+}
+
+/** `toIndex` kept inside the tab's own group, so a move never lets a pinned tab leave the leading block or an unpinned one enter it. */
+function withinGroup(list: readonly Tab[], tab: Tab, toIndex: number): number {
+  const pinned = pinnedCount(list);
+  const [first, last] = tab.pinned ? [0, pinned - 1] : [pinned, list.length - 1];
+  return Math.max(first, Math.min(toIndex, last));
+}
+
+/** Puts the strip in `next`'s order and sends it; false when nothing moved. */
+function applyOrder(tabs: TabStrip, next: Tab[]): boolean {
   if (next.every((t, i) => t === tabs.list[i])) return false;
   tabs.list.splice(0, tabs.list.length, ...next);
   tabs.sendTabList();
+  return true;
+}
+
+/** Moves tab `id` to `toIndex` within its group (pinned or not); false when there is no such tab or nothing moved. */
+export function moveTabTo(tabs: TabStrip, id: number, toIndex: unknown): boolean {
+  const from = tabs.list.findIndex((t) => t.id === id);
+  if (from === -1 || typeof toIndex !== 'number' || !Number.isInteger(toIndex)) return false;
+  return applyOrder(tabs, reorder(tabs.list, from, withinGroup(tabs.list, tabs.list[from], toIndex)));
+}
+
+/**
+ * Pins or unpins tab `id`: pinning puts it at the end of the pinned block,
+ * unpinning at the start of the rest. The strip is always sent, even when the
+ * tab did not move, because the send is what redraws it and saves the session.
+ */
+export function setPinned(tabs: TabStrip, id: number, pinned: boolean): boolean {
+  const from = tabs.list.findIndex((t) => t.id === id);
+  if (from === -1 || !!tabs.list[from].pinned === pinned) return false;
+  const to = pinnedCount(tabs.list) - (pinned ? 0 : 1);
+  tabs.list[from].pinned = pinned;
+  if (!applyOrder(tabs, reorder(tabs.list, from, to))) tabs.sendTabList();
   return true;
 }
 
@@ -109,17 +145,17 @@ function closeWhere(tabs: OrderedTabs, pick: (tab: Tab, index: number) => boolea
   for (const id of ids) tabs.closeTab(id);
 }
 
-/** Closes every tab but `id`, and shows it. */
+/** Closes every unpinned tab but `id`, and shows it: pinned tabs are spared, as in Chrome. */
 export function closeOthers(tabs: OrderedTabs, id: number): void {
   if (!tabs.find(id)) return;
-  closeWhere(tabs, (t) => t.id !== id);
+  closeWhere(tabs, (t) => t.id !== id && !t.pinned);
   tabs.activateTab(id);
 }
 
-/** Closes the tabs right of `id`. */
+/** Closes the unpinned tabs right of `id`; pinned tabs are spared. */
 export function closeToRight(tabs: OrderedTabs, id: number): void {
   const index = tabs.list.findIndex((t) => t.id === id);
-  if (index !== -1) closeWhere(tabs, (_t, i) => i > index);
+  if (index !== -1) closeWhere(tabs, (t, i) => i > index && !t.pinned);
 }
 
 /** Reopens the most recently closed tab where it was; returns its id, or undefined when none is left. */

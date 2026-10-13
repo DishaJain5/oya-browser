@@ -11,6 +11,7 @@ import type { TabCardViewModel } from '../view-models/tab-card-view-model.ts';
 import type { Tab } from '../model/tab-model.ts';
 import { measureSlots, stripPort } from '../hooks/use-tab-strip.ts';
 import { BUTTONS, CLOSE_KEY } from '../model/constants.ts';
+import { groupRange, pinnedCount } from '../model/tab-math.ts';
 
 /** What a tab's handlers act on. */
 export interface TabContext {
@@ -39,9 +40,15 @@ function startDrag(ctx: TabContext, event: PointerEvent<HTMLElement>): void {
   const list = ctx.list.current;
   if (!list) return;
   const { id, agent } = ctx.tab;
-  const press = { id, agent: !!agent, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+  const press = { id, agent: !!agent, pointerId: event.pointerId, x: event.clientX, y: event.clientY, ...group(ctx) };
   ctx.drag.start({ ...press, ...measureSlots(list, event.currentTarget) }, stripPort(list));
   event.currentTarget.setPointerCapture?.(event.pointerId);
+}
+
+/** Where the pressed tab may go: within its own group (pinned or not), and off the strip only when it is not pinned. */
+function group({ tab, strip }: TabContext) {
+  const tabs = strip.state.tabs;
+  return { range: groupRange(pinnedCount(tabs), tabs.length, !!tab.pinned), tearable: !tab.pinned };
 }
 
 /** The button came up, or the system took the pointer: the press ends (a drag drops only on `up`). */

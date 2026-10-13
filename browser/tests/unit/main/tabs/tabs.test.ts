@@ -268,6 +268,7 @@ describe('TabManager', () => {
         url: 'https://a.test/',
         home: false,
         favicon: null,
+        pinned: false,
         active: true,
         agent: true,
         loading: true,

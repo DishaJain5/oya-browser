@@ -17,6 +17,10 @@ export interface Slot {
 /** The size a tab draws at: 'small' drops an inactive tab's close button, 'tiny' shows only its icon. */
 export type TabSize = 'normal' | 'small' | 'tiny';
 
+/** How many tabs lead the strip pinned (the main process keeps them first). */
+export const pinnedCount = (tabs: readonly { /** Pinned to the leading block. */ pinned?: boolean }[]): number =>
+  tabs.filter((t) => t.pinned).length;
+
 /** Each tab's width: an even share of `available`, at most the widest a tab grows and at least the narrowest. */
 export function tabWidth(available: number, count: number): number {
   if (count < 1) return C.TAB_MAX_WIDTH;
@@ -35,11 +39,25 @@ export const middle = (slot: Slot): number => slot.left + slot.width * C.HALF;
 /** The right edge of a slot. */
 const right = (slot: Slot): number => slot.left + slot.width;
 
-/** How far the tab in slot `from` may be dragged by `dx` without leaving the strip's first and last slots. */
-export function clamp(slots: readonly Slot[], from: number, dx: number): number {
-  const first = slots[0].left - slots[from].left;
-  const last = right(slots[slots.length - 1]) - right(slots[from]);
-  return Math.max(first, Math.min(last, dx));
+/** The first and last slot a dragged tab may reach: its own group's, so pinned and unpinned tabs never cross. */
+export interface SlotRange {
+  /** The first slot it may reach. */
+  first: number;
+  /** The last slot it may reach. */
+  last: number;
+}
+
+/** The slots a tab may be dragged across: the leading `pinned` slots for a pinned tab, the rest for the others. */
+export function groupRange(pinned: number, count: number, isPinned: boolean): SlotRange {
+  return isPinned ? { first: 0, last: pinned - 1 } : { first: pinned, last: count - 1 };
+}
+
+/** How far the tab in slot `from` may be dragged by `dx` without leaving the slots in `range` (the whole strip by default). */
+export function clamp(slots: readonly Slot[], from: number, dx: number, range?: SlotRange): number {
+  const { first, last } = range ?? { first: 0, last: slots.length - 1 };
+  const least = slots[first].left - slots[from].left;
+  const most = right(slots[last]) - right(slots[from]);
+  return Math.max(least, Math.min(most, dx));
 }
 
 /** The index the tab in slot `from` lands at when dragged by `dx`: its leading edge passed the middle of each tab it displaces. */

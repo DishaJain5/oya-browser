@@ -69,6 +69,8 @@ export interface Tab {
   blankCommitted?: boolean;
   /** The tab that opened it, so a test run's tabs close with it. */
   openerId?: number;
+  /** Pinned to the strip's leading block: drawn as its icon, spared by bulk closes, restored pinned. */
+  pinned?: boolean;
 }
 
 /** What a collaborator tells when a tab changed: the strip is sent again. */

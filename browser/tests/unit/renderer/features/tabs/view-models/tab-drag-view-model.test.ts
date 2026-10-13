@@ -248,3 +248,30 @@ it('a click never starts the native drag surface', () => {
   vm.release(7);
   assert.deepEqual(fake.called('beginTabDrag'), []);
 });
+
+describe('dragging a pinned tab', () => {
+  /** A pinned tab 1 pressed among two pinned slots, over a measured strip. */
+  function pinned() {
+    const fake = fakeBridge();
+    const vm = new TabDragViewModel({ bridge: fake.bridge, frames: manualFrames(), card: new TabCardViewModel() });
+    vm.start(
+      { id: 1, pointerId: 7, x: 50, y: 20, slots: SLOTS, index: 0, range: { first: 0, last: 1 }, tearable: false },
+      { ...port().port, edges: () => ({ left: 0, right: 300, top: 0, bottom: 44 }) },
+    );
+    return { fake, vm };
+  }
+
+  it('stops at the end of the pinned block', () => {
+    const { vm } = pinned();
+    vm.move(7, 290, 20);
+    assert.equal(vm.state.dx, 100);
+    assert.equal(vm.release(7)?.to, 1);
+  });
+
+  it('pulled off the strip neither tears off nor asks for the drag card', () => {
+    const { fake, vm } = pinned();
+    vm.move(7, 50, 140);
+    assert.deepEqual(fake.called('beginTabDrag'), []);
+    assert.equal(vm.release(7), null, 'it never left its place, so nothing moves');
+  });
+});

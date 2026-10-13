@@ -253,8 +253,23 @@ body.mode-browsing .tab-bar {
   inset: 0;
   opacity: 0;
 }
-.tab-list[data-size='tiny'] .tab-item.active .tab-icon {
+/* The active tiny tab swaps its icon for its close button; a pinned one has no close button, so it keeps its icon. */
+.tab-list[data-size='tiny'] .tab-item.active:not(.pinned) .tab-icon {
   display: none;
+}
+/* ── Pinned: the icon alone at a fixed width, at every strip size, as in Chrome (matches TAB_PINNED_WIDTH) ── */
+.tab-list .tab-item.pinned {
+  justify-content: center;
+  padding: 0;
+}
+.tab-list .tab-item.pinned:not(.closing) {
+  width: 44px;
+}
+/* The title stays as the role=tab button, covering the tab, so it keeps focus and the page's name for a screen reader. */
+.tab-list .tab-item.pinned .tab-title {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
 }
 /* ── The agent drives this tab: a small Oya light on its icon, even while the person works in another ── */
 .tab-item.agent .tab-icon::after {

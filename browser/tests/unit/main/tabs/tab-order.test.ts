@@ -10,6 +10,7 @@ import * as order from '../../../../src/main/tabs/tab-order.ts';
 import { mainCtx } from '../../support/main-ctx.cjs';
 
 const { ClosedTabs, reorder, moveTabTo, openBeside, closeOthers, closeToRight, reopenClosed, reopenable } = order;
+const { pinnable, pinnedCount, setPinned } = order;
 
 describe('reopenable', () => {
   it('excludes the start page, popups, blank tabs and tabs with no address', () => {
@@ -121,5 +122,111 @@ describe('the strip order', () => {
     assert.equal(ctx.tabs.closed.size, 1);
     ctx.tabs.closeTab(2, { keepOne: false });
     assert.equal(ctx.tabs.closed.size, 0, 'a log out or profile switch must not reopen the last profile');
+  });
+});
+
+describe('pinnable', () => {
+  it('refuses the start page, collections, popups and private tabs, which the session file never keeps', () => {
+    const page = { url: 'https://a.test/', view: { webContents: { session: {} } } };
+    assert.equal(pinnable(page as any), true);
+    assert.equal(pinnable({ ...page, home: true } as any), false);
+    assert.equal(pinnable({ ...page, collection: 'bookmarks' } as any), false);
+    assert.equal(pinnable({ ...page, window: {} } as any), false);
+    assert.equal(
+      pinnable({ ...page, url: 'file:///Users/a/x.pdf' } as any),
+      false,
+      'never restored, so the pin would be lost',
+    );
+  });
+});
+
+describe('pinned tabs on the strip', () => {
+  let ctx;
+  /** The ids on the strip, in order. */
+  const ids = () => ctx.tabs.list.map((t) => t.id);
+  /** The ids that are pinned, in order. */
+  const pins = () => ctx.tabs.list.filter((t) => t.pinned).map((t) => t.id);
+  beforeEach(() => {
+    mock.timers.enable({ apis: ['setTimeout'] });
+    ctx = mainCtx({ tabs: TabManager });
+    for (const site of ['a', 'b', 'c', 'd']) ctx.tabs.createTab(`https://${site}.test/`);
+  });
+  afterEach(() => mock.timers.reset());
+
+  it('pinning puts a tab at the end of the pinned block', () => {
+    setPinned(ctx.tabs, 3, true);
+    setPinned(ctx.tabs, 4, true);
+    assert.deepEqual(ids(), [3, 4, 1, 2]);
+    assert.equal(pinnedCount(ctx.tabs.list), 2);
+  });
+
+  it('unpinning puts a tab at the start of the unpinned block', () => {
+    setPinned(ctx.tabs, 3, true);
+    setPinned(ctx.tabs, 4, true);
+    setPinned(ctx.tabs, 3, false);
+    assert.deepEqual(ids(), [4, 3, 1, 2]);
+    assert.deepEqual(pins(), [4]);
+  });
+
+  it('sends the strip even when the pinned tab did not move, so it redraws and is saved', () => {
+    const sent = ctx.shell.sentOn('tabs-updated').length;
+    assert.equal(setPinned(ctx.tabs, 1, true), true);
+    assert.equal(ctx.shell.sentOn('tabs-updated').length, sent + 1);
+    assert.equal(ctx.shell.sentOn('tabs-updated').at(-1)[0].pinned, true);
+  });
+
+  it('refuses an unknown tab and a pin that changes nothing', () => {
+    assert.equal(setPinned(ctx.tabs, 99, true), false);
+    assert.equal(setPinned(ctx.tabs, 1, false), false);
+  });
+
+  it('keeps a pinned tab inside the pinned block when moved', () => {
+    setPinned(ctx.tabs, 1, true);
+    setPinned(ctx.tabs, 2, true);
+    moveTabTo(ctx.tabs, 1, 3);
+    assert.deepEqual(ids(), [2, 1, 3, 4]);
+  });
+
+  it('keeps an unpinned tab out of the pinned block when moved', () => {
+    setPinned(ctx.tabs, 1, true);
+    moveTabTo(ctx.tabs, 4, 0);
+    assert.deepEqual(ids(), [1, 4, 2, 3]);
+  });
+
+  it('opens a new tab from a pinned one unpinned, at the first unpinned place', () => {
+    setPinned(ctx.tabs, 1, true);
+    setPinned(ctx.tabs, 2, true);
+    const id = openBeside(ctx.tabs, 1, 'https://e.test/');
+    assert.deepEqual(ids(), [1, 2, id, 3, 4]);
+    assert.deepEqual(pins(), [1, 2]);
+  });
+
+  it('reopens a closed tab unpinned, clamped out of the pinned block', () => {
+    ctx.tabs.closeTab(1);
+    setPinned(ctx.tabs, 3, true);
+    setPinned(ctx.tabs, 4, true);
+    const id = reopenClosed(ctx.tabs);
+    assert.deepEqual(ids(), [3, 4, id, 2]);
+    assert.equal(ctx.tabs.find(id).pinned, undefined);
+  });
+
+  it('closing the others spares pinned tabs', () => {
+    setPinned(ctx.tabs, 1, true);
+    closeOthers(ctx.tabs, 3);
+    assert.deepEqual(ids(), [1, 3]);
+  });
+
+  it('closing the others from a pinned tab closes every unpinned tab', () => {
+    setPinned(ctx.tabs, 1, true);
+    setPinned(ctx.tabs, 2, true);
+    closeOthers(ctx.tabs, 1);
+    assert.deepEqual(ids(), [1, 2]);
+  });
+
+  it('closing to the right spares pinned tabs', () => {
+    setPinned(ctx.tabs, 1, true);
+    setPinned(ctx.tabs, 2, true);
+    closeToRight(ctx.tabs, 1);
+    assert.deepEqual(ids(), [1, 2]);
   });
 });

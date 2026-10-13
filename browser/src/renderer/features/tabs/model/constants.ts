@@ -20,6 +20,8 @@ export const TEXT = {
   close: 'Close ',
   /** The close button's name for an untitled tab. */
   closeUntitled: 'Close tab',
+  /** What a screen reader adds after a pinned tab's title. */
+  pinned: 'Pinned',
   /** The card's address line on the start page. */
   home: 'Oya start page',
   /** The card's address line for a tab with no address. */
