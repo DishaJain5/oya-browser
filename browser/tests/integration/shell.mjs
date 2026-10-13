@@ -734,6 +734,7 @@ try {
     'New Tab to the Right',
     'Reload',
     'Duplicate',
+    'Pin Tab',
     'Move Tab to New Window',
     'Close Tab',
     'Close Other Tabs',
@@ -794,6 +795,24 @@ try {
   );
   assert.deepEqual(await reported(), [before[1], before[2], before[0], ...before.slice(3)], 'main owns the new order');
   assert.deepEqual(await shownOrder(), await reported());
+  // And back: throw tab 4 past the strip's start. It lands first; only leaving the tab bar tears it off.
+  const rightToLeft = await reported();
+  const [backX, backY] = await nthTab(3).evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return [r.left + 20, r.top + r.height / 2];
+  });
+  const stripStart = await page.evaluate(() => document.getElementById('tab-list').getBoundingClientRect().left);
+  await page.mouse.move(backX, backY);
+  await page.mouse.down();
+  await page.mouse.move(Math.max(stripStart - 40, 2), backY, { steps: 12 });
+  assert(await nthTab(3).evaluate((el) => el.classList.contains('dragging')), 'a tab lifts moving left too');
+  await page.mouse.up();
+  const leftward = [rightToLeft[3], ...rightToLeft.slice(0, 3), ...rightToLeft.slice(4)];
+  await page.waitForFunction(
+    (expected) => JSON.stringify(window.oyaShell.tabs.strip.state.tabs.map((t) => t.url)) === expected,
+    JSON.stringify(leftward),
+  );
+  assert.deepEqual(await shownOrder(), await reported(), 'a drag thrown past the start reorders, never tears off');
   // A press without movement only activates, at once.
   await nthTab(4).click();
   await page.waitForFunction(() => document.querySelectorAll('#tab-list .tab-item')[4].classList.contains('active'));

@@ -243,6 +243,32 @@ it('keeps native feedback through a detached drop until main-process handoff fin
   assert.equal(vm.release(7)?.detached, true);
   assert.deepEqual(fake.called('endTabDrag'), []);
 });
+describe('a drag thrown past the end of the strip', () => {
+  /** The last tab pressed on a strip from x=80 to 480, inside a tab bar the window's width. */
+  function thrown() {
+    const fake = fakeBridge();
+    const vm = new TabDragViewModel({ bridge: fake.bridge, frames: manualFrames(), card: new TabCardViewModel() });
+    const strip = { ...port().port, edges: () => ({ left: 80, right: 480, top: 0, bottom: 44 }) };
+    vm.start(
+      { id: 4, pointerId: 7, x: 400, y: 20, slots: SLOTS, index: 3 },
+      { ...strip, bar: () => ({ left: 0, right: 1000 }) },
+    );
+    return { fake, vm };
+  }
+
+  it('reorders to the start, never tearing off, while the pointer stays over the tab bar', () => {
+    const { fake, vm } = thrown();
+    vm.move(7, 20, 20);
+    assert.deepEqual(vm.release(7), { id: 4, to: 0, offset: 0 });
+    assert.deepEqual(fake.called('beginTabDrag'), []);
+  });
+
+  it('tears off once the pointer leaves the tab bar sideways', () => {
+    const { vm } = thrown();
+    vm.move(7, -20, 20);
+    assert.equal(vm.release(7)?.detached, true);
+  });
+});
 it('a click never starts the native drag surface', () => {
   const { fake, vm } = pressed();
   vm.release(7);

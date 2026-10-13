@@ -117,6 +117,7 @@ export function stripPort(list: HTMLElement): StripPort {
     scrollLeft: () => list.scrollLeft,
     edges: () => list.getBoundingClientRect(),
     scrollBy: (px) => void (list.scrollLeft += px),
+    bar: () => (list.closest('.tab-bar') ?? list).getBoundingClientRect(),
   };
 }
 

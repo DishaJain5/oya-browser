@@ -22,6 +22,8 @@ export interface StripPort {
   edges(): Pick<DOMRectReadOnly, 'left' | 'right'> & Partial<Pick<DOMRectReadOnly, 'top' | 'bottom'>>;
   /** Scrolls the strip by `px`. */
   scrollBy(px: number): void;
+  /** The whole tab bar's left and right edges: only past these does a sideways drag tear the tab off (the strip's when absent). */
+  bar?(): Pick<DOMRectReadOnly, 'left' | 'right'>;
 }
 
 /** A press on a tab, as the view measured it. */
@@ -152,7 +154,7 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
 
   /** Whether the pointer left the strip (a margin prevents an accidental tear-off near its edges); never for a pinned tab, which cannot be torn off. */
   private outside(): boolean {
-    return this.press?.tearable !== false && outsideStrip(this.x, this.y, this.strip?.edges());
+    return this.press?.tearable !== false && outsideStrip(this.x, this.y, this.strip?.edges(), this.strip?.bar?.());
   }
 
   /** Escape during a drag puts every tab back; answers whether it took the key. */
