@@ -83,14 +83,22 @@ export class ScreenShare {
     if (!remembered && !(await gate.allowedBy(shareScreenPrompt(origin), ALLOW_MEDIA_CHOICE))) return false;
     if (!gate.current(contents, generation) || this.deps.persona.partitionName() !== partition) return false;
     if (!remembered) this.deps.sitePermissions.grant(partition, origin, ['screen']);
-    return this.osDenied() ? gate.osDenied(contents, generation) : true;
+    return this.confirmOS(contents, generation, partition);
+  }
+
+  /** Request native enumeration before refusing: otherwise macOS may never register Oya for permission. */
+  private async confirmOS(contents: WebContents, generation: number, partition: string): Promise<boolean> {
+    if (this.osDenied()) await this.deps.screenPicker.requestOSPermission();
+    const { gate } = this.deps.mediaPermissions;
+    if (!gate.current(contents, generation) || this.deps.persona.partitionName() !== partition) return false;
+    return this.osDenied() ? gate.osDenied(contents, generation, true) : true;
   }
 
   /** macOS Screen Recording turned off for Oya in System Settings; elsewhere the OS has no such switch. */
   private osDenied(): boolean {
     const denied =
-      this.platform === 'darwin' && this.deps.electron.systemPreferences.getMediaAccessStatus('screen') === 'denied';
-    if (denied) console.log('[oya] media: macOS refused screen recording; allow Oya Browser in System Settings');
+      this.platform === 'darwin' &&
+      ['denied', 'restricted'].includes(this.deps.electron.systemPreferences.getMediaAccessStatus('screen'));
     return denied;
   }
 }

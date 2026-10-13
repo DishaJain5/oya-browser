@@ -44,3 +44,13 @@ export const OS_DENIED_PROMPT: MessageBoxOptions = {
     'Allow Oya Browser in System Settings → Privacy & Security → Microphone, Camera or Screen & System Audio Recording, then rejoin the call.',
   buttons: ['OK'],
 };
+
+/** Screen Recording has its own pane and may require adding the installed application manually. */
+export const SCREEN_DENIED_PROMPT: MessageBoxOptions = {
+  message: 'Allow Oya to share your screen',
+  detail:
+    'In System Settings → Privacy & Security → Screen & System Audio Recording, enable Oya Browser. If it is missing, click + and select Oya Browser in Applications. Then quit and reopen Oya and try sharing again.',
+  buttons: ['Not now', 'Open System Settings'],
+  defaultId: 1,
+  cancelId: 0,
+};

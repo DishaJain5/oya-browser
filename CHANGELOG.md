@@ -6,6 +6,12 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- Request macOS Screen Recording access before refusing screen sharing, with a direct link to the correct System Settings pane and instructions for missing app entries.
+- Generate real screen-sharing previews for background and restored tabs, including tabs that have never been shown. Wait for the first rendered frame and display a clear fallback when a preview cannot be captured.
+- Keep desktop capture choices consistent with macOS permissions and prevent a picker shutdown crash when its requesting window closes.
+
 ## [1.0.182](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.182) · 2026-10-13
 
 ### Fixed

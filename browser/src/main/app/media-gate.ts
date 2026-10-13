@@ -7,7 +7,8 @@
  */
 import type { WebContents, MessageBoxOptions, MessageBoxReturnValue } from 'electron';
 import type { AppServices } from './services.ts';
-import { OS_DENIED_PROMPT } from './media-prompts.ts';
+import { SCREEN_RECORDING_SETTINGS_URL } from '../screen-share/index.ts';
+import { OS_DENIED_PROMPT, SCREEN_DENIED_PROMPT } from './media-prompts.ts';
 
 /** Sensitive access uses native dialogs and the normal control boundary. */
 type Deps = Pick<AppServices, 'electron' | 'shell' | 'tabs' | 'agentTab' | 'governance'>;
@@ -26,6 +27,8 @@ export class MediaGate {
   private readonly generations = new WeakMap<WebContents, number>();
   /** The document generation the macOS denial was last explained for: once per page, not once per request. */
   private readonly explained = new WeakMap<WebContents, number>();
+  /** Screen Recording needs its own recovery even if a microphone denial was already explained. */
+  private readonly screenExplained = new WeakMap<WebContents, number>();
   /** Prevents a page from stacking permission dialogs. */
   private pending = false;
 
@@ -86,10 +89,13 @@ export class MediaGate {
   }
 
   /** Explains the OS denial once per document; always answers false. */
-  async osDenied(contents: WebContents, generation: number): Promise<false> {
-    if (this.explained.get(contents) !== generation) {
-      this.explained.set(contents, generation);
-      await this.ask(OS_DENIED_PROMPT);
+  async osDenied(contents: WebContents, generation: number, screen = false): Promise<false> {
+    const explained = screen ? this.screenExplained : this.explained;
+    if (explained.get(contents) !== generation) {
+      explained.set(contents, generation);
+      const answer = await this.ask(screen ? SCREEN_DENIED_PROMPT : OS_DENIED_PROMPT);
+      if (screen && answer.response === SCREEN_DENIED_PROMPT.defaultId && this.current(contents, generation))
+        await this.deps.electron.shell.openExternal(SCREEN_RECORDING_SETTINGS_URL);
     }
     return false;
   }
