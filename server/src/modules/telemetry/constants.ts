@@ -23,6 +23,12 @@ export const CLIENT_HEADER = 'x-oya-client';
 export { SELF_HOST_FREE_CAP } from '../../platform/license/index.ts';
 /** The largest browser count a ping may report: anything above is a malformed ping. */
 export const PING_MAX_COUNT = 1_000_000;
+/** Keel's step meter is an unsigned 32-bit count. */
+export const KEEL_MAX_STEPS = 4_294_967_295;
+/** The version field stays bounded even when it includes a prerelease suffix. */
+export const KEEL_VERSION_MAX_LENGTH = 32;
+/** Characters in the UTC usage day. */
+export const KEEL_DAY_CHARS = 10;
 /** Cents in a dollar, for amounts said in Slack. */
 export const CENTS = 100;
 /** Digits after the point in an amount of money. */

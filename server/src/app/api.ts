@@ -32,6 +32,7 @@ import { router as poolRoutes } from '../modules/browsers/pool-routes.ts';
 import { billingRoutes, hosted } from '../modules/billing/index.ts';
 import { whoamiRoutes } from '../modules/auth/whoami.ts';
 import { router as pingRoutes } from '../modules/telemetry/ping-routes.ts';
+import { router as keelPingRoutes } from '../modules/telemetry/keel-routes.ts';
 import { router as adminRoutes } from '../modules/admin/index.ts';
 
 // Imported by control/routes.js, control/worker.js and the tests.
@@ -118,6 +119,8 @@ router.use(poolRoutes);
 router.use(billingRoutes(container.billing));
 /** Self-hosted servers' daily ping, received on the hosted deployment. */
 router.use(pingRoutes);
+/** Keel's anonymous daily step reports, received on the hosted deployment. */
+router.use(keelPingRoutes);
 /** The admin page: overview, a person by email, licenses. Company accounts only. */
 router.use(adminRoutes);
 
