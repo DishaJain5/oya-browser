@@ -861,7 +861,7 @@ jobs:
         run: |
           set -euo pipefail
           : "${PGDATABASE:?Missing database connection for Keel telemetry migration}"
-          psql -X --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/024_keel_usage.sql
+          psql -X --dbname="$PGDATABASE" --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/024_keel_usage.sql
 
       - name: Roll out only the server container by immutable digest
         env:
