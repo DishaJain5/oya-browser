@@ -74,3 +74,20 @@ describe('tab math', () => {
     assert.equal(M.cardLeft(-10, 1000, 200), 0);
   });
 });
+
+describe('pinned tab math', () => {
+  it('keeps a drag inside its own group: a pinned tab among the pinned, the others after them', () => {
+    const pinned = M.groupRange(2, 4, true);
+    const unpinned = M.groupRange(2, 4, false);
+    assert.deepEqual(pinned, { first: 0, last: 1 });
+    assert.deepEqual(unpinned, { first: 2, last: 3 });
+    assert.equal(M.clamp(SLOTS, 0, 500, pinned), 100, 'stops at the last pinned slot');
+    assert.equal(M.clamp(SLOTS, 3, -500, unpinned), -100, 'stops at the first unpinned slot');
+    assert.equal(M.dropIndex(SLOTS, 0, M.clamp(SLOTS, 0, 500, pinned)), 1);
+  });
+
+  it('counts the pinned tabs', () => {
+    assert.equal(M.pinnedCount([{ pinned: true }, { pinned: true }, {}]), 2);
+    assert.equal(M.pinnedCount([]), 0);
+  });
+});

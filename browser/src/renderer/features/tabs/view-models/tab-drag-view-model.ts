@@ -11,7 +11,7 @@ import { ViewModel } from '../../../core/view-model.ts';
 import { RendererConstants as C } from '../../../core/constants.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
 import type { RendererServices } from '../../../app/services.ts';
-import { clamp, dropIndex, edgeSpeed, landingLeft, shifts, type Slot } from '../model/tab-math.ts';
+import { clamp, dropIndex, edgeSpeed, landingLeft, shifts, type Slot, type SlotRange } from '../model/tab-math.ts';
 import type { TabCardViewModel } from './tab-card-view-model.ts';
 
 /** The strip as a drag sees it, measured live by the view. */
@@ -42,6 +42,10 @@ export interface Press {
   index: number;
   /** An agent drives the pressed tab. */
   agent?: boolean;
+  /** The slots it may reach: its own group, so a pinned tab stays among the pinned (the whole strip when absent). */
+  range?: SlotRange;
+  /** False for a pinned tab: pulling it off the strip neither tears it off nor asks for the drag card. */
+  tearable?: boolean;
 }
 
 /** A finished drag: the tab, where it lands, and how far off its new place it was let go (for the glide home). */
@@ -148,9 +152,9 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
     return drop;
   }
 
-  /** A small margin prevents an accidental tear-off while reordering near strip edges. */
+  /** Whether the pointer left the strip (a margin prevents an accidental tear-off near its edges); never for a pinned tab, which cannot be torn off. */
   private outside(): boolean {
-    return outsideStrip(this.x, this.y, this.strip?.edges(), this.strip?.bar?.());
+    return this.press?.tearable !== false && outsideStrip(this.x, this.y, this.strip?.edges(), this.strip?.bar?.());
   }
 
   /** Escape during a drag puts every tab back; answers whether it took the key. */
@@ -197,8 +201,8 @@ export class TabDragViewModel extends ViewModel<TabDragState> {
   /** Puts the dragged tab under the pointer and slides the others to make room where it would land. */
   private follow(): void {
     if (!this.press || !this.strip) return;
-    const { slots, index, x } = this.press;
-    const dx = clamp(slots, index, this.x - x + this.strip.scrollLeft() - this.startScroll);
+    const { slots, index, x, range } = this.press;
+    const dx = clamp(slots, index, this.x - x + this.strip.scrollLeft() - this.startScroll, range);
     this.to = dropIndex(slots, index, dx);
     this.set({ dx, shifts: shifts(slots, index, this.to) });
   }

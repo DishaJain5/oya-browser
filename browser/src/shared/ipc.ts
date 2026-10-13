@@ -39,6 +39,8 @@ export interface TabSummary {
   favicon: string | null;
   /** Whether this is the tab on screen. */
   active: boolean;
+  /** Whether the tab is pinned: drawn as its icon in the strip's leading block, with no close button. */
+  pinned?: boolean;
   /** Whether the agent drives this tab; the strip marks it while the agent works. */
   agent?: boolean;
   /** Whether the page is loading. */

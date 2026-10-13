@@ -144,6 +144,8 @@ export const RendererConstants = {
   TAB_MAX_WIDTH: 240,
   /** The narrowest a tab shrinks before the strip scrolls: room for its icon, in pixels (matches tabs.css). */
   TAB_MIN_WIDTH: 44,
+  /** A pinned tab's fixed width: its icon alone, as in Chrome, in pixels (matches tabs.css). */
+  TAB_PINNED_WIDTH: 44,
   /** Below this width an inactive tab drops its close button, in pixels. */
   TAB_SMALL_WIDTH: 96,
   /** Below this width a tab shows only its icon (the active one its close button), in pixels. */

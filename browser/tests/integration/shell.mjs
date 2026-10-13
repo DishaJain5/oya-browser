@@ -734,6 +734,7 @@ try {
     'New Tab to the Right',
     'Reload',
     'Duplicate',
+    'Pin Tab',
     'Move Tab to New Window',
     'Close Tab',
     'Close Other Tabs',

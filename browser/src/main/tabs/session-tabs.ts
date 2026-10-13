@@ -8,11 +8,23 @@
  */
 import type { AppServices } from '../app/services.ts';
 import type { JsonFile } from '../app/json-file.ts';
-import { reopenable } from './tab-order.ts';
+import { pinnedCount, reopenable } from './tab-order.ts';
+import type { Tab } from './types.ts';
 import { RESTORED_TABS_MAX, SESSION_SAVE_DELAY_MS, WEB_URL } from './constants.ts';
 
 /** Only web addresses are kept or restored: the file is an input, and a file: or javascript: entry must never become a tab. */
 const webAddress = (url: unknown): url is string => typeof url === 'string' && WEB_URL.test(url);
+
+/** `tabs` with the pinned ones first, each group in its own order. */
+function pinnedFirst(tabs: Tab[]): Tab[] {
+  return [...tabs.filter((tab) => tab.pinned), ...tabs.filter((tab) => !tab.pinned)];
+}
+
+/** How many restored tabs come back pinned: the file is an input, so anything but a whole positive count is none, and never more than were restored. */
+function pinnedOf(saved: SavedSession, restored: number): number {
+  const pinned = saved.pinned;
+  return typeof pinned === 'number' && Number.isInteger(pinned) && pinned > 0 ? Math.min(pinned, restored) : 0;
+}
 
 /** What the file holds: whose tabs, their addresses in strip order, and which was shown. */
 export interface SavedSession {
@@ -22,6 +34,8 @@ export interface SavedSession {
   urls: string[];
   /** The index of the tab that was shown. */
   active: number;
+  /** How many of the leading addresses were pinned; absent in files written before pinning, read as none. */
+  pinned?: number;
 }
 
 /** The tabs, the profile, the window's mode and the governance rule. */
@@ -68,14 +82,20 @@ export class SessionTabs {
     this.file.write(saved);
   }
 
-  /** The tabs worth bringing back, and which of them was shown. */
+  /**
+   * The tabs worth bringing back, pinned ones first, and which was shown. The
+   * list spans every window, so a pinned block is only leading per window;
+   * gathering the pins first, and counting them among the tabs actually kept,
+   * is what lets every pin come back.
+   */
   private snapshot(): SavedSession {
-    const open = this.deps.tabs.list.filter((tab) => reopenable(tab) && webAddress(tab.url));
-    const active = open.findIndex((tab) => tab.id === this.deps.tabs.activeTabId);
+    const kept = pinnedFirst(this.deps.tabs.list.filter((tab) => reopenable(tab) && webAddress(tab.url)));
+    const active = kept.findIndex((tab) => tab.id === this.deps.tabs.activeTabId);
     return {
       partition: this.deps.persona.partitionName(),
-      urls: open.map((tab) => tab.url),
+      urls: kept.map((tab) => tab.url),
       active: Math.max(active, 0),
+      pinned: pinnedCount(kept),
     };
   }
 
@@ -85,7 +105,8 @@ export class SessionTabs {
     this.restored = true;
     const saved = this.file.read();
     if (saved?.partition !== this.deps.persona.partitionName() || !Array.isArray(saved.urls)) return;
-    this.open(saved.urls.filter(webAddress).slice(0, RESTORED_TABS_MAX), saved.active);
+    const urls = saved.urls.filter(webAddress).slice(0, RESTORED_TABS_MAX);
+    this.open(urls, saved.active, pinnedOf(saved, urls.length));
   }
 
   /** Not a governed browser, in browsing mode, and no page open yet (a switch reopened its own, or the person already typed one). */
@@ -94,12 +115,27 @@ export class SessionTabs {
     return !governance.configuration && !!shell.browsingMode && !tabs.list.some(reopenable);
   }
 
-  /** Opens the pages in order, shows the one that was shown, and closes the start page they replace. */
-  private open(urls: string[], active: number): void {
+  /** Opens the pages in order, shows the one that was shown, closes the start page they replace, and pins the first `pinned`. */
+  private open(urls: string[], active: number, pinned: number): void {
     if (!urls.length) return;
     const starts = this.deps.tabs.list.map((tab) => tab.id);
     const ids = urls.map((url) => this.deps.tabs.createTab(url, false));
     this.deps.tabs.activateTab(ids[Number.isInteger(active) && active >= 0 && active < ids.length ? active : 0]);
     for (const id of starts) this.deps.tabs.closeTab(id);
+    this.pin(ids.slice(0, pinned));
+  }
+
+  /**
+   * Flags the restored tabs that were pinned. They are flagged, not moved:
+   * they already lead the strip once the start page closed, and the root
+   * strip's list is a copy that a reorder would not reach.
+   */
+  private pin(ids: number[]): void {
+    if (!ids.length) return;
+    for (const id of ids) {
+      const tab = this.deps.tabs.find(id);
+      if (tab) tab.pinned = true;
+    }
+    this.deps.tabs.sendTabList();
   }
 }

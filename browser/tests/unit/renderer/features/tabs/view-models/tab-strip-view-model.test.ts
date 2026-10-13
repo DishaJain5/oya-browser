@@ -223,3 +223,32 @@ describe('TabStripViewModel', () => {
     assert.equal(vm.state.items.length, 3, 'nothing changes after dispose');
   });
 });
+
+describe('pinned tabs on the strip layout', () => {
+  beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
+  afterEach(() => mock.timers.reset());
+
+  it('shares the room among unpinned tabs only, pinned ones keeping their fixed width', () => {
+    const { fake, vm } = strip();
+    fake.emit('onTabsUpdated', [tab(1, { pinned: true }), tab(2, { pinned: true }), tab(3, { active: true }), tab(4)]);
+    vm.setRoom(2 * C.TAB_PINNED_WIDTH + 400);
+    assert.deepEqual(stripLayout(vm.state), { width: 200, size: 'normal', overflowing: false });
+  });
+
+  it('counts pinned tabs at their fixed width when saying the strip overflows', () => {
+    const { fake, vm } = strip();
+    fake.emit('onTabsUpdated', [tab(1, { pinned: true }), tab(2, { active: true })]);
+    vm.setRoom(C.TAB_PINNED_WIDTH + C.TAB_MIN_WIDTH - 1);
+    assert.equal(stripLayout(vm.state).overflowing, true);
+    vm.setRoom(C.TAB_PINNED_WIDTH + C.TAB_MIN_WIDTH);
+    assert.equal(stripLayout(vm.state).overflowing, false);
+  });
+
+  it('holds the unpinned share after a close with the mouse, not a share counting pinned tabs', () => {
+    const { fake, vm } = strip();
+    fake.emit('onTabsUpdated', [tab(1, { pinned: true }), tab(2, { active: true }), tab(3)]);
+    vm.setRoom(C.TAB_PINNED_WIDTH + 400);
+    vm.closeByMouse(3);
+    assert.equal(vm.state.frozen, 200);
+  });
+});

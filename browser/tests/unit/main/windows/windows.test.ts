@@ -293,6 +293,50 @@ it('detaches a human-owned tab in agent mode while retaining the agent tab and i
   assert.equal(root.agentTab.humanMay(agent), false);
   await assert.rejects(() => root.windows.detach(agent), /Switch to Human Mode/);
 });
+it('moving a pinned tab to another window unpins it, so it lands in the unpinned block', async (t) => {
+  const { root, primary } = setup(t);
+  primary.tabs.createTab('https://stay.test/');
+  const id = primary.tabs.createTab('https://move.test/');
+  primary.tabs.find(id).pinned = true;
+  await root.windows.detach(id);
+  assert.equal(root.windows.owner(id).tabs.find(id).pinned, false);
+});
+
+/** Two windows with a tab each, recording how many tabs every session save saw. */
+async function twoWindows(t) {
+  const { root, primary } = setup(t);
+  primary.tabs.createTab('https://one.test/');
+  await root.windows.newWindow();
+  const second = root.windows.current;
+  second.tabs.createTab('https://two.test/');
+  const saves: number[] = [];
+  root.sessionTabs.flush = () => void saves.push(root.tabs.list.length);
+  return { root, primary, second, saves };
+}
+
+it('a quit saves the session once, with every window open, so the last window to close cannot overwrite it', async (t) => {
+  const { root, primary, second, saves } = await twoWindows(t);
+  const total = root.tabs.list.length;
+  root.callGuard.commit(); // what Lifecycle does on a quit with no call
+  second.shell.window.close();
+  primary.shell.window.close();
+  assert.deepEqual(saves, [total]);
+});
+
+it('an update restart, which closes windows before the quit, also saves once with every window open', async (t) => {
+  const { root, primary, second, saves } = await twoWindows(t);
+  const total = root.tabs.list.length;
+  root.electron.autoUpdater.emit('before-quit-for-update');
+  primary.shell.window.close();
+  second.shell.window.close();
+  assert.deepEqual(saves, [total]);
+});
+
+it('closing windows one by one without quitting saves at each close', async (t) => {
+  const { second, saves } = await twoWindows(t);
+  second.shell.window.close();
+  assert.equal(saves.length, 1);
+});
 
 /** Marks a tab's document as holding a camera, microphone or screen, as a granted call does. */
 async function joinCall(root, id) {

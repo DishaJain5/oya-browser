@@ -10,7 +10,7 @@ import { ViewModel } from '../../../core/view-model.ts';
 import { RendererConstants as C } from '../../../core/constants.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
 import { mergeItems, moveItem, type Tab, type TabItemModel } from '../model/tab-model.ts';
-import { tabSize, tabWidth, type TabSize } from '../model/tab-math.ts';
+import { pinnedCount, tabSize, tabWidth, type TabSize } from '../model/tab-math.ts';
 import { isRovingKey, rovingIndex } from '../../../hooks/index.ts';
 import type { Drop, TabDragViewModel } from './tab-drag-view-model.ts';
 import type { TabCardViewModel } from './tab-card-view-model.ts';
@@ -59,10 +59,12 @@ export interface TabStripDeps {
   refused?: () => void;
 }
 
-/** The layout for `state`: a held width, or an even share of the room. */
+/** The layout for `state`: a held width, or an even share of the room left after the pinned tabs, which keep their fixed width. */
 export function stripLayout({ tabs, room, frozen }: TabStripState): StripLayout {
-  const width = frozen ?? tabWidth(room, tabs.length);
-  return { width, size: tabSize(width), overflowing: tabs.length * width > room };
+  const pinned = pinnedCount(tabs) * C.TAB_PINNED_WIDTH;
+  const unpinned = tabs.length - pinnedCount(tabs);
+  const width = frozen ?? tabWidth(room - pinned, unpinned);
+  return { width, size: tabSize(width), overflowing: pinned + unpinned * width > room };
 }
 
 /** The tab strip. */
@@ -115,7 +117,7 @@ export class TabStripViewModel extends ViewModel<TabStripState> {
 
   /** Closes a tab the mouse closed, holding every width so the next close button lands under the pointer. */
   closeByMouse(id: number): void {
-    this.set({ frozen: this.state.frozen ?? tabWidth(this.state.room, this.state.tabs.length) });
+    this.set({ frozen: stripLayout(this.state).width });
     this.deps.card.hide();
     this.close(id);
   }

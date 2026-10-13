@@ -52,6 +52,8 @@ export interface TabSummary {
   favicon: string | null;
   /** Whether it is the one on screen. */
   active: boolean;
+  /** Whether it is pinned, so the strip draws it as an icon in the leading block. */
+  pinned: boolean;
   /** Whether the agent drives it. */
   agent: boolean;
   /** Whether it is loading. */
@@ -77,12 +79,13 @@ function tabSummary(t: Tab, activeTabId: number | null, agentTabs: Array<number 
 }
 
 /** Where the tab is: its title, address and icon, and whether it is on the start page. */
-const placeSummary = (t: Tab): Pick<TabSummary, 'title' | 'url' | 'home' | 'favicon' | 'collection'> => ({
+const placeSummary = (t: Tab): Pick<TabSummary, 'title' | 'url' | 'home' | 'favicon' | 'collection' | 'pinned'> => ({
   title: t.title,
   url: t.url,
   home: !!t.home,
   ...(t.collection ? { collection: t.collection } : {}),
   favicon: t.favicon || null,
+  pinned: !!t.pinned,
 });
 
 /** Whether the tab is loading, and why it failed if it did. */
