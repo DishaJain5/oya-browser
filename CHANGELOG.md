@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.181](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.181) · 2026-10-13
+
 ### Added
 
 - Separate, searchable **Bookmarks** and **History** tabs, with compact adjacent buttons on the bookmarks row, your browser theme, website filters, sorting, date sections for history, and clear save/remove actions.
