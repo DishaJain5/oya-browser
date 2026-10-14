@@ -36,6 +36,8 @@ export interface ImportState {
   chosen: string;
   /** The last thing to tell the person: progress, or how the last import went. Kept across reconnects. */
   note: ImportNote;
+  /** Oya already opens web links from other apps, so Settings says so instead of offering Make default. */
+  isDefault: boolean;
 }
 
 /** The parts of the bridge imports use. */
@@ -44,6 +46,7 @@ export type ImportBridge = Pick<
   | 'importSources'
   | 'reimportBrowser'
   | 'makeDefaultBrowser'
+  | 'onboardingStatus'
   | 'importPasswords'
   | 'onMirrorStatus'
   | 'onWsStatus'
@@ -94,7 +97,8 @@ export const earlierImports = (state: ImportState): ImportRecord[] =>
 /** Initial invitation and discovery state before any IPC replies. */
 function initialImportState(): ImportState {
   const note: ImportNote = { text: '', kind: '' };
-  return { offer: false, connected: false, running: false, history: [], sources: null, chosen: '', note };
+  const empty = { history: [], sources: null, chosen: '', note, isDefault: false };
+  return { offer: false, connected: false, running: false, ...empty };
 }
 
 /** A partial import says what failed instead of silently claiming complete success. */
@@ -129,6 +133,8 @@ export class ImportViewModel extends ViewModel<ImportState> {
     this.own(bridge.onMirrorStatus((status) => this.onMirror(shape<MirrorStatus>(status))));
     void this.load();
     void this.loadOffer();
+    void this.refreshDefault();
+    this.watchFocus();
   }
 
   /** Lists the browsers found on this computer, choosing the first (the person's default). */
@@ -167,6 +173,23 @@ export class ImportViewModel extends ViewModel<ImportState> {
   /** Asks the system to make Oya the default browser (the first-run offer's second step). */
   async makeDefault(): Promise<void> {
     await this.bridge.makeDefaultBrowser().catch(() => {});
+    await this.refreshDefault();
+  }
+
+  /** Reads whether Oya is the default browser; an unanswered check counts as not, so the button stays. */
+  async refreshDefault(): Promise<void> {
+    const status = await this.bridge.onboardingStatus().catch(() => null);
+    this.set({ isDefault: !!status?.isDefault });
+  }
+
+  /**
+   * The OS confirms the choice after makeDefaultBrowser returns (a macOS prompt, Windows Settings),
+   * so check again when the person comes back to the window.
+   */
+  private watchFocus(): void {
+    const refresh = () => void this.refreshDefault();
+    globalThis.addEventListener?.('focus', refresh);
+    this.own(() => globalThis.removeEventListener?.('focus', refresh));
   }
 
   /** Imports a passwords export the person chooses, and says how it went. */

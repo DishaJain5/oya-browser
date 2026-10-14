@@ -115,6 +115,28 @@ describe('Import logins', () => {
     assert.equal(app.fake.called('makeDefaultBrowser').length, 1);
   });
 
+  it('says Oya is the default browser when the system reports it', async () => {
+    const app = build({ onboardingStatus: { isDefault: true } });
+    await settle();
+    assert.equal(app.imports.state.isDefault, true);
+  });
+
+  it('keeps offering Make default when Oya is not the default or the check fails', async () => {
+    const notDefault = build({ onboardingStatus: { isDefault: false } });
+    const failed = build({ onboardingStatus: () => Promise.reject(new Error('gone')) });
+    await settle();
+    assert.deepEqual([notDefault.imports.state.isDefault, failed.imports.state.isDefault], [false, false]);
+  });
+
+  it('checks again after Make default, so the row follows the new choice', async () => {
+    let isDefault = false;
+    const app = build({ onboardingStatus: () => ({ isDefault }) });
+    await settle();
+    isDefault = true;
+    await app.imports.makeDefault();
+    assert.equal(app.imports.state.isDefault, true);
+  });
+
   it('still says what was imported after the reconnect that follows an import', async () => {
     const app = await connected();
     app.fake.emit('onMirrorStatus', { done: true, source: 'Firefox', profiles: 1, cookies: 2 });

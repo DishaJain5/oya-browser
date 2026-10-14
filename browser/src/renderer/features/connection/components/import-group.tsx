@@ -145,7 +145,8 @@ export function ImportRows({ vm }: ViewProps<ImportViewModel>) {
 
 /** Make Oya the default browser, the first thing to do so links from other apps come here. */
 export function DefaultBrowserRow({ vm }: ViewProps<ImportViewModel>) {
-  const button = (
+  const { isDefault } = useViewModel(vm);
+  const button = !isDefault && (
     <Button variant="primary" id="make-default" onClick={() => void vm.makeDefault()}>
       Make default
     </Button>
@@ -153,7 +154,11 @@ export function DefaultBrowserRow({ vm }: ViewProps<ImportViewModel>) {
   return (
     <SettingsRow control={button}>
       <p className="row-title">Default browser</p>
-      <p className="quiet">Open links from other apps in Oya.</p>
+      <p className="quiet" id="default-browser-detail">
+        {isDefault
+          ? 'Oya is your default browser. Links from other apps open here.'
+          : 'Open links from other apps in Oya.'}
+      </p>
     </SettingsRow>
   );
 }
