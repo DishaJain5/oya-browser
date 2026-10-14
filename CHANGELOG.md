@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.192](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.192) · 2026-10-14
+
 ### Fixed
 
 - The active tab's close button works again when many tabs are open. The tab's title covered it, so a click only selected the tab.
