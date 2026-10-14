@@ -6,6 +6,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- Sign in with ChatGPT keeps this install's ChatGPT registration, as OpenAI requires, so trying again after `invalid_grant` works instead of failing the same way every time. The same fix applies to signing in from a self-hosted server.
+
 ## [1.0.186](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.186) · 2026-10-14
 
 ### Fixed

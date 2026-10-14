@@ -62,6 +62,24 @@ async function hostId(): Promise<string> {
   });
 }
 
+/**
+ * The client ChatGPT issued this project, kept apart from the credential so a
+ * sign-in whose code exchange was refused still leaves it: OpenAI wants the retry
+ * under that client, and registering afresh is refused again.
+ */
+async function savedClient(project: string): Promise<string | undefined> {
+  return control().store.transact(async (tx) => (await tx.get('meta', `chatgpt_client:${project}`))?.clientId);
+}
+
+/** Keeps the client ChatGPT issued this project, before its code is exchanged. */
+async function keepClient(project: string, clientId: string) {
+  const id = `chatgpt_client:${project}`;
+  // Read before writing: rows are versioned, and a write over a row this transaction never read conflicts.
+  await control().store.transact(async (tx) => {
+    if ((await tx.get('meta', id))?.clientId !== clientId) tx.put('meta', id, { id, clientId });
+  });
+}
+
 /** The authorize URL's parameters; a first sign-in registers through the dynamic client and names the app. */
 function authorizeParams(login: Login, state: string, host: string) {
   const first = login.clientId === C.CHATGPT_DYNAMIC_CLIENT ? { agent_name_hint: C.CHATGPT_AGENT_NAME } : {};
@@ -82,7 +100,8 @@ async function admitLogin(apiKey: string) {
 /** Starts a sign-in for this key; the URL to open in a browser on this machine. */
 export async function startLogin(apiKey: string): Promise<string> {
   await admitLogin(apiKey);
-  const clientId = credentialOf(resolve(apiKey).openaiKey)?.client_id || C.CHATGPT_DYNAMIC_CLIENT;
+  const issued = credentialOf(resolve(apiKey).openaiKey)?.client_id || (await savedClient(projectId(apiKey)));
+  const clientId = issued || C.CHATGPT_DYNAMIC_CLIENT;
   const login: Login = { project: projectId(apiKey), verifier: random(), nonce: random(), clientId, expiresAt: 0 };
   login.expiresAt = Date.now() + C.CHATGPT_LOGIN_TTL_MS;
   const state = random();
@@ -190,7 +209,8 @@ async function forKey<T>(apiKey: string, work: () => Promise<T>): Promise<T> {
  * The client id to exchange the code under: the one the callback issued, else (a
  * re-sign-in, which may leave it out) the one the sign-in started with. The dynamic
  * registration client is never exchanged under: a first sign-in that came back
- * without an issued id did not finish registering.
+ * without an issued id did not finish registering. A re-sign-in answered for
+ * another client is refused, as OpenAI asks, rather than replacing this one.
  */
 function issuedClient(query: Record<string, any>, login: Login): string {
   const issued = String(query.client_id || '');
@@ -199,6 +219,13 @@ function issuedClient(query: Record<string, any>, login: Login): string {
   );
   const clientId = String(query.client_id || login.clientId);
   if (clientId === C.CHATGPT_DYNAMIC_CLIENT) throw new HttpError(Status.BAD_GATEWAY, NOT_FINISHED);
+  return sameClient(clientId, login);
+}
+
+/** `clientId`, unless a re-sign-in came back for a client other than the one it opened with. */
+function sameClient(clientId: string, login: Login): string {
+  if (login.clientId !== C.CHATGPT_DYNAMIC_CLIENT && clientId !== login.clientId)
+    throw new HttpError(Status.BAD_REQUEST, 'ChatGPT sign-in did not match');
   return clientId;
 }
 
@@ -206,6 +233,7 @@ function issuedClient(query: Record<string, any>, login: Login): string {
 async function completeLogin(query: Record<string, any>, login: Login, apiKey: string) {
   if (query.error) throw new HttpError(Status.FORBIDDEN, 'ChatGPT sign-in was cancelled or not allowed');
   const clientId = issuedClient(query, login);
+  await keepClient(login.project, clientId);
   const tokens = await exchangeCode(login, clientId, String(query.code || ''));
   const credential = credentialFrom(tokens, clientId, login.nonce);
   await save(apiKey, credential, { llm_provider: 'chatgpt', openai_base_url: null, chat_model: null });
