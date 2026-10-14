@@ -24,9 +24,9 @@ export const CALLBACK_PATH = '/auth/callback';
 /** Loopback only: the browser that signs in is on this machine. */
 export const LOOPBACK_HOST = '127.0.0.1';
 /**
- * The loopback port sign-in returns to. Fixed, as in every client that works
- * (Codex and pi use 1455, so not that one): a different port on each sign-in made
- * OpenAI refuse the code exchange with invalid_grant.
+ * The loopback port sign-in returns to. OpenAI allows any port as long as one
+ * attempt sends the same address twice; a fixed one (not Codex's 1455) is simply
+ * predictable.
  */
 export const LOOPBACK_PORT = 1456;
 /** How long a sign-in may take before the listener gives up. */

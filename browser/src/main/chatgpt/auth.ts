@@ -7,6 +7,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AppServices } from '../app/services.ts';
+import type { ConfigValues } from '../app/config-store.ts';
 import { SealedJson } from './credential-store.ts';
 import { awaitCallback, type Callback } from './loopback.ts';
 import * as O from './oauth.ts';
@@ -14,7 +15,7 @@ import * as C from './constants.ts';
 import { openOutside } from './outside.ts';
 
 /** The services sign-in uses. */
-type Deps = Pick<AppServices, 'electron'>;
+type Deps = Pick<AppServices, 'config' | 'electron'>;
 
 /** What tests replace: the network, the listener, and where the sealed file goes. */
 export interface AuthSeams {
@@ -33,6 +34,9 @@ export interface ChatgptAccount {
   /** The account's email, or ''. */
   email: string;
 }
+
+/** What a sign-in that came back for another request or another client says. */
+const MISMATCH = 'ChatGPT sign-in did not match. Try again.';
 
 /** The ChatGPT account this app is signed in to. */
 export class ChatgptAuth {
@@ -70,19 +74,21 @@ export class ChatgptAuth {
 
   /** Opens the sign-in for `callback`'s address and waits for its credential. */
   private async through(callback: Callback): Promise<O.Credential> {
-    // Every sign-in registers afresh under a new host id, as the reference flow does: reusing an
-    // earlier registration or client made OpenAI refuse the code exchange.
-    const login = O.newLogin(callback.redirectUri);
-    await openOutside(this.deps, O.authorizeUrl(login, `urn:uuid:${randomUUID()}`));
+    // OpenAI's sign-in wants one host id per install and the client it issued reused: registering
+    // afresh after a refused exchange is refused again, so a failed sign-in could never recover.
+    const login = O.newLogin(callback.redirectUri, this.saved('chatgptClientId'));
+    await openOutside(this.deps, O.authorizeUrl(login, this.hostId()));
     return this.complete(login, await callback.done);
   }
 
-  /** Checks what came back and exchanges the code, never under the registration client. */
+  /** Checks what came back, keeps the issued client before exchanging the code, never under the registration client. */
   private async complete(login: O.Login, query: Record<string, string>): Promise<O.Credential> {
-    if (query.state !== login.state) throw Error('ChatGPT sign-in did not match. Try again.');
+    if (query.state !== login.state) throw Error(MISMATCH);
     if (query.error) throw Error('ChatGPT sign-in was cancelled or not allowed.');
     const clientId = query.client_id || login.clientId;
     if (clientId === C.DYNAMIC_CLIENT) throw Error('ChatGPT did not finish the sign-in. Try again.');
+    if (login.clientId !== C.DYNAMIC_CLIENT && clientId !== login.clientId) throw Error(MISMATCH);
+    this.keep({ chatgptClientId: clientId });
     const tokens = await O.exchangeCode(login, clientId, query.code || '', this.fetch);
     return O.credentialFrom(tokens, clientId, login.nonce);
   }
@@ -113,5 +119,26 @@ export class ChatgptAuth {
   /** Forgets the sign-in. */
   signOut(): void {
     this.store.clear();
+  }
+
+  /** This install's agent host id: made once, kept, and carrying nothing about its owner. */
+  private hostId(): string {
+    const kept = this.saved('chatgptHostId');
+    if (kept) return kept;
+    const made = `urn:uuid:${randomUUID()}`;
+    this.keep({ chatgptHostId: made });
+    return made;
+  }
+
+  /** A kept registration value, or undefined when the config file holds anything but text there. */
+  private saved(field: 'chatgptHostId' | 'chatgptClientId'): string | undefined {
+    const value: unknown = this.deps.config.values[field];
+    return typeof value === 'string' && value ? value : undefined;
+  }
+
+  /** Saves part of this install's ChatGPT registration to the config. */
+  private keep(values: Pick<ConfigValues, 'chatgptHostId' | 'chatgptClientId'>): void {
+    this.deps.config.merge(values);
+    this.deps.config.save();
   }
 }

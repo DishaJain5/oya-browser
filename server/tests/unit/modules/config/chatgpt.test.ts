@@ -140,6 +140,26 @@ describe('Sign in with ChatGPT', () => {
     assert.equal(params.get('agent_name_hint'), null);
   });
 
+  it('keeps the issued client id when the code exchange is refused, so the retry reuses it', async () => {
+    const params = await start();
+    tokenEndpoint({ error: 'invalid_grant' }, 400);
+    const callback = { state: params.get('state'), code: 'c', client_id: 'oaiapp_issued' };
+    await assert.rejects(chatgpt.finishLogin(callback), { message: /did not finish/ });
+    const retry = await start();
+    assert.equal(retry.get('client_id'), 'oaiapp_issued');
+    assert.equal(retry.get('agent_name_hint'), null);
+  });
+
+  it('refuses a re-sign-in that comes back for another client, without exchanging its code', async () => {
+    await signIn();
+    const params = await start();
+    const endpoint = tokenEndpoint(tokens());
+    const callback = { state: params.get('state'), code: 'c', client_id: 'oaiapp_other' };
+    await assert.rejects(chatgpt.finishLogin(callback), { status: 400, message: /did not match/ });
+    assert.equal(endpoint.mock.callCount(), 0);
+    assert.equal((await start()).get('client_id'), 'oaiapp_issued');
+  });
+
   it('refuses a first sign-in that came back without an issued client id, without a doomed exchange', async () => {
     const params = await start();
     const endpoint = tokenEndpoint(tokens({ id_token: idToken({ nonce: params.get('nonce') }) }));
