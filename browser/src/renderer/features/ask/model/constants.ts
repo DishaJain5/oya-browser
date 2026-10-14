@@ -6,6 +6,12 @@
 
 /** The words the Ask pane shows. */
 export const ASK_TEXT = {
+  /** The pill on a reply where the agent stopped to ask the person something. */
+  needsInput: 'Needs your answer',
+  /** The same pill once the person replied. */
+  answered: 'Answered',
+  /** The composer's placeholder while the agent waits for an answer. */
+  answerPlaceholder: 'Type your answer…',
   /** Explicit permission for another bounded run without repeating completed work. */
   continueTask:
     'Continue the unfinished task from the current page. Check what is already done and do not repeat completed actions.',
@@ -75,6 +81,9 @@ export const CLAIM_CODE = 'claim_required';
 
 /** How the agent opens its report: DONE: or FAILED:, shown as a verdict instead of text. */
 export const VERDICT = /^(DONE|FAILED):\s*/i;
+
+/** How a reply begins when the agent stopped to ask the person (the server's NEEDS_INPUT, agent/loop.ts). */
+export const NEEDS_INPUT = /^NEEDS INPUT:\s*/i;
 
 /** A reply that reports a failed run. */
 export const FAILED_REPLY = /^FAILED:/i;

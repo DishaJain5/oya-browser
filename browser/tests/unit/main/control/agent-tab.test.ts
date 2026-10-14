@@ -15,8 +15,11 @@ const AGENT = { mode: 'agent', mine: false, interactive: false, connected: true,
 function setup(state: object = AGENT, shown = 1) {
   const views = { 1: { id: 'view-1' }, 2: { id: 'view-2' } };
   const tabs = {
-    activeTabId: shown,
+    activeTabId: shown as number | null,
     created: [] as string[],
+    closed: [] as number[],
+    activateTab: (id: number) => void (tabs.activeTabId = id),
+    closeTab: (id: number) => void tabs.closed.push(id),
     find: (id: number) => (id in views ? { id, view: views[id as keyof typeof views] } : undefined),
     getActiveView: () => views[tabs.activeTabId as 1 | 2],
     createTab: (url: string, activate: boolean) => {
@@ -190,4 +193,32 @@ it("a released lane's lapse is cleared, so finished lanes leave no timers behind
   } finally {
     mock.timers.reset();
   }
+});
+
+it('a finished run closes the tabs it opened and brings a watching person back to the tab it started in', () => {
+  const { agentTab, tabs } = setup();
+  agentTab.drive();
+  const opened = agentTab.opened(tabs.createTab('https://a.test', true));
+  tabs.activeTabId = opened;
+  agentTab.release();
+  assert.deepEqual([tabs.closed, tabs.activeTabId], [[opened], 1]);
+});
+
+it('a finished run leaves the person where they are when they were not watching it', () => {
+  const { agentTab, tabs } = setup();
+  agentTab.drive();
+  agentTab.opened(tabs.createTab('https://a.test', false));
+  tabs.activeTabId = 2;
+  agentTab.release();
+  assert.equal(tabs.activeTabId, 2);
+  assert.equal(tabs.closed.length, 1);
+});
+
+it("a finished run closes only its own tabs, never another agent's or the person's", () => {
+  const { agentTab, tabs } = setup();
+  inLane('a', () => agentTab.drive());
+  const theirs = inLane('b', () => agentTab.opened(tabs.createTab('https://b.test', false)));
+  inLane('a', () => agentTab.release());
+  assert.equal(tabs.closed.includes(theirs), false);
+  assert.equal(tabs.closed.includes(2), false);
 });

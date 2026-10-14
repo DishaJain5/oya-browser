@@ -7,7 +7,7 @@ export { SetupScreen } from './components/setup-screen.tsx';
 export { ReconnectOverlay } from './components/reconnect-overlay.tsx';
 export { ShellDialog, type ShellDialogProps, type AccountModels } from './components/shell-dialog.tsx';
 export { UpdatePill, ProfileButton, AppVersion } from './components/toolbar-pills.tsx';
-export { AccountViewModel } from './view-models/account-view-model.ts';
+export { AccountViewModel, accountCard, type AccountCard } from './view-models/account-view-model.ts';
 export { SyncViewModel } from './view-models/sync-view-model.ts';
 export { ImportViewModel } from './view-models/import-view-model.ts';
 export { ProfileViewModel } from './view-models/profile-view-model.ts';

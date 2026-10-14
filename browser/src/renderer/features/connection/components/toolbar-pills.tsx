@@ -52,14 +52,17 @@ export interface ProfileButtonProps {
   pill: ConnectionPillViewModel;
   /** Who is signed in, for the avatar's initial. */
   account: AccountViewModel;
+  /** Opens the profile card. */
+  onOpen: () => void;
 }
 
 /**
  * The profile button at the toolbar's end, as in Chrome: the account's initial, with
  * a dot that says whether this browser is online (green), connecting (amber) or
- * offline (grey). It opens Settings. The words stay for assistive tech and tooltips.
+ * offline (grey). It opens the profile menu, as Chrome's does: the browsing profiles with
+ * a tick on the active one, and Settings. The words stay for assistive tech and tooltips.
  */
-export function ProfileButton({ pill, account }: ProfileButtonProps) {
+export function ProfileButton({ pill, account, onOpen }: ProfileButtonProps) {
   const s = useViewModel(pill);
   const { initial } = accountCard(useViewModel(account));
   return (
@@ -67,8 +70,9 @@ export function ProfileButton({ pill, account }: ProfileButtonProps) {
       className={`${s.className} profile-button`}
       id="conn-pill"
       title={s.title}
-      aria-label={`Settings, ${s.label}`}
-      onClick={() => pill.click()}
+      aria-label={`Profiles and settings, ${s.label}`}
+      aria-haspopup="dialog"
+      onClick={onOpen}
     >
       <span className="profile-avatar" aria-hidden="true">
         {initial}

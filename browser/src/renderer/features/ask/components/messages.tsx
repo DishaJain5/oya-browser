@@ -9,7 +9,7 @@ import { createPortal } from 'react-dom';
 import { useViewModel } from '../../../hooks/index.ts';
 import { Icon, Orb } from '../../../ui/index.ts';
 import { ASK_TEXT, EXAMPLE_TASKS } from '../model/constants.ts';
-import { isErrorReply, replyHtml } from '../model/reply.ts';
+import { isErrorReply, replyHtml, questionOf } from '../model/reply.ts';
 import type { AskViewModel, ChatMessage } from '../view-models/ask-view-model.ts';
 import { FinishedRunCard, LiveRun } from './run-card.tsx';
 import { PlanNoticeCard } from './plan-notice.tsx';
@@ -27,6 +27,15 @@ interface AskProps {
 interface MessageProps extends AskProps {
   /** The message. */
   message: ChatMessage;
+  /** It is the conversation's last entry, so a question in it still waits on the person. */
+  waiting?: boolean;
+}
+
+/** A reply's classes: an error, or a question that waits for the person or was answered. */
+function replyClass(content: string, waiting = false): string {
+  if (isErrorReply(content)) return 'chat-msg assistant error';
+  if (questionOf(content) === null) return 'chat-msg assistant';
+  return `chat-msg assistant asking ${waiting ? 'waiting' : 'answered'}`;
 }
 
 /** The empty state: the orb, the question, and example tasks sent as if typed. */
@@ -67,7 +76,7 @@ function CopyButton({ ask, message }: MessageProps) {
  * offer are portalled in after it. A message never changes, so React never
  * resets that HTML under them.
  */
-function AgentMessage({ ask, message, onViewPlaybook }: MessageProps) {
+function AgentMessage({ ask, message, onViewPlaybook, waiting }: MessageProps) {
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const html = useMemo(() => ({ __html: replyHtml(message.content) }), [message.content]);
   const failed = isErrorReply(message.content);
@@ -79,11 +88,7 @@ function AgentMessage({ ask, message, onViewPlaybook }: MessageProps) {
   );
   return (
     <>
-      <div
-        ref={setBox}
-        className={failed ? 'chat-msg assistant error' : 'chat-msg assistant'}
-        dangerouslySetInnerHTML={html}
-      />
+      <div ref={setBox} className={replyClass(message.content, waiting)} dangerouslySetInnerHTML={html} />
       {box && createPortal(extras, box)}
     </>
   );
@@ -117,7 +122,13 @@ export function Messages({ ask, onViewPlaybook }: AskProps) {
         ) : item.notice ? (
           <PlanNoticeCard key={item.id} notice={item.notice} open={() => ask.openBilling()} />
         ) : (
-          <AgentMessage key={item.id} ask={ask} message={item} onViewPlaybook={onViewPlaybook} />
+          <AgentMessage
+            key={item.id}
+            ask={ask}
+            message={item}
+            onViewPlaybook={onViewPlaybook}
+            waiting={item === items.at(-1) && !card}
+          />
         ),
       )}
       <LiveRun run={ask.run} />

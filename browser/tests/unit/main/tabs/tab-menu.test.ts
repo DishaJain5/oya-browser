@@ -137,4 +137,19 @@ describe('tab menu pinning', () => {
     assert.equal(menuFor(1)['Close Other Tabs'].enabled, false);
     assert.equal(menuFor(2)['Close Tabs to the Right'].enabled, false);
   });
+
+  it('closes the others in agent mode with no agent running: a desktop rests in agent mode', () => {
+    Object.assign(ctx.control.state, { connected: true, mode: 'agent', localClients: 0, interactive: false });
+    menuFor(1)['Close Other Tabs'].click();
+    assert.deepEqual(ids(), [1]);
+  });
+
+  it("the bulk closes leave a tab an agent is working in, and its own tab's items do nothing", () => {
+    Object.assign(ctx.control.state, { connected: true, mode: 'agent', localClients: 0, interactive: false });
+    (ctx.agentTab as any).claims.set('lane', 2);
+    menuFor(1)['Close Other Tabs'].click();
+    assert.deepEqual(ids(), [1, 2]);
+    menuFor(2)['Close Tab'].click();
+    assert.deepEqual(ids(), [1, 2]);
+  });
 });

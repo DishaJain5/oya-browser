@@ -145,17 +145,20 @@ function closeWhere(tabs: OrderedTabs, pick: (tab: Tab, index: number) => boolea
   for (const id of ids) tabs.closeTab(id);
 }
 
-/** Closes every unpinned tab but `id`, and shows it: pinned tabs are spared, as in Chrome. */
-export function closeOthers(tabs: OrderedTabs, id: number): void {
+/** Spares no tab: what a bulk close spares besides pinned tabs, when nothing else is. */
+const NONE = (): boolean => false;
+
+/** Closes every unpinned tab but `id`, and shows it: pinned tabs are spared, as in Chrome, and any `spare` picks. */
+export function closeOthers(tabs: OrderedTabs, id: number, spare: (tab: Tab) => boolean = NONE): void {
   if (!tabs.find(id)) return;
-  closeWhere(tabs, (t) => t.id !== id && !t.pinned);
+  closeWhere(tabs, (t) => t.id !== id && !t.pinned && !spare(t));
   tabs.activateTab(id);
 }
 
-/** Closes the unpinned tabs right of `id`; pinned tabs are spared. */
-export function closeToRight(tabs: OrderedTabs, id: number): void {
+/** Closes the unpinned tabs right of `id`; pinned tabs are spared, and any `spare` picks. */
+export function closeToRight(tabs: OrderedTabs, id: number, spare: (tab: Tab) => boolean = NONE): void {
   const index = tabs.list.findIndex((t) => t.id === id);
-  if (index !== -1) closeWhere(tabs, (t, i) => i > index && !t.pinned);
+  if (index !== -1) closeWhere(tabs, (t, i) => i > index && !t.pinned && !spare(t));
 }
 
 /** Reopens the most recently closed tab where it was; returns its id, or undefined when none is left. */

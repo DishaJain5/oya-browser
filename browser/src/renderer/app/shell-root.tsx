@@ -5,6 +5,7 @@
  * feature's, after the page-wide ones app/main.tsx loads first.
  */
 import { NotificationsButton, NotificationsCenter } from '../features/notifications/index.ts';
+import { ProfilesCard } from '../features/profiles/index.ts';
 import { BrowserFooter } from './browser-footer.tsx';
 import { useViewModel } from '../hooks/index.ts';
 import { IconButton } from '../ui/index.ts';
@@ -58,7 +59,11 @@ function ToolbarEnd({ vms }: ShellRootProps) {
   return (
     <>
       <NotificationsButton vm={vms.notifications} />
-      <ProfileButton pill={vms.connection.pill} account={vms.connection.account} />
+      <ProfileButton
+        pill={vms.connection.pill}
+        account={vms.connection.account}
+        onOpen={() => vms.connection.profiles.toggle()}
+      />
     </>
   );
 }
@@ -141,6 +146,7 @@ function Dialogs({ vms }: ShellRootProps) {
   return (
     <>
       <NotificationsCenter vm={vms.notifications} />
+      <ProfilesCard vm={vms.connection.profiles} account={vms.connection.account} />
       <ReconnectOverlay vm={c.reconnect} />
       <ShellDialog palette={c.palette} reconnect={c.reconnect} footer={footer} preferences={preferences} {...models} />
     </>

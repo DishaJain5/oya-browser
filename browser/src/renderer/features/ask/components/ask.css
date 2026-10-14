@@ -1004,3 +1004,33 @@
   color: var(--logo-green);
   font-weight: 650;
 }
+/* A reply where the agent stopped to ask: a normal reply under a "Needs your answer" pill in Oya's green,
+   its dot pulsing while it waits, and the composer glowing where the answer goes. Quiet once answered. */
+.chat-verdict.asking {
+  background: color-mix(in srgb, var(--oya) 14%, transparent);
+  color: var(--accent);
+}
+.chat-msg.waiting .chat-verdict.asking::before {
+  animation: chat-asking 1.6s var(--ease) infinite;
+}
+@keyframes chat-asking {
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--oya) 25%, transparent);
+  }
+}
+.chat-msg.answered .chat-verdict.asking {
+  background: var(--muted-surface);
+  color: var(--secondary);
+}
+.chat-msg.waiting .when-answered,
+.chat-msg.answered .when-waiting {
+  display: none;
+}
+.chat-composer.awaiting {
+  box-shadow: var(--glass-edge), var(--shadow-sm), var(--glow);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg.waiting .chat-verdict.asking::before {
+    animation: none;
+  }
+}

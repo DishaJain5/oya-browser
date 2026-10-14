@@ -8,11 +8,12 @@
 import { ChecklistViewModel } from '../features/connection/view-models/checklist-view-model.ts';
 import { RendererConstants as C } from '../core/constants.ts';
 import { NotificationsViewModel } from '../features/notifications/index.ts';
+import { ProfilesViewModel } from '../features/profiles/index.ts';
 import type { OyaBrowser } from '../core/bridge.ts';
 import { ShellViewModel } from './shell-view-model.ts';
 import { PanelViewModel, type FrameClock } from './panel/panel-view-model.ts';
 import { PlaybooksViewModel } from '../features/playbooks/index.ts';
-import { AskSessions } from '../features/ask/index.ts';
+import { AskSessions, PersonaViewModel } from '../features/ask/index.ts';
 import {
   ThemeViewModel,
   AgentActivityViewModel,
@@ -247,6 +248,8 @@ export interface ConnectionModels {
   pill: ConnectionPillViewModel;
   /** The coding agents the footer connects to Oya's MCP port. */
   agents: AgentsViewModel;
+  /** The profile circle's card: the browsing profiles and Settings. */
+  profiles: ProfilesViewModel;
 }
 
 /** The account page's parts, then the dialog over them. */
@@ -289,6 +292,14 @@ function paletteHost(root: ShellViewModels) {
   };
 }
 
+/** The toolbar's end: the connection pill, the coding agents, and the profile circle's card (whose Settings opens the account page, as the circle used to). */
+function toolbarModels(bridge: PageEnvironment['bridge'], shell: ShellViewModel, dialog: ShellDialogViewModel) {
+  const pill = new ConnectionPillViewModel({ bridge, shell, account: dialog });
+  const persona = new PersonaViewModel(bridge);
+  const profiles = new ProfilesViewModel({ bridge, persona, openSettings: () => pill.click() });
+  return { pill, agents: new AgentsViewModel(bridge), profiles };
+}
+
 /** The connection feature, wired to the panel, the studio and the toolbar. */
 function connectionModels(env: PageEnvironment, root: ShellViewModels): ConnectionModels {
   const { bridge, platform } = env;
@@ -297,6 +308,6 @@ function connectionModels(env: PageEnvironment, root: ShellViewModels): Connecti
   const [setup, checklist] = [new SetupViewModel({ bridge, shell }), new ChecklistViewModel(bridge)];
   const [reconnect, updates] = [new ReconnectViewModel({ bridge, shell, dialog, setup }), new UpdatesViewModel(bridge)];
   const palette = new PaletteViewModel({ bridge, panel, shell, dialog, updates, host: paletteHost(root), platform });
-  const [pill, agents] = [new ConnectionPillViewModel({ bridge, shell, account: dialog }), new AgentsViewModel(bridge)];
-  return { ...parts, dialog, setup, checklist, reconnect, updates, palette, pill, agents };
+  const toolbar = toolbarModels(bridge, shell, dialog);
+  return { ...parts, dialog, setup, checklist, reconnect, updates, palette, ...toolbar };
 }

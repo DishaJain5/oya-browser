@@ -87,9 +87,34 @@ export class AgentTab {
     else this.claim(tabs.activeTabId);
   }
 
-  /** The running lane's run ended: its tab is the person's again. */
+  /**
+   * The running lane's run ended: its tab is the person's again, the tabs it opened
+   * close, and a person watching the agent is brought back to the tab it started in,
+   * so they never hunt for it among the agent's leftovers. Tabs the person opened stay.
+   */
   release(): void {
-    if (this.claims.has(currentLane())) this.update(() => this.forget(currentLane()));
+    const lane = currentLane();
+    const home = this.homes.get(lane);
+    const watching = this.watching(lane);
+    if (this.claims.has(lane)) this.update(() => this.forget(lane));
+    this.closeOpened(lane);
+    if (watching && home !== undefined && this.deps.tabs.find(home)) this.deps.tabs.activateTab(home);
+  }
+
+  /** Whether the window shows lane `lane`'s tab or one it opened. */
+  private watching(lane: string): boolean {
+    const shown = this.deps.tabs.activeTabId;
+    return shown !== null && (shown === this.claims.get(lane) || this.openers.get(shown) === lane);
+  }
+
+  /** Closes every tab lane `lane` opened, but the one it started in, and forgets them. */
+  private closeOpened(lane: string): void {
+    const home = this.homes.get(lane);
+    for (const [id, opener] of [...this.openers]) {
+      if (opener !== lane) continue;
+      this.openers.delete(id);
+      if (id !== home) this.deps.tabs.closeTab(id);
+    }
   }
 
   /** The running lane now drives tab `id` (a tab it opened, one it switched to, the one a chat was sent from). */

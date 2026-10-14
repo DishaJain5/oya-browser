@@ -1,7 +1,8 @@
 /**
  * The tab strip's right-click menu, a native menu like Chrome's: new tab to
  * the right, reload, duplicate, pin or unpin, close, close others, close to
- * the right, and reopen closed tab. Every item acts only while a person has control.
+ * the right, and reopen closed tab. Every item acts only while the person may use
+ * the tab, and the bulk closes leave alone any tab an agent is working in.
  */
 import type { MenuItemConstructorOptions } from 'electron';
 import type { AppServices } from '../app/services.ts';
@@ -36,19 +37,23 @@ export class TabMenu {
     return [...this.openItems(tab), { type: 'separator' }, ...this.closeItems(tab)];
   }
 
-  /** One item that runs `run` only while a person holds control. */
-  private item(label: string, run: () => unknown, enabled = true): MenuItemConstructorOptions {
-    return { label, enabled, click: () => this.deps.control.snapshot().interactive && run() };
+  /**
+   * One item that runs `run` only while the person may use tab `tab`. This is the
+   * per-tab check the tab's close button uses: a desktop rests in agent mode, so
+   * asking for whole-browser control left every item dead even with no agent running.
+   */
+  private item(tab: Tab, label: string, run: () => unknown, enabled = true): MenuItemConstructorOptions {
+    return { label, enabled, click: () => this.deps.agentTab.humanMay(tab.id) && run() };
   }
 
   /** The items that open or reload: they act on tab `tab`. */
   private openItems(tab: Tab): MenuItemConstructorOptions[] {
     const tabs = this.deps.tabs;
     return [
-      this.item('New Tab to the Right', () => openBeside(tabs, tab.id, HOME_URL)),
+      this.item(tab, 'New Tab to the Right', () => openBeside(tabs, tab.id, HOME_URL)),
       { type: 'separator' },
-      this.item('Reload', () => tabs.reloadTab(tab), !tab.home),
-      this.item('Duplicate', () => openBeside(tabs, tab.id, tab.url || HOME_URL)),
+      this.item(tab, 'Reload', () => tabs.reloadTab(tab), !tab.home),
+      this.item(tab, 'Duplicate', () => openBeside(tabs, tab.id, tab.url || HOME_URL)),
       ...this.placeItems(tab),
     ];
   }
@@ -85,10 +90,10 @@ export class TabMenu {
   private closeItems(tab: Tab): MenuItemConstructorOptions[] {
     const tabs = this.deps.tabs;
     return [
-      this.item('Close Tab', () => tabs.closeTab(tab.id)),
+      this.item(tab, 'Close Tab', () => tabs.closeTab(tab.id)),
       ...this.bulkCloseItems(tab),
       { type: 'separator' },
-      this.item('Reopen Closed Tab', () => reopenClosed(tabs), tabs.closed.size > 0),
+      this.item(tab, 'Reopen Closed Tab', () => reopenClosed(tabs), tabs.closed.size > 0),
     ];
   }
 
@@ -99,9 +104,15 @@ export class TabMenu {
     const others = this.unpinned((t) => t !== tab);
     const right = this.unpinned((_t, i) => i > index);
     return [
-      this.item('Close Other Tabs', () => closeOthers(tabs, tab.id), others),
-      this.item('Close Tabs to the Right', () => closeToRight(tabs, tab.id), right),
+      this.item(tab, 'Close Other Tabs', () => closeOthers(tabs, tab.id, this.spared()), others),
+      this.item(tab, 'Close Tabs to the Right', () => closeToRight(tabs, tab.id, this.spared()), right),
     ];
+  }
+
+  /** The tabs a bulk close leaves alone besides pinned ones: those agents are working in. */
+  private spared(): (tab: Tab) => boolean {
+    const driven = this.deps.agentTab.claimed();
+    return (t) => driven.includes(t.id);
   }
 
   /** Whether some unpinned tab matches `pick`: the bulk closes spare pinned tabs, so only these give them something to do. */

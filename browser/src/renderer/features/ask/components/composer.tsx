@@ -13,6 +13,8 @@ import type { RendererServices } from '../../../app/services.ts';
 import type { AskViewModel } from '../view-models/ask-view-model.ts';
 import type { FilesViewModel } from '../view-models/files-view-model.ts';
 import { ModelChip, ProfileChip } from './ask-toolbar.tsx';
+import { awaitingAnswer } from '../model/reply.ts';
+import { ASK_TEXT } from '../model/constants.ts';
 
 /** What the input bar is given. */
 interface ComposerProps {
@@ -124,19 +126,19 @@ function SendButtons({ ask }: AskProps) {
 
 /** The input bar. */
 export function Composer({ ask, panel }: ComposerProps) {
-  const { input } = useViewModel(ask);
+  const { input, items } = useViewModel(ask);
   const box = useAskBox({ ask, panel });
   return (
     <div className="chat-input-bar">
       <FileChips files={ask.files} />
-      <div className="chat-composer">
+      <div className={awaitingAnswer(items) ? 'chat-composer awaiting' : 'chat-composer'}>
         <textarea
           className="chat-input"
           id="chat-input"
           ref={box}
           rows={1}
           aria-label="Ask Oya"
-          placeholder="Ask about this page or give a task…"
+          placeholder={awaitingAnswer(items) ? ASK_TEXT.answerPlaceholder : 'Ask about this page or give a task…'}
           spellCheck={false}
           value={input}
           onChange={(e) => ask.setInput(e.target.value)}

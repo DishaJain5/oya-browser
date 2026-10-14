@@ -5,7 +5,12 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { isErrorReply, replyHtml } from '../../../../../../src/renderer/features/ask/model/reply.ts';
+import {
+  awaitingAnswer,
+  isErrorReply,
+  questionOf,
+  replyHtml,
+} from '../../../../../../src/renderer/features/ask/model/reply.ts';
 
 describe('replyHtml', () => {
   it('shows DONE: as the done verdict above the report', () => {
@@ -29,5 +34,27 @@ describe('replyHtml', () => {
   it('tells an error reply apart', () => {
     assert.equal(isErrorReply('Error: boom'), true);
     assert.equal(isErrorReply('No error here'), false);
+  });
+});
+
+describe('a reply where the agent stopped to ask', () => {
+  it('gives the question without the NEEDS INPUT marker, and null for any other reply', () => {
+    assert.equal(questionOf('NEEDS INPUT: Which size, M or L?'), 'Which size, M or L?');
+    assert.equal(questionOf('DONE: Ordered.'), null);
+  });
+
+  it('draws the question under a Needs your answer pill, without the marker', () => {
+    const html = replyHtml('NEEDS INPUT: Which **size**?');
+    assert.match(html, /^<span class="chat-verdict asking">/);
+    assert.match(html, /<strong>size<\/strong>/);
+    assert.doesNotMatch(html, /NEEDS INPUT/);
+  });
+
+  it('waits on the person only while the question is the last entry', () => {
+    const question = { role: 'assistant', content: 'NEEDS INPUT: Which size?' };
+    assert.equal(awaitingAnswer([question]), true);
+    assert.equal(awaitingAnswer([question, { role: 'user', content: 'M' }]), false);
+    assert.equal(awaitingAnswer([{ role: 'assistant', content: 'DONE: ok' }]), false);
+    assert.equal(awaitingAnswer([]), false);
   });
 });

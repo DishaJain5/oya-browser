@@ -169,7 +169,7 @@ describe('server messages', () => {
     /** A real agent tab under the server's agents, with lanes `named` each holding a tab of its own. */
     function claimed(...named: string[]) {
       const state = { mode: 'agent', connected: true, localClients: 0, interactive: false };
-      const tabs = { activeTabId: 1 };
+      const tabs = { activeTabId: 1, find: (id: number) => ({ id }), activateTab() {}, closeTab() {} };
       ctx.agentTab = new AgentTab({ control: { snapshot: () => state }, tabs } as any);
       named.forEach((lane, i) => inLane(lane, () => ctx.agentTab.claim(i + 1)));
       return ctx.agentTab as AgentTab;
