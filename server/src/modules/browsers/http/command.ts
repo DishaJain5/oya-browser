@@ -10,8 +10,7 @@ import { Status } from '../../../platform/http-status.ts';
 import { HttpError, answerFor, sendError } from '../../../platform/errors.ts';
 import * as flow from '../../playbooks/flow-recorder.ts';
 import { getKey, longJson, validData } from '../../../app/http.ts';
-import { randomUUID } from 'node:crypto';
-import { inLane } from '../connection/lane.ts';
+import { inLane, inOwnLane } from '../connection/lane.ts';
 import { noTimeouts, refuseAction } from './helpers.ts';
 import { CHAT_DRAIN_MS, MAX_SCHEMA_CHARS } from '../constants.ts';
 import { challengesFor, quietCheckpointFor } from '../../playbooks/checkpoint.ts';
@@ -93,10 +92,18 @@ export async function chat(req, res) {
   // Checked before the 200 goes out: with no model there is nothing to converse with, and the caller deserves the real status.
   if (!withLlm(req, res)) return;
   const { messages, data = {}, secrets = {}, schema } = req.body;
-  const signal = abortOnHangUp(res);
-  // The run's lane: an Oya desktop gives it a tab of its own, beside other agents and the person.
-  const lane = req.body.lane ?? randomUUID();
-  await inFlight(longJson(res, () => inLane(lane, () => converse(req, messages, { data, secrets, schema, signal }))));
+  const work = () => converse(req, messages, { data, secrets, schema, signal: abortOnHangUp(res) });
+  await inFlight(longJson(res, () => inChatLane(req, work)));
+}
+
+/**
+ * Runs a chat in its lane: an Oya desktop gives it a tab of its own, beside other agents and the
+ * person. A lane the caller named is the caller's to end; one this server names, it ends itself,
+ * so the desktop frees the tab for the next run instead of holding it until the lane lapses.
+ */
+function inChatLane<T>(req, run: () => Promise<T>): Promise<T> {
+  const { lane } = req.body;
+  return lane ? inLane(lane, run) : inOwnLane(req.params.browserId, run);
 }
 
 /** Chats this replica is answering, so a shutdown lets them finish instead of cutting them off mid-run. */

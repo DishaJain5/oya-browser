@@ -2,9 +2,16 @@
  * Unit tests for lanes: the agent a browser command comes from rides along with
  * its work into every command, so an Oya desktop can give each agent its own tab.
  */
-import { it } from 'node:test';
+import { it, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { inLane, currentLane, laneFrom, LaneMap } from '../../../../../src/modules/browsers/connection/lane.ts';
+import {
+  inLane,
+  inOwnLane,
+  currentLane,
+  laneFrom,
+  LaneMap,
+} from '../../../../../src/modules/browsers/connection/lane.ts';
+import { registry } from '../../../../../src/modules/browsers/registry.ts';
 import { describeCall } from '../../../../../src/modules/browsers/connection/reporter.ts';
 
 it("stamps every command sent inside a lane's work with that lane, across awaits", async () => {
@@ -78,4 +85,48 @@ it('keeps at most its cap of entries, the oldest going first', () => {
     inLane('c', () => runs.get('b1')),
     3,
   );
+});
+
+afterEach(() => mock.restoreAll());
+
+/** Every message sent to a browser while the test runs, as [browserId, message]. */
+function sends() {
+  const sent: [string, any][] = [];
+  mock.method(registry, 'send', (browserId: string, message: any) => (sent.push([browserId, message]), true));
+  return sent;
+}
+
+it('runs work in a lane of its own, then tells the browser that lane has ended', async () => {
+  const sent = sends();
+  const lane = await inOwnLane('b1', async () => currentLane());
+  assert.match(String(lane), /^[0-9a-f-]{36}$/);
+  assert.deepEqual(sent, [['b1', { type: 'lane_end', lane }]]);
+});
+
+it('ends its lane when the work throws too', async () => {
+  const sent = sends();
+  await assert.rejects(
+    inOwnLane('b1', async () => {
+      throw new Error('portal down');
+    }),
+    /portal down/,
+  );
+  assert.equal(sent[0][1].type, 'lane_end');
+});
+
+it('ends no lane while the work is still waiting, as a run parked on a person is', async () => {
+  const sent = sends();
+  let resume = () => {};
+  const run = inOwnLane('b1', () => new Promise<void>((resolve) => (resume = resolve)));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(sent, []);
+  resume();
+  await run;
+  assert.equal(sent.length, 1);
+});
+
+it('sends the end before the work reports done, so the next run never finds the lane still held', async () => {
+  const sent = sends();
+  const seenAtDone = await inOwnLane('b1', async () => 'ok').then(() => sent.length);
+  assert.equal(seenAtDone, 1);
 });

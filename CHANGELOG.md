@@ -6,6 +6,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- On the desktop app, a run started from the SDK or the API now gives its tab back as soon as it ends. The next run works in the tab you are watching, instead of a hidden background tab for the first two minutes.
+
 ## [1.0.185](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.185) · 2026-10-13
 
 ### Changed

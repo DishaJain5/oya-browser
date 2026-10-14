@@ -10,6 +10,7 @@ import { ownDataDir } from '../../support/data-dir.ts';
 ownDataDir();
 const { runJob } = await import('../../../../src/modules/playbooks/jobs.ts');
 const { scriptedBrowser, stubLlm, textReply } = await import('../../support/agent.ts');
+const { registry } = await import('../../../../src/modules/browsers/registry.ts');
 
 const KEY = 'jobs-key';
 const BROWSER = 'b-jobs';
@@ -71,6 +72,14 @@ describe('runJob', () => {
       runJob(job(), async () => 'done'),
       { message: 'Looked around.\n  FAILED: no slots' },
     );
+  });
+
+  it('runs in a lane of its own and tells the browser when that lane ends, so its tab is free for the next run', async () => {
+    const ends: any[] = [];
+    mock.method(registry, 'send', (id, message) => (ends.push([id, message.type]), true));
+    stubLlm([textReply('DONE: booked')]);
+    await runJob(job(), async () => 'done');
+    assert.deepEqual(ends, [[BROWSER, 'lane_end']]);
   });
 
   it('fails a prompt that hit the step limit', async () => {
