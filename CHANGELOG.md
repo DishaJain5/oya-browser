@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.193](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.193) · 2026-10-14
+
 ### Fixed
 
 - Saving a playbook from an agent run now removes unsupported tab and reload commands that could trigger avoidable replay healing.
