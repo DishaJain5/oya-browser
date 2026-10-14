@@ -6,6 +6,7 @@ import { describe, it, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { ServerMessages } from '../../../../src/main/connection/server-messages.ts';
 import { mainCtx } from '../../support/main-ctx.cjs';
+import { AgentTab, inLane } from '../../../../src/main/control/agent-tab.ts';
 
 /** Routes one message the way the socket does. */
 const handleServerMessage = (ctx, msg) => new ServerMessages(ctx).handle(msg);
@@ -162,5 +163,34 @@ describe('server messages', () => {
       { runId: 'r1', event, tabId: null },
       { runId: 'r2', event, tabId: 7 },
     ]);
+  });
+
+  describe('lane_end', () => {
+    /** A real agent tab under the server's agents, with lanes `named` each holding a tab of its own. */
+    function claimed(...named: string[]) {
+      const state = { mode: 'agent', connected: true, localClients: 0, interactive: false };
+      const tabs = { activeTabId: 1 };
+      ctx.agentTab = new AgentTab({ control: { snapshot: () => state }, tabs } as any);
+      named.forEach((lane, i) => inLane(lane, () => ctx.agentTab.claim(i + 1)));
+      return ctx.agentTab as AgentTab;
+    }
+
+    it("releases that lane's tab and leaves another lane's claim", () => {
+      const agentTab = claimed('run-a', 'run-b');
+      handleServerMessage(ctx, { type: 'lane_end', lane: 'run-a' });
+      assert.deepEqual(agentTab.claimed(), [2]);
+    });
+
+    it('with no lane releases nothing, not even the default lane', () => {
+      const agentTab = claimed('default');
+      for (const lane of [undefined, '', 7]) handleServerMessage(ctx, { type: 'lane_end', lane } as any);
+      assert.deepEqual(agentTab.claimed(), [1]);
+    });
+
+    it("ignores a tab's own chat lane, which releases itself", () => {
+      const agentTab = claimed('tab-4');
+      handleServerMessage(ctx, { type: 'lane_end', lane: 'tab-4' });
+      assert.deepEqual(agentTab.claimed(), [1]);
+    });
   });
 });

@@ -4,6 +4,7 @@
  */
 import { answerModelRequest } from '../chatgpt/relay.ts';
 import { tabOfLane } from './chat.ts';
+import { inLane } from '../control/agent-tab.ts';
 import { captureProfile } from './profile-capture.ts';
 import { HOME_URL } from '../tabs/constants.ts';
 import type { AppServices } from '../app/services.ts';
@@ -31,6 +32,7 @@ export type ServerMessageDeps = Pick<
   | 'governance'
   | 'chatgpt'
   | 'onboarding'
+  | 'agentTab'
 >;
 
 /** The persona the server signed this browser in as. */
@@ -65,7 +67,7 @@ export interface ServerMessage {
   sites?: unknown[];
   /** agent-event: the chat run it belongs to. */
   runId?: string;
-  /** agent-event: the agent it comes from; a tab's chat is lane tab-<id>. */
+  /** agent-event: the agent it comes from; a tab's chat is lane tab-<id>. lane_end: the lane that finished. */
   lane?: string;
   /** agent-event: what the agent did. */
   event?: unknown;
@@ -88,6 +90,12 @@ export interface ServerMessage {
   /** cmd: the command's arguments. */
   params?: CommandParams;
 }
+
+/**
+ * Whether a lane_end may release `lane`: a lane the server named for one run. A missing lane
+ * would read as the default lane (an MCP agent's), and a tab's chat releases its own lane.
+ */
+const serverLane = (lane: unknown): lane is string => typeof lane === 'string' && !!lane && tabOfLane(lane) === null;
 
 /** Runs one message type. */
 type Handler = (router: ServerMessages, msg: ServerMessage, current: () => void) => unknown;
@@ -134,6 +142,8 @@ const SERVER_MESSAGES: Record<string, Handler> = {
   stream_start: ({ deps }, msg) => deps.stream.startStream(msg.fps || DEFAULT_STREAM_FPS),
   stream_stop: ({ deps }) => deps.stream.stopStream(),
   // Commands run concurrently; the queue does not wait for one to finish.
+  // A run the server gave its own lane has finished: its tab is the person's again, and the next run takes the shown tab.
+  lane_end: ({ deps }, msg) => serverLane(msg.lane) && inLane(msg.lane, () => deps.agentTab.release()),
   cmd: ({ deps }, msg) => void deps.commands.handleCommand(msg),
   llm_request: ({ deps }, msg) => void answerModelRequest(deps, msg as Parameters<typeof answerModelRequest>[1]),
   cdp_open: ({ deps }, msg) => void deps.relay.openCdpRelay(msg.sid),

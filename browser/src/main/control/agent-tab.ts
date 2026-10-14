@@ -178,6 +178,8 @@ export class AgentTab {
   private forget(lane: string): void {
     this.claims.delete(lane);
     this.homes.delete(lane);
+    clearTimeout(this.lapses.get(lane));
+    this.lapses.delete(lane);
   }
 
   /** Changes the claims, then tells the windows. */

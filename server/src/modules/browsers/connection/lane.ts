@@ -5,7 +5,9 @@
  * the work that sends the commands, so no tool needs to pass it on.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { randomUUID } from 'node:crypto';
 import { LANE_PATTERN } from './constants.ts';
+import { registry } from '../registry.ts';
 
 /** The lane of the work in progress. */
 const lanes = new AsyncLocalStorage<string>();
@@ -13,6 +15,22 @@ const lanes = new AsyncLocalStorage<string>();
 /** Runs `work` as lane `lane`'s; a lane that is not a short name runs in no lane. */
 export function inLane<T>(lane: unknown, work: () => T): T {
   return typeof lane === 'string' && LANE_PATTERN.test(lane) ? lanes.run(lane, work) : work();
+}
+
+/**
+ * Runs `work` in a lane of its own that this server names, and tells browser `browserId`
+ * when it has finished, however it finishes. A desktop only learns a server-named lane's
+ * end this way; without it the lane holds its tab until it lapses, and the next run on
+ * that browser gets a hidden background tab. The end goes out before `work`'s promise
+ * settles, so it reaches the socket ahead of anything sent after the run reports done.
+ */
+export async function inOwnLane<T>(browserId: string, work: () => T): Promise<Awaited<T>> {
+  const lane = randomUUID();
+  try {
+    return await inLane(lane, work);
+  } finally {
+    registry.send(browserId, { type: 'lane_end', lane });
+  }
 }
 
 /** The lane of the work in progress, if any. */

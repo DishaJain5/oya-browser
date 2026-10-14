@@ -139,6 +139,30 @@ describe('chat', () => {
     }
   });
 
+  /** Runs one chat that stops at once (no steps allowed) with `extra` in its body; answers what reached the browser. */
+  async function sentBy(extra: object) {
+    const { registry } = await import('../../../../../src/modules/browsers/registry.ts');
+    const sent: any[] = [];
+    mock.method(registry, 'send', (id, message) => (sent.push([id, message.type]), true));
+    process.env.CHAT_MAX_ITERATIONS = '0';
+    process.env.OPENAI_API_KEY = 'sk-test';
+    try {
+      await talk({ messages: [{ role: 'user', content: 'Task' }], ...extra });
+    } finally {
+      delete process.env.CHAT_MAX_ITERATIONS;
+      delete process.env.OPENAI_API_KEY;
+    }
+    return sent.filter(([, type]) => type === 'lane_end');
+  }
+
+  it('ends the lane it named for a chat, so a desktop frees that tab', async () => {
+    assert.deepEqual(await sentBy({}), [[B, 'lane_end']]);
+  });
+
+  it("never ends a lane the caller named: that lane is the caller's", async () => {
+    assert.deepEqual(await sentBy({ lane: 'tab-4' }), []);
+  });
+
   it('answers 422 llm_unconfigured before committing to a 200 when no model is configured', async () => {
     const res = await talk({ messages: [{ role: 'user', content: 'hi' }] });
     assert.equal(res.statusCode, 422);

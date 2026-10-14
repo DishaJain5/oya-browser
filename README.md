@@ -1,237 +1,179 @@
 <p align="center">
-  <img src="assets/oya-banner.svg" alt="Oya Browser: the automation lives inside the browser, not attached to it" width="100%">
+  <img src="assets/oya-banner.svg" alt="Oya Browser: the AI browser for the agentic era" width="100%">
 </p>
 
-<h3 align="center">Everyone else drives Chrome from the outside. We built the browser.</h3>
+<h3 align="center">The browser for regulated industries (community version).</h3>
 
 <p align="center">
-  The automation lives inside it, not attached over the debugging protocol, so your agents stop<br>
-  looking like a harness. Sign in once and every browser you start is already signed in.<br>
-  Do the task once and Oya replays it forever, with no model in the loop.
+  People and AI agents work together in one browser, with control over where it runs and how it is governed.
 </p>
 
 <p align="center">
-  <a href="https://github.com/OyadotAI/oya-browser/actions/workflows/deploy-dev.yaml"><img src="https://img.shields.io/github/actions/workflow/status/OyadotAI/oya-browser/deploy-dev.yaml?branch=main&label=build&logo=github" alt="Build"></a>
-  <a href="https://codecov.io/gh/OyadotAI/oya-browser"><img src="https://img.shields.io/codecov/c/github/OyadotAI/oya-browser?label=coverage&logo=codecov" alt="Coverage"></a>
+  <a href="https://oyabrowser.com/#download"><strong>Download Oya Browser</strong></a> ·
+  <a href="https://oyabrowser.com">Get started in the cloud</a> ·
+  <a href="docs/self-hosting.md">Self-host Oya</a> ·
+  For enterprise, <a href="mailto:sales@getoya.ai">contact sales@getoya.ai</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/OyadotAI/oya-browser/releases/latest"><img src="https://img.shields.io/github/v/release/OyadotAI/oya-browser?label=release&color=39ed35" alt="Latest release"></a>
   <a href="https://www.npmjs.com/package/@oya-ai/browser"><img src="https://img.shields.io/npm/v/@oya-ai/browser?color=39ed35&label=@oya-ai/browser&logo=npm" alt="npm: @oya-ai/browser"></a>
-  <a href="https://www.npmjs.com/package/@oya-ai/browser"><img src="https://img.shields.io/npm/dm/@oya-ai/browser?label=downloads" alt="npm downloads"></a>
-  <br>
-  <a href="https://www.npmjs.com/package/@oya-ai/browser"><img src="https://img.shields.io/npm/types/@oya-ai/browser" alt="TypeScript types included"></a>
-  <a href="https://www.npmjs.com/package/@oya-ai/browser"><img src="https://img.shields.io/node/v/@oya-ai/browser" alt="Node version"></a>
+  <a href="https://codecov.io/gh/OyadotAI/oya-browser"><img src="https://img.shields.io/codecov/c/github/OyadotAI/oya-browser?label=coverage&logo=codecov" alt="Coverage"></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-Sustainable_Use_%2B_MIT_SDK-157a13" alt="License"></a>
-  <a href="https://github.com/OyadotAI/oya-browser/stargazers"><img src="https://img.shields.io/github/stars/OyadotAI/oya-browser?logo=github" alt="GitHub stars"></a>
-  <a href="https://oyabrowser.com"><img src="https://img.shields.io/badge/hosted-oyabrowser.com-141410?logo=googlechrome&logoColor=39ed35" alt="Hosted"></a>
   <a href="https://discord.gg/wqSeXJPygn"><img src="https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
 <p align="center">
-  <a href="https://discord.gg/wqSeXJPygn">Join the Discord</a> ·
-  <a href="https://calendly.com/d/dvrm-r65-kkx/oya-founder-call">Talk to the founders</a>
+  <img src="assets/prior-auth.gif" alt="The Oya agent completes a prior authorization workflow in a mock payer portal" width="100%">
 </p>
+<p align="center"><sub>A run in the Oya desktop app, sped up. The portal and patient data are fictional. Watch <a href="assets/prior-auth-1.mp4">run 1</a> · <a href="assets/prior-auth-2.mp4">run 2</a> · <a href="assets/prior-auth-3.mp4">run 3</a>.</sub></p>
 
-## Start
+This repository contains the **Oya Browser community edition**. People and AI agents work
+together in one browser: agents can use an existing signed-in browser, start managed cloud
+browsers, or connect through familiar tools and APIs. People can watch the work, step in when
+needed, and keep control of browser access and repeatable tasks.
+
+The **enterprise edition, including the HIPAA-ready offering, is maintained in a separate private
+repository**. Contact [sales@getoya.ai](mailto:sales@getoya.ai) to learn about that edition.
+
+## Choose how to get started
+
+### Use Oya with an AI assistant
+
+Install the [desktop app](https://oyabrowser.com/#download), sign in, and connect your assistant
+from the app. Oya works with Claude Code, Codex, Cursor and VS Code. People can see the agent's
+browser activity and take control when a task needs their attention.
+
+[Download the desktop app](https://oyabrowser.com/#download) · [Agent setup guide](https://oyabrowser.com/llms.txt)
+
+### Control a browser from Node.js
+
+Install the SDK and create an API key at [oyabrowser.com](https://oyabrowser.com). Node.js 20 or
+newer is required.
 
 ```bash
-npm i @oya-ai/browser
+npm install @oya-ai/browser
 ```
+
+Set `OYA_API_KEY`, then run:
 
 ```js
 import { Oya } from '@oya-ai/browser';
 
-const browser = await new Oya().browser.start(); // real Chrome, yours for the session
-await browser.goto('https://news.ycombinator.com');
-console.log(await browser.ask('What are the top 3 stories?'));
-await browser.stop();
+const oya = new Oya();
+const browser = await oya.browser.start();
+
+try {
+  await browser.goto('https://news.ycombinator.com');
+  console.log(await browser.ask('Summarize the top three stories.'));
+} finally {
+  await browser.stop();
+}
 ```
 
-```
-DONE: The top 3 stories on Hacker News are:
-1. Google's Open Agentic Orchestrator
-2. Samsung is expected to more than double output of its HBM4 and HBM4E DRAM
-3. What happened to the Snowden archive
-```
+With no browser provider configured, `start()` can use the Oya desktop browser already connected
+to your account. To start cloud or self-hosted browsers, configure a provider with
+[`npx @oya-ai/cli init`](packages/cli/README.md). The SDK and CLI can also use Browserbase, Steel,
+Anchor, Browser Use, or a browser you provide. Your application can keep the same SDK calls when
+you change providers.
 
-Set `OYA_API_KEY` from [oyabrowser.com](https://oyabrowser.com), or let your agent sign itself up
-([below](#for-ai-agents)). Node 20+.
+[SDK guide](packages/sdk/README.md) · [Runnable examples](examples/README.md) · [CLI guide](packages/cli/README.md)
 
-No provider set up yet? Open the [desktop browser](https://oyabrowser.com) on the same
-key and `start()` hands that one over, so those five lines work with nothing else
-configured. `npx @oya-ai/cli init` picks where browsers run when you want it to start them.
+### Connect over MCP
 
-## For AI agents
-
-Are you an AI agent (OpenClaw, Hermes, Claude Code, Codex, Cursor or any other) looking for a
-browser? Everything below works with no person at a dashboard. Full reference, written for you:
-[oyabrowser.com/llms.txt](https://oyabrowser.com/llms.txt).
-
-**As a skill**, for any agent that reads `SKILL.md`:
-
-```bash
-npx skills add OyadotAI/oya-browser
-```
-
-**In code** (Node 22.3+). Sign yourself up with your person's email, then use their own
-browser, already signed in to their sites:
-
-```js
-import { Oya } from '@oya-ai/browser';
-
-await Oya.signup({ email: 'person@example.com' }); // your own key, saved to ~/.oya/config.json
-const browser = await new Oya().desktop.connect(); // pairs the Oya desktop app, imports their logins
-await browser.goto('https://example.com');
-const { markdown, elements } = await browser.analyze();
-```
-
-`desktop.connect()` asks your person to install the [desktop app](https://oyabrowser.com/#download)
-if it is missing, and to click Connect when it opens.
-
-**Over MCP**, for tools that cannot run code (Claude Desktop, Cursor, Windsurf and the rest):
-`https://oyabrowser.com/mcp/pool` with `Authorization: Bearer <key>`. In Claude Code:
+For assistants that support remote MCP, connect to `https://oyabrowser.com/mcp/pool` and
+authenticate with your Oya API key. For Claude Code:
 
 ```bash
 claude mcp add --transport http oya https://oyabrowser.com/mcp/pool \
   --header "Authorization: Bearer $OYA_API_KEY"
 ```
 
-**In claude.ai, Claude Desktop or Claude mobile**, on your Claude plan with no API key: Settings →
-Connectors → Add custom connector, paste `https://oyabrowser.com/mcp/pool`, sign in to Oya and
-allow it for a project. A self-hosted server works the same way once it is reachable over HTTPS
-(a tunnel is enough) and `OYA_CONSOLE_URL` is set to that address: Claude connects from
-Anthropic's cloud, not from your machine.
+Use the same endpoint with your self-hosted server URL when you run your own deployment.
 
-Then just ask: _"Start a browser, open Hacker News and summarise the top 3 stories."_ Oya is in
-the MCP registry as `io.github.OyadotAI/oya-browser`, on [Smithery](https://smithery.ai/skills/oyaai/oya-browser)
-and on ClawHub as `oya-browser`.
+[Agent instructions and MCP reference](https://oyabrowser.com/llms.txt)
 
-## Record it once, replay it forever
+### For AI agents
 
-`ask()` costs a model call every time. Save the run and it never costs one again.
+Use the [agent reference](https://oyabrowser.com/llms.txt) for setup instructions, available
+tools, SDK examples, and MCP configuration. The desktop app can pair with Claude Code, Codex,
+Cursor, and VS Code. For remote MCP clients, connect to `https://oyabrowser.com/mcp/pool` with
+your Oya API key.
 
-```js
-await browser.ask('Log in with {{user}} and {{pass}}. Open New Request for {{name}}.', {
-  data: { name: 'Alex Example' },
-  secrets: { user, pass },
-});
-await browser.toPlaybook('new-request'); // the steps it just took
+### Run Oya in your own environment
 
-await replay.play('new-request', { name: 'Sam Example', user, pass }); // no model, new inputs
-```
-
-Nine of ten public sites replay every recorded step with no model and no repair.
-[The tenth is named, with its error](docs/replay-benchmark.md). When a page really has changed,
-the agent finishes the run and its fix replaces the broken steps, so the next replay runs clean.
-A replay that meets a login signs in with the profile's saved credentials and carries on.
-
-Values you gave in the prompt become variables. A free-text field the agent wrote itself, a
-comment or the answer to a question, is written fresh by your model on every replay instead of
-repeating the first run's words. Every playbook is also a Playwright module you can read and keep:
-
-```js
-export default async function run(page, vars = {}, oya) {
-  await page.getByLabel('Customer name:').first().fill(`${vars['custname']}`);
-  await page
-    .getByLabel('Delivery instructions:')
-    .first()
-    .fill(vars['comments'] ?? (await oya.llm.answer('Delivery instructions:', vars)));
-}
-```
-
-Move one to another environment with `oya.playbooks.export(name)` and `oya.playbooks.import(doc)`,
-`oya playbooks export|import` on the command line, or Export and Import in the dashboard.
-
-## Sign in once
-
-Scripted logins break on Google SSO, Okta, passkeys and Cloudflare. Don't script them. Import
-the logins you already have from Chrome, Arc, Brave, Edge or Firefox when you connect the
-[desktop app](https://oyabrowser.com), or sign in by hand once in it. Every browser you start on
-that persona is then already signed in: the session travels as cookies **and localStorage**,
-sealed at rest, because half the portals worth automating keep you signed in with neither one
-alone. [Every way in and out](docs/logins.md).
-
-For the portals that end the session server-side anyway, store the login and Oya signs in itself,
-and stops rather than retrying a password the site has already refused, because that is how a
-real account gets locked out.
-
-## Why it isn't flagged as a bot
-
-Everyone else ships an SDK that drives headless Chrome over the debugging protocol. That is the
-easy way, and it is the shape anti-bot vendors have learned to look for. Oya is a real headful
-browser a person can sit in front of, and the automation runs inside the process:
-
-- The persona's platform, timezone, locale, cores and screen are set through **Chrome's own
-  emulation** before the first document, and again in workers and cross-site iframes. A value
-  Chrome reports about itself cannot be caught lying.
-- Reading a page uses an isolated world, so it needs no `Runtime.enable`, which is a known detection
-  vector. Replay never turns it on.
-- Console and network come from browser-process APIs, not the `Log` and `Network` domains, so
-  watching a run adds nothing a page can see.
-
-Measured, not asserted: **0% CreepJS headless score** (bare headless Chrome: 100%) and
-**31 of 31** Bot.Sannysoft, re-run on 2026-09-20. Nobody can promise you are never detected ([our own numbers
-page says so](docs/stealth.md)), but you can run the harness yourself and see what it says.
-
-## Self-host
+Use the installer to set up a self-hosted instance:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OyadotAI/oya-browser/main/install.sh | sh
 ```
 
-It checks for git, Docker and Node 20+, asks six questions, then clones, writes the config, builds and waits for `/readyz`.
-Add `-s -- --yes` (what an agent should run) to skip the questions: SQLite, the server and a browser
-worker in Docker on this machine, and it prints `OYA_BASE_URL` and `OYA_API_KEY` at the end.
-Storage is SQLite (the default), Postgres or JSON files; browsers run on Docker, Kubernetes or your
-own machines. For production, [`deployments/`](deployments) deploys the control plane and its
-browsers to one Docker host, Amazon ECS on Fargate, any Kubernetes cluster, or GKE Autopilot, with
-one `deploy.sh` each.
+For production, choose Docker, Amazon ECS, Kubernetes, or GKE. The deployment guides cover
+configuration, storage, upgrades, and operations.
 
-To update an install made this way to the latest version (it keeps your settings and number of
-browser workers, and stops without changing anything if the checkout has local edits):
+[Self-hosting guide](docs/self-hosting.md) · [Deployment templates](deployments/)
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/OyadotAI/oya-browser/main/update.sh | sh
-```
+## What you can do with Oya
 
-Self-hosting is free up to 5 cloud browsers running at once. Past that, or if you are using it
-seriously, write to **sales@getoya.ai** for a license key (`OYA_LICENSE_KEY`). A self-hosted server
-sends Oya one anonymous ping a day (a random install id, the version and browser counts, nothing
-about your users or pages); see [telemetry](docs/self-hosting.md#telemetry).
+- **Work in a signed-in browser.** Connect the desktop app and reuse logins imported from Chrome,
+  Arc, Brave, Edge, or Firefox. [Set up logins](docs/logins.md).
+- **Keep a person in control.** Watch an agent work, switch between AI Mode and Human Mode, and
+  keep agent activity in its own tabs.
+- **Turn a successful run into a playbook.** Replay repeatable tasks with new inputs, inspect the
+  generated Playwright module, and export or import workflows.
+  [Playbook details](packages/sdk/README.md#portal-automation-record-once-replay-with-new-inputs) ·
+  [Replay benchmark](docs/replay-benchmark.md).
+- **Choose where browsers run.** Use Oya Cloud, your own deployment, supported browser providers,
+  or a browser you provide. [Why route through Oya?](docs/why-oya.md).
+- **Operate with governance controls.** Self-hosted community deployments include host egress
+  rules and a tamper-evident audit trail. See the [control evidence](compliance/EVIDENCE.md) and
+  [trust center](https://oyabrowser.com/trust).
 
-<p align="center">
-  <img src="assets/oya-demo.gif" alt="The Oya browser: a task asked in plain language, answered, and kept as a playbook" width="100%">
-</p>
-<p align="center"><sub>The browser itself, filmed in real time: a task asked in the Ask pane, the answer, and the run kept as a playbook. The green boxes are the page as the agent reads it: every element it can act on, numbered. <a href="assets/oya-demo.mp4">The four-minute version</a> goes on to LinkedIn already signed in, Amazon, and a login it completes by itself (subtitles included).</sub></p>
+## For contributors
 
-## The rest
+Oya is made up of the browser, control plane, console, SDK, and CLI. Start with the architecture
+map, then read the guide for the part you plan to change.
 
-|                           |                                                                                                                                                                                                                                                                             |
-| :------------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **CAPTCHA and 2FA**       | Solved where they can be, handed to a person where they can't                                                                                                                                                                                                               |
-| **Record it yourself**    | The desktop recorder keeps a draft you edit step by step, validate in fresh tabs and save as a playbook ([how](docs/workflow-studio.md))                                                                                                                                    |
-| **Routines**              | Saved prompts the agent runs every N minutes or daily at a set time, on the desktop or, with **Run in the cloud**, on an Oya Cloud browser the server starts for each run, with each run's steps and answer kept                                                            |
-| **It proves what it did** | A hash-chained audit trail the database won't let you rewrite, host allow-listing, [regenerable evidence](compliance/EVIDENCE.md)                                                                                                                                           |
-| **It isn't one vendor**   | Oya Cloud, Browserbase, Steel, Anchor, Browser Use or your own Chrome ([why](docs/why-oya.md))                                                                                                                                                                              |
-| **It keeps your tools**   | Every browser has a `cdpUrl`, so Playwright and Puppeteer connect unchanged                                                                                                                                                                                                 |
-| **Full docs**             | [SDK](packages/sdk) · [CLI](packages/cli) · [self-hosting](docs/self-hosting.md) · [deployments](deployments) · [moving logins](docs/logins.md) · [examples](examples) · [oyabrowser.com/docs](https://oyabrowser.com/docs) · [for agents](https://oyabrowser.com/llms.txt) |
+- [Architecture overview](ARCHITECTURE.md)
+- [Development setup and commands](#development)
+- [Open issues](https://github.com/OyadotAI/oya-browser/issues)
+- [Join the community on Discord](https://discord.gg/wqSeXJPygn)
 
-## Packages
+### Development
 
-| Package                                                |                                                                |
-| :----------------------------------------------------- | :------------------------------------------------------------- |
-| [`@oya-ai/browser`](packages/sdk)                      | TypeScript SDK. ESM and CJS, typed, zero runtime dependencies. |
-| [`@oya-ai/cli`](packages/cli)                          | The fleet, the live view, the installer.                       |
-| [`server`](server) · [`ui`](ui) · [`browser`](browser) | Control plane, console, and the browser itself.                |
-| [`skills/oya-browser`](skills/oya-browser)             | The agent skill: `npx skills add OyadotAI/oya-browser`.        |
-| [`deployments`](deployments)                           | Production deploys: Docker, ECS, Kubernetes, GKE.              |
+Requirements and commands vary by project area. See [Working in this repository](AGENTS.md) for
+the conventions and complete command list. To install dependencies across the workspace:
 
 ```bash
-npm test                 # server, CLI and packages; ui and browser run their own (see AGENTS.md)
-cd server && npm run stealth -- --live   # the stealth numbers, on your machine
+npm run setup
 ```
+
+Common checks:
+
+```bash
+npm run lint
+npm run format:check
+npm test
+```
+
+The full test command builds the SDK and runs the server, CLI, package, and script suites. For
+changes in the UI or browser app, run the checks listed in that part's `package.json` and
+architecture guide as well.
+
+## Packages and project areas
+
+| Path | What it contains |
+| :--- | :--- |
+| [`packages/sdk`](packages/sdk) | `@oya-ai/browser`, the TypeScript SDK (MIT) |
+| [`packages/cli`](packages/cli) | `@oya-ai/cli`, setup and command-line tools (MIT) |
+| [`browser`](browser) | Oya's desktop browser and cloud browser image |
+| [`server`](server) | API, browser connections, MCP, and control plane |
+| [`ui`](ui) | Web console and public site |
+| [`examples`](examples) | SDK and browser integration examples |
+| [`docs`](docs) | Operator guides and product details |
 
 ## License
 
-The [SDK](packages/sdk) and [CLI](packages/cli) are MIT. Embed them in commercial agents.
-Everything else is source-available under the [Sustainable Use License](LICENSE.md): free for
-internal business use, research and non-commercial use, self-hosted up to 5 cloud browsers at once.
-Beyond that, write to sales@getoya.ai.
+The SDK and CLI are MIT licensed. The rest of the project is available under the Sustainable Use
+License. See [LICENSE.md](LICENSE.md) for permitted use, self-hosting terms, and commercial
+licensing details.

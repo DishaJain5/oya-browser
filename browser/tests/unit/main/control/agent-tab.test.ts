@@ -169,3 +169,25 @@ it('a finished run gives its first tab back, so the next run starts afresh', () 
     assert.equal(agentTab.mayWorkIn(1), false);
   });
 });
+
+it('after a lane is released, the next lane takes the shown tab, not a new background one', () => {
+  const { agentTab, tabs } = setup();
+  inLane('sign-in', () => agentTab.drive());
+  inLane('sign-in', () => agentTab.release());
+  inLane('request', () => agentTab.drive());
+  assert.deepEqual(agentTab.claimed(), [1]);
+  assert.deepEqual(tabs.created, []);
+});
+
+it("a released lane's lapse is cleared, so finished lanes leave no timers behind", () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const { agentTab } = setup();
+    inLane('sign-in', () => agentTab.drive());
+    inLane('sign-in', () => agentTab.release());
+    // A leak shows nowhere else: one timer and one entry left behind per finished lane.
+    assert.equal((agentTab as any).lapses.size, 0);
+  } finally {
+    mock.timers.reset();
+  }
+});
