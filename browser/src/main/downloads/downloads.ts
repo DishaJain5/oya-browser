@@ -1,7 +1,8 @@
 /**
- * The person's downloads, as Chrome keeps them: a file a page downloads goes
- * straight to the Downloads folder (no save dialog), and the Downloads page lists
- * it with its progress, per profile. Agents' browser contexts have their own
+ * The person's downloads, as Chrome keeps them: a file a page the person may use
+ * downloads goes straight to the Downloads folder (no save dialog), and the
+ * Downloads page lists it with its progress, per profile. A page an agent drives
+ * keeps Electron's Save As dialog, so a person confirms what it writes. Agents' browser contexts have their own
  * download policy (native-downloads/) and are never installed here.
  */
 import { randomUUID } from 'node:crypto';
@@ -29,6 +30,12 @@ export class Downloads {
   changed: () => void = () => {};
   /** Hears the page a download started from, so a tab opened only to download can close, as in Chrome. */
   started: (contents: WebContents) => void = () => {};
+  /**
+   * Whether the person may use the page a download started from. Only then is it saved
+   * without asking: from a page an agent drives, Electron's Save As dialog stays, so a
+   * person still confirms every file an agent would write to their disk.
+   */
+  mayAutoSave: (contents: WebContents) => boolean = () => false;
   /** Every kept download, newest first, across profiles. */
   private entries: StoredDownload[];
   /** Sessions already reporting here. */
@@ -45,14 +52,18 @@ export class Downloads {
     this.deps = deps;
     this.file = file;
     const kept = file.read();
-    this.entries = (Array.isArray(kept) ? kept : []).filter(validEntry).map(settled);
+    this.entries = (Array.isArray(kept) ? kept : []).filter(isStoredDownload).map(settled);
   }
 
   /** Saves `session`'s downloads to the Downloads folder and lists them under `partition`. */
   install(session: Session, partition: string): void {
     if (this.installed.has(session)) return;
     this.installed.add(session);
-    session.on('will-download', (_event, item, contents) => (this.start(item, partition), this.started(contents)));
+    session.on('will-download', (_event, item, contents) => {
+      if (!this.mayAutoSave(contents)) return;
+      this.start(item, partition);
+      this.started(contents);
+    });
   }
 
   /** The shown profile's downloads, newest first, without where they were saved. */
@@ -98,7 +109,7 @@ export class Downloads {
   private start(item: DownloadItem, partition: string): void {
     const path = claimPath(this.deps.electron.app.getPath('downloads'), item.getFilename());
     item.setSavePath(path);
-    const entry: StoredDownload = { ...describe(item), id: randomUUID(), path, partition };
+    const entry: StoredDownload = { ...newDownload(item), id: randomUUID(), path, partition };
     this.entries = [entry, ...this.entries].slice(0, DOWNLOADS_KEPT);
     item.on('updated', (_event, state) => this.update(entry, item, state === 'interrupted' ? 'interrupted' : null));
     item.once('done', (_event, state) => this.finish(entry, item, state));
@@ -129,7 +140,7 @@ export class Downloads {
 }
 
 /** A new download as the page shows it: its file name, where it came from, now. */
-function describe(item: DownloadItem): DownloadEntry {
+function newDownload(item: DownloadItem): DownloadEntry {
   // A data: address carries the whole file: keep only its scheme.
   const url = item.getURL().startsWith('data:') ? 'data:' : item.getURL();
   const title = item.getFilename();
@@ -143,7 +154,7 @@ const bytes = (item: DownloadItem): Pick<DownloadEntry, 'received' | 'total'> =>
 });
 
 /** Whether a kept entry has what the list needs: a file read back is untrusted. */
-function validEntry(e: unknown): e is StoredDownload {
+function isStoredDownload(e: unknown): e is StoredDownload {
   const d = e as StoredDownload;
   return !!d && typeof d.id === 'string' && typeof d.path === 'string' && typeof d.partition === 'string';
 }

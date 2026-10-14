@@ -63,6 +63,7 @@ function setup(kept: StoredDownload[] | null = null) {
   const file = { read: () => saved, write: (v: StoredDownload[]) => void (saved = JSON.parse(JSON.stringify(v))) };
   const downloads = new Downloads({ electron, persona } as any, file);
   const session = new EventEmitter();
+  downloads.mayAutoSave = () => true;
   downloads.install(session as any, 'persist:oya-a');
   const start = (item = new FakeItem()) => (session.emit('will-download', {}, item), item);
   return { downloads, start, opened, persona, saved: () => saved };
@@ -172,4 +173,12 @@ it('keeps only the scheme of a data: address, which carries the whole file', () 
   const { downloads, start } = setup();
   start(new FakeItem(`data:text/plain;base64,${'A'.repeat(1000)}`, 'a.txt'));
   assert.equal(downloads.list()[0].url, 'data:');
+});
+
+it('leaves a download from a page an agent drives to the Save As dialog, unsaved and unlisted', () => {
+  const { downloads, start } = setup();
+  downloads.mayAutoSave = () => false;
+  const item = start();
+  assert.equal(item.path, '', 'no save path: Electron asks the person');
+  assert.deepEqual(downloads.list(), []);
 });

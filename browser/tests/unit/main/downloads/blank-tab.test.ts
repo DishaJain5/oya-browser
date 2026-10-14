@@ -5,7 +5,7 @@
  */
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { closeDownloadOnlyTab } from '../../../../src/main/downloads/index.ts';
+import { closeDownloadOnlyTab, personMayUse } from '../../../../src/main/downloads/index.ts';
 
 /** A tab whose page is at `url`, with or without a page before it. */
 function setup(url: string, canGoBack = false, home = false) {
@@ -41,4 +41,12 @@ it('ignores a download from a page that is not a tab', () => {
   const { deps, closed } = setup('about:blank');
   closeDownloadOnlyTab(deps, { getURL: () => '' } as any);
   assert.deepEqual(closed, []);
+});
+
+it('the person may use a tab no agent drives, and not one an agent does', () => {
+  const { deps, contents } = setup('https://site.test/');
+  deps.agentTab = { humanMay: (id: number | null) => id !== 7 };
+  assert.equal(personMayUse(deps, contents), false);
+  deps.agentTab = { humanMay: () => true };
+  assert.equal(personMayUse(deps, contents), true);
 });

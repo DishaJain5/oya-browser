@@ -15,3 +15,9 @@ export function closeDownloadOnlyTab(deps: Pick<AppServices, 'tabs'>, contents: 
   if (!tab || tab.home || !contents || contents.isDestroyed()) return;
   if (BLANK.has(contents.getURL()) && !contents.navigationHistory.canGoBack()) deps.tabs.closeTab(tab.id);
 }
+
+/** Whether the person may use the tab whose page is `contents`; a page that is no tab (a popup window) counts as new. */
+export function personMayUse(deps: Pick<AppServices, 'tabs' | 'agentTab'>, contents: WebContents | undefined): boolean {
+  const tab = deps.tabs.list.find((t) => t.view.webContents === contents);
+  return deps.agentTab.humanMay(tab ? tab.id : null);
+}

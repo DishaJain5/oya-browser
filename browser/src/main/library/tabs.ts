@@ -53,14 +53,14 @@ function describeTab(deps: Deps, tab: Tab, kind: LibraryKind): void {
 
 /** What a download's row can do, by id: open the file, show it in its folder, take it off the list. */
 const DOWNLOAD_ACTIONS: Partial<Record<LibraryAction, (deps: Deps, id: string) => unknown>> = {
-  open: (deps, id) => deps.downloads.open(id) || fail('This file was moved or deleted'),
-  reveal: (deps, id) => deps.downloads.reveal(id) || fail('This file was moved or deleted'),
+  open: (deps, id) => deps.downloads.open(id) || fileGone(),
+  reveal: (deps, id) => deps.downloads.reveal(id) || fileGone(),
   remove: (deps, id) => deps.downloads.forget(id),
 };
 
-/** Throws `message` for the page to show. */
-function fail(message: string): never {
-  throw Error(message);
+/** Throws that a download's file was moved or deleted, for the page to say. */
+function fileGone(): never {
+  throw Error('This file was moved or deleted');
 }
 
 /** Validate and apply a single idempotent saved-page action; a download's names its id, not an address. */
