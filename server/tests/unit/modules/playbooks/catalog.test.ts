@@ -67,6 +67,29 @@ describe('playbook catalog', () => {
       browser.disconnect();
     });
 
+    it('drops incidental tab and reload commands from an agent run before saving', async () => {
+      const run = {
+        prompt: 'Search for {{query}}',
+        steps: [
+          { action: 'navigate', url: 'https://www.wikipedia.org/', start: true },
+          { action: 'open_tab', url: 'https://en.wikipedia.org/' },
+          { action: 'switch_tab', tabUrl: 'https://www.wikipedia.org/' },
+          { action: 'close_tab', tabUrl: 'https://www.wikipedia.org/' },
+          { action: 'reload' },
+          { action: 'type', text: 'Apollo 11', el: { type: 'input', name: 'search' } },
+          {
+            action: 'click',
+            el: { type: 'link', text: 'Apollo 11', rawHref: 'https://en.wikipedia.org/wiki/Apollo_11' },
+          },
+        ],
+      };
+      await catalog.create(KEY, 'b-tabs', 'wikipedia-search', run);
+      assert.deepEqual(
+        keyConfig.getPlaybook(KEY, 'wikipedia-search').steps.map((step) => step.action),
+        ['navigate', 'type', 'click'],
+      );
+    });
+
     it('keeps a workflow run’s declared variables, with non-secret defaults', async () => {
       const run = {
         schemaVersion: 2,
