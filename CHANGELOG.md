@@ -6,6 +6,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- Playbook replay now re-finds a recorded control and retries when its native agent frame detaches before the action runs.
+
 ## [1.0.193](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.193) · 2026-10-14
 
 ### Fixed
