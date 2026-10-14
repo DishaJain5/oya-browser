@@ -136,8 +136,8 @@ try {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.waitForFunction(() => document.documentElement.dataset.ready === 'true');
-  // First run opens on the checklist; an Oya key is under "Have an Oya account?".
-  await page.locator('#btn-have-account').click();
+  // First run opens on the checklist; an Oya key is under its "API key" tab.
+  await page.locator('#tab-key').click();
   await page.locator('#btn-manual').click();
   // CDP clicks bypass native draggable regions: check those separately so a
   // passing automation test cannot conceal a shell that swallows human clicks.
@@ -146,7 +146,7 @@ try {
   for (const selector of ['body', '.setup-screen', '.setup-screen .setup-card']) {
     assert.notEqual(await regionOf(page, selector), 'drag', `${selector} must accept native input`);
   }
-  for (const selector of ['#cfg-server', '#cfg-key', '#cfg-name', '#btn-connect', '#btn-signin', '#btn-skip']) {
+  for (const selector of ['#cfg-server', '#cfg-key', '#cfg-name', '#btn-connect', '#btn-skip']) {
     assert.equal(await regionOf(page, selector), 'no-drag', `${selector} must accept native input`);
     if (await page.locator(selector).isVisible())
       assert.equal(await regionAt(page, ...(await centre(page, selector))), 'no-drag', `${selector} is never dragged`);

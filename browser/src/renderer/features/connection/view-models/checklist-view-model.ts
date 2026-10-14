@@ -1,6 +1,6 @@
 /**
- * The first-run checklist: connect ChatGPT (which also makes this browser's Oya
- * key, so there is no account to create), bring in the person's logins, make Oya
+ * The first-run checklist: connect ChatGPT, or a free Gemini key with an email,
+ * (either also makes this browser's Oya key, so there is no account to create), bring in the person's logins, make Oya
  * the default browser, and start. Each step's state is read from the main
  * process, so it is right whichever order things happen in.
  */
@@ -14,6 +14,8 @@ export interface OnboardingProgress {
   signedIn: boolean;
   /** The ChatGPT sign-in, and as whom. */
   chatgpt: { /** A sign-in is kept. */ connected: boolean; /** Its email. */ email: string };
+  /** The project has a model: the ChatGPT plan or a Gemini key. */
+  hasModel: boolean;
   /** The person's logins came in. */
   imported: boolean;
   /** Oya Browser is the default browser. */
@@ -21,6 +23,9 @@ export interface OnboardingProgress {
   /** Where the key becomes an Oya account. */
   claimUrl: string;
 }
+
+/** Step 1's ways in, one per tab of its switch. */
+export type ConnectWay = 'chatgpt' | 'gemini' | 'oya' | 'key';
 
 /** What the checklist shows. */
 export interface ChecklistState {
@@ -30,6 +35,12 @@ export interface ChecklistState {
   connecting: boolean;
   /** Bring in the default browser's logins on connect. */
   importLogins: boolean;
+  /** The way in step 1 shows: ChatGPT, the Gemini key form, an Oya account, or an Oya API key. */
+  way: ConnectWay;
+  /** The email typed in the key form. */
+  email: string;
+  /** The Gemini key typed in the key form. */
+  key: string;
   /** Why the last step failed, or ''. */
   error: string;
 }
@@ -37,7 +48,14 @@ export interface ChecklistState {
 /** The parts of the bridge the checklist uses. */
 export type ChecklistBridge = Pick<
   OyaBrowser,
-  'connectChatgpt' | 'onboardingStatus' | 'finishOnboarding' | 'makeDefaultBrowser' | 'onWsStatus' | 'onMirrorStatus'
+  | 'connectChatgpt'
+  | 'connectGemini'
+  | 'openGeminiKeys'
+  | 'onboardingStatus'
+  | 'finishOnboarding'
+  | 'makeDefaultBrowser'
+  | 'onWsStatus'
+  | 'onMirrorStatus'
 >;
 
 /** The first-run checklist. */
@@ -47,7 +65,7 @@ export class ChecklistViewModel extends ViewModel<ChecklistState> {
 
   /** Reads the steps now, and again whenever the connection or an import changes. */
   constructor(bridge: ChecklistBridge) {
-    super({ progress: null, connecting: false, importLogins: true, error: '' });
+    super({ progress: null, connecting: false, importLogins: true, way: 'oya', email: '', key: '', error: '' });
     this.bridge = bridge;
     this.own(bridge.onWsStatus(() => void this.refresh()));
     this.own(bridge.onMirrorStatus(() => void this.refresh()));
@@ -70,6 +88,32 @@ export class ChecklistViewModel extends ViewModel<ChecklistState> {
     this.set({ connecting: true, error: '' });
     const answer = await this.bridge
       .connectChatgpt({ importLogins: this.state.importLogins })
+      .catch((e: Error) => ({ error: e.message }));
+    this.set({ connecting: false, error: String(answer?.error || '') });
+    await this.refresh();
+  }
+
+  /** Switches step 1 to another way in. */
+  pick(way: ConnectWay): void {
+    this.set({ way, error: '' });
+  }
+
+  /** Records what is typed in the key form. */
+  type(fields: Partial<Pick<ChecklistState, 'email' | 'key'>>): void {
+    this.set(fields);
+  }
+
+  /** Opens Google's free-key page in the system browser. */
+  getKey(): void {
+    void this.bridge.openGeminiKeys();
+  }
+
+  /** Step 1 without ChatGPT: the email makes the Oya key and the project runs on the Gemini key. */
+  async connectGemini(): Promise<void> {
+    const { email, key, importLogins } = this.state;
+    this.set({ connecting: true, error: '' });
+    const answer = await this.bridge
+      .connectGemini({ email, key, importLogins })
       .catch((e: Error) => ({ error: e.message }));
     this.set({ connecting: false, error: String(answer?.error || '') });
     await this.refresh();

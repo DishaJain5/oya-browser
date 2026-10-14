@@ -80,8 +80,8 @@ try {
   });
   const page = await app.firstWindow();
   page.setDefaultTimeout(10000);
-  // First run opens on the checklist; an Oya key is under "Have an Oya account?".
-  await page.locator('#btn-have-account').click();
+  // First run opens on the checklist; an Oya key is under its "API key" tab.
+  await page.locator('#tab-key').click();
   await page.locator('#btn-manual').click();
   await page.locator('#cfg-key').fill('test');
   await page.locator('#btn-connect').click();

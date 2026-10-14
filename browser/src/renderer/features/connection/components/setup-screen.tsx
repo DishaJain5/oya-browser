@@ -9,7 +9,7 @@ import { Button, Orb } from '../../../ui/index.ts';
 import './setup-screen.css';
 import type { SetupView, SetupViewModel } from '../view-models/setup-view-model.ts';
 import type { ViewProps } from '../model/models.ts';
-import { ManualView, StartView, WaitingView } from './setup-views.tsx';
+import { ManualView, WaitingView } from './setup-views.tsx';
 import { AccountChooser } from './account-chooser.tsx';
 import { ChecklistView } from './checklist-view.tsx';
 import type { ChecklistViewModel } from '../view-models/checklist-view-model.ts';
@@ -76,19 +76,23 @@ export function SetupScreen({ vm, checklist }: SetupScreenProps) {
       <WelcomeStage />
       <section className="setup-card welcome-panel" aria-label="Connect this browser" ref={panel}>
         <AccountChooser vm={vm} />
-        <ChecklistView vm={checklist} onAccount={() => vm.show('start')} onSkip={() => vm.skip()} />
-        <StartView vm={vm} />
+        <ChecklistView
+          vm={checklist}
+          onSignIn={() => void vm.signIn()}
+          onManual={() => vm.show('manual')}
+          onSkip={() => vm.skip()}
+        />
         <WaitingView vm={vm} />
         <ManualView vm={vm} />
         <div role="alert" className="setup-error" id="setup-error">
           {s.error}
         </div>
-        {s.view !== 'checklist' && s.view !== 'accounts' && (
+        {s.view === 'manual' && (
           <Button type="button" variant="secondary" onClick={() => void vm.makeDefaultBrowser()}>
             Make Oya Browser default…
           </Button>
         )}
-        {s.view !== 'checklist' && (
+        {s.view !== 'checklist' && s.view !== 'waiting' && (
           <Button type="button" className="welcome-skip" id="btn-skip" onClick={() => vm.skip()}>
             Just browse for now
           </Button>

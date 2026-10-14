@@ -116,9 +116,9 @@ describe('signing in with Oya', () => {
 
   it('says the server address is not valid when the dashboard cannot open', async () => {
     const app = build({ openConsole: null });
-    app.setup.show('start');
+    app.setup.show('checklist');
     await app.setup.signIn();
-    assert.equal(app.setup.state.view, 'start');
+    assert.equal(app.setup.state.view, 'checklist');
     assert.match(app.setup.state.error, /not valid/);
   });
 

@@ -76,3 +76,49 @@ it('a retry after a later step failed starts from the ChatGPT sign-in that worke
   await onboarding.connect({ importLogins: false });
   assert.equal(chatgpt.signIn.mock.callCount(), 2, 'a finished connect forgets it, so the next is a fresh sign-in');
 });
+
+it('the Gemini key route makes a key from the typed email, puts the project on Gemini, and connects', async () => {
+  const posts: any[] = [];
+  mock.method(globalThis, 'fetch', async (_url: string, init: RequestInit) => {
+    posts.push(JSON.parse(String(init.body)));
+    return new Response('{}');
+  });
+  const { onboarding, values, socket, mirror, signUp, chatgpt } = setup();
+  await onboarding.connectWithKey({ email: ' me@y.test ', key: ' AIza1 ', importLogins: true });
+  assert.deepEqual(signUp.mock.calls[0].arguments, ['wss://oya.test/ws', 'me@y.test']);
+  assert.deepEqual([posts[0].llm_provider, posts[0].openai_api_key, posts[0].chat_model], ['gemini', 'AIza1', null]);
+  assert.deepEqual([socket.connected, mirror.importOnConnect, values.modelFromKey], [1, true, true]);
+  assert.equal(chatgpt.signIn.mock.callCount(), 0);
+});
+
+it('the Gemini key route keeps an existing Oya key and does not reconnect', async () => {
+  mock.method(globalThis, 'fetch', async () => new Response('{}'));
+  const { onboarding, socket, signUp } = setup('existing');
+  await onboarding.connectWithKey({ email: 'me@y.test', key: 'AIza1', importLogins: false });
+  assert.deepEqual([signUp.mock.callCount(), socket.connected], [0, 0]);
+});
+
+it('the Gemini key route refuses a bad email or an empty key before calling anything', async () => {
+  const fetched = mock.method(globalThis, 'fetch', async () => new Response('{}'));
+  const { onboarding, signUp } = setup();
+  await assert.rejects(onboarding.connectWithKey({ email: 'nope', key: 'AIza1', importLogins: false }), /email/);
+  await assert.rejects(onboarding.connectWithKey({ email: 'me@y.test', key: ' ', importLogins: false }), /Gemini/);
+  assert.deepEqual([signUp.mock.callCount(), fetched.mock.callCount()], [0, 0]);
+});
+
+it('the project has a model once a Gemini key is in, without a ChatGPT sign-in', async () => {
+  mock.method(globalThis, 'fetch', async () => new Response('{}'));
+  const { onboarding, chatgpt } = setup('existing');
+  chatgpt.status = () => ({ connected: false, email: '' });
+  assert.equal(onboarding.status().hasModel, false);
+  await onboarding.connectWithKey({ email: 'me@y.test', key: 'AIza1', importLogins: false });
+  assert.equal(onboarding.status().hasModel, true);
+});
+
+it('a new Oya key forgets that an old one had a Gemini model', async () => {
+  mock.method(globalThis, 'fetch', async () => new Response('{}'));
+  const { onboarding, values } = setup();
+  values.modelFromKey = true;
+  await onboarding.connect({ importLogins: false });
+  assert.equal(values.modelFromKey, false);
+});

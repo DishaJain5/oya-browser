@@ -17,9 +17,10 @@ export interface ModelChoice {
 /** A shorthand for a list of model choices: [id, label] pairs. */
 const models = (pairs: [string, string][]): ModelChoice[] => pairs.map(([id, label]) => ({ id, label }));
 
-/** Gemini's models, offered by both Google endpoints. */
+/** Gemini's models, offered by both Google endpoints. 3.8 Flash stays the default: it is on the free tier, Argon is not. */
 const GEMINI = models([
   ['gemini-3.8-flash', 'Gemini 3.8 Flash'],
+  ['gemini-4-argon', 'Gemini 4 Argon (paid)'],
   ['gemini-3.7-flash', 'Gemini 3.7 Flash'],
   ['gemini-3.6-flash', 'Gemini 3.6 Flash'],
   ['gemini-3.5-flash-lite', 'Gemini 3.5 Flash-Lite'],

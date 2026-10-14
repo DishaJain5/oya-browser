@@ -54,6 +54,8 @@ export interface ConfigValues {
   chatgptHostId?: string;
   /** The client id ChatGPT issued this install; kept even when a code exchange fails, so the retry reuses it rather than re-registering. */
   chatgptClientId?: string;
+  /** Set when the first-run key route gave the project a model (src/main/chatgpt/onboarding.ts); cleared with a new key. */
+  modelFromKey?: boolean;
   /** Where the person claims a key this app made into an Oya account. */
   claimUrl?: string;
   /** The shell's appearance and panel. */

@@ -1,12 +1,12 @@
 /**
- * The welcome panel's three views: start (Sign in with Oya), waiting (for the
+ * The welcome panel's two views beside the checklist: waiting (for the Oya
  * sign-in to finish in the web browser) and manual (server, key and name). The
  * account chooser is in account-chooser.tsx.
  * The screen shows one at a time by its data-view (setup-screen.css).
  */
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useViewModel } from '../../../hooks/index.ts';
-import { Button, Orb, TextField } from '../../../ui/index.ts';
+import { Button, TextField } from '../../../ui/index.ts';
 import type { SetupField, SetupViewModel } from '../view-models/setup-view-model.ts';
 import type { ViewProps } from '../model/models.ts';
 import { TEXT } from '../model/constants.ts';
@@ -47,43 +47,23 @@ function Field({ vm, field, id, label, type, placeholder, hint }: FieldProps) {
   );
 }
 
-/** Start: one-click sign-in, or the manual form. */
-export function StartView({ vm }: ViewProps<SetupViewModel>) {
-  return (
-    <div className="welcome-view" data-view="start">
-      <h2>Get started</h2>
-      <p className="sub">Sign-in opens in your web browser. There is no key to copy.</p>
-      <button className="btn-connect setup-primary" id="btn-signin" onClick={() => void vm.signIn()}>
-        Sign in with Oya
-        <span className="welcome-arrow" aria-hidden="true">
-          →
-        </span>
-      </button>
-      <div className="welcome-or">
-        <span>or</span>
-      </div>
-      <button className="btn-skip setup-secondary" id="btn-manual" onClick={() => vm.show('manual')}>
-        Connect with an API key
-      </button>
-      <p className="welcome-note">Self-hosting? Use your own server&apos;s address and key.</p>
-    </div>
-  );
-}
-
 /** Waiting: the sign-in finishes in the web browser, and this screen closes on its own. */
 export function WaitingView({ vm }: ViewProps<SetupViewModel>) {
   return (
-    <div className="welcome-view" data-view="waiting" id="setup-waiting" role="status">
-      <Orb size="lg" state="thinking" className="welcome-orbit" />
+    <div className="welcome-view" data-view="waiting" id="setup-waiting">
+      <Button type="button" className="welcome-back" data-view-go="checklist" onClick={() => vm.show('checklist')}>
+        ← Back
+      </Button>
       <h2>Finish in your web browser</h2>
       <p className="sub">
-        Sign in there, then click <em>Connect</em> when this browser asks. This screen closes on its own.
+        Sign in there, then click <strong>Connect</strong> when Oya asks. This screen closes on its own.
       </p>
-      <Button type="button" id="btn-signin-again" onClick={() => void vm.signIn()}>
+      <p className="waiting-status" role="status">
+        <span className="welcome-orbit" aria-hidden="true" />
+        Waiting for sign-in…
+      </p>
+      <Button type="button" variant="secondary" id="btn-signin-again" onClick={() => void vm.signIn()}>
         Open the sign-in page again
-      </Button>
-      <Button type="button" data-view-go="start" onClick={() => vm.show('start')}>
-        Back
       </Button>
     </div>
   );
@@ -102,7 +82,7 @@ export function ManualView({ vm }: ViewProps<SetupViewModel>) {
   );
   return (
     <div className="welcome-view" data-view="manual">
-      <Button type="button" className="welcome-back" data-view-go="start" onClick={() => vm.show('start')}>
+      <Button type="button" className="welcome-back" data-view-go="checklist" onClick={() => vm.show('checklist')}>
         ← Back
       </Button>
       <h2>Connect with an API key</h2>

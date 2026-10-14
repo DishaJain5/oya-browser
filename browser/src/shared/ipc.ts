@@ -17,6 +17,14 @@ export interface ConnectChatgptOptions {
   importLogins: boolean;
 }
 
+/** What the first-run key route sends: the email the Oya key is made from and the Gemini key. */
+export interface ConnectGeminiOptions extends ConnectChatgptOptions {
+  /** The person's email. */
+  email: string;
+  /** Their Gemini API key. */
+  key: string;
+}
+
 /** The fields every failed call answers with. */
 export interface Failure {
   /** What went wrong, in words for the person. */
@@ -235,6 +243,10 @@ export interface ShellCalls {
   makeDefaultBrowser(): Promise<void>;
   /** First run: signs in with ChatGPT (making this browser's Oya key when it has none) and connects; importLogins brings in the default browser's logins. */
   connectChatgpt(options: ConnectChatgptOptions): Promise<Payload & Failure>;
+  /** First run without ChatGPT: makes this browser's Oya key from an email when it has none, and puts the project on a Gemini key. */
+  connectGemini(options: ConnectGeminiOptions): Promise<Payload & Failure>;
+  /** Opens Google's page for a free Gemini API key in the system browser. */
+  openGeminiKeys(): Promise<void>;
   /** Where each first-run step stands: ChatGPT, logins, default browser, and the claim link. */
   onboardingStatus(): Promise<Payload>;
   /** Ends the first-run checklist and opens the start page. */
@@ -471,6 +483,8 @@ export const CALL_CHANNELS = {
   addressSuggestions: 'address-suggestions',
   makeDefaultBrowser: 'make-default-browser',
   connectChatgpt: 'connect-chatgpt',
+  connectGemini: 'connect-gemini',
+  openGeminiKeys: 'open-gemini-keys',
   onboardingStatus: 'onboarding-status',
   finishOnboarding: 'finish-onboarding',
   openClaim: 'open-claim',

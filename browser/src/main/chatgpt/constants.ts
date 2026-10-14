@@ -73,3 +73,11 @@ export const OTHER_MAC_BROWSERS = ['Google Chrome', 'Arc', 'Brave Browser', 'Mic
 export const EDGE_SCHEME = 'microsoft-edge:';
 /** What the app says when another program holds the sign-in's loopback port. */
 export const PORT_BUSY = 'Another app is using the port ChatGPT sign-in returns to (1456). Close it and try again.';
+/** Where a person gets a free Gemini API key, for the first-run key route. */
+export const GEMINI_KEYS_URL = 'https://aistudio.google.com/apikey';
+/** An email address, loosely: something@something.something, no spaces. */
+export const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** What the app says when the key route has no usable email. */
+export const BAD_EMAIL = 'Enter your email address.';
+/** What the app says when the key route has no key. */
+export const NO_GEMINI_KEY = 'Paste your Gemini API key.';

@@ -3,7 +3,8 @@
  * Oya key when it has none: no Oya account to create), tell the server the model
  * lives here, connect and import the person's logins, and offer to become the
  * default browser. The same `connect` serves an already signed-in browser that
- * just switches its model to the ChatGPT plan.
+ * just switches its model to the ChatGPT plan. Without a ChatGPT plan,
+ * `connectWithKey` does the same from a typed email and a Gemini API key.
  */
 import type { AppServices } from '../app/services.ts';
 import { DefaultBrowser } from '../app/default-browser.ts';
@@ -24,10 +25,26 @@ const DESKTOP_MODEL = {
   chat_model: null,
 };
 
+/** The project's model settings for a Gemini key typed at first run; the server's catalog has Gemini's endpoint and model. */
+const geminiModel = (key: string) => ({
+  llm_provider: 'gemini',
+  openai_api_key: key,
+  openai_base_url: null,
+  chat_model: null,
+});
+
 /** How the person asked to connect. */
 export interface ConnectOptions {
   /** Bring in the default browser's logins once connected. */
   importLogins: boolean;
+}
+
+/** The key route's input: the email the Oya key is made from, and the Gemini key the project runs on. */
+export interface KeyConnectOptions extends ConnectOptions {
+  /** The person's email. */
+  email: string;
+  /** Their Gemini API key. */
+  key: string;
 }
 
 /** What the checklist shows. */
@@ -36,6 +53,8 @@ export interface OnboardingStatus {
   signedIn: boolean;
   /** The ChatGPT sign-in, and as whom. */
   chatgpt: ChatgptAccount;
+  /** The project has a model: the ChatGPT plan, or a key given at first run. */
+  hasModel: boolean;
   /** The person's logins came in from another browser. */
   imported: boolean;
   /** Oya Browser is the system's default browser. */
@@ -77,6 +96,18 @@ export class Onboarding {
     return account;
   }
 
+  /** The key route: makes this browser's Oya key from `email` when it has none and puts the project on the Gemini `key`. */
+  async connectWithKey({ email, key, importLogins }: KeyConnectOptions): Promise<void> {
+    const [mail, secret] = [String(email || '').trim(), String(key || '').trim()];
+    if (!C.EMAIL_SHAPE.test(mail)) throw Error(C.BAD_EMAIL);
+    if (!secret) throw Error(C.NO_GEMINI_KEY);
+    const minted = await this.ensureKey(mail);
+    await this.api.post('config', geminiModel(secret));
+    this.deps.config.merge({ modelFromKey: true });
+    this.deps.config.save();
+    if (minted) this.connectFirstTime(importLogins);
+  }
+
   /** Signs in to ChatGPT, then brings Oya back in front of the browser the sign-in ran in. */
   private async signIn(): Promise<ChatgptAccount> {
     const account = await this.deps.chatgpt.signIn();
@@ -90,7 +121,7 @@ export class Onboarding {
     if (config.values.apiKey) return false;
     if (!email) throw Error(C.NO_EMAIL);
     const { apiKey, claimUrl } = await this.signUp(config.values.serverUrl, email);
-    config.merge({ apiKey, claimUrl, keyFromApp: true, signedOut: false, account: null });
+    config.merge({ apiKey, claimUrl, keyFromApp: true, signedOut: false, account: null, modelFromKey: false });
     config.save();
     return true;
   }
@@ -105,9 +136,10 @@ export class Onboarding {
 
   /** Where each step stands. */
   status(): OnboardingStatus {
-    const { apiKey, mirroredFrom, imports, claimUrl } = this.deps.config.values;
+    const { apiKey, mirroredFrom, imports, claimUrl, modelFromKey } = this.deps.config.values;
+    const chatgpt = this.deps.chatgpt.status();
     return {
-      ...{ signedIn: !!apiKey, chatgpt: this.deps.chatgpt.status() },
+      ...{ signedIn: !!apiKey, chatgpt, hasModel: chatgpt.connected || !!modelFromKey },
       ...{ imported: !!mirroredFrom || (Array.isArray(imports) && imports.length > 0) },
       ...{ isDefault: this.defaultBrowser.isDefault(), claimUrl: String(claimUrl || '') },
     };

@@ -13,7 +13,7 @@ import { SERVER_URL, TEXT } from '../model/constants.ts';
 import { messageOf, shape, type Config } from '../model/models.ts';
 
 /** The panel's views. */
-export type SetupView = 'accounts' | 'checklist' | 'start' | 'waiting' | 'manual';
+export type SetupView = 'accounts' | 'checklist' | 'waiting' | 'manual';
 
 /** The manual form's fields. */
 export type SetupField = 'server' | 'apiKey' | 'name';

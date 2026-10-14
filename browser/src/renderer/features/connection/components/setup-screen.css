@@ -253,7 +253,6 @@ body.mode-setup .setup-screen {
 }
 .setup-screen[data-view='accounts'] .welcome-view[data-view='accounts'],
 .setup-screen[data-view='checklist'] .welcome-view[data-view='checklist'],
-.setup-screen[data-view='start'] .welcome-view[data-view='start'],
 .setup-screen[data-view='waiting'] .welcome-view[data-view='waiting'],
 .setup-screen[data-view='manual'] .welcome-view[data-view='manual'] {
   display: block;
@@ -271,8 +270,7 @@ body.mode-setup .setup-screen {
   line-height: 1.55;
   color: var(--secondary);
 }
-.welcome-panel .setup-primary,
-.welcome-panel .setup-secondary {
+.welcome-panel .setup-primary {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -284,37 +282,11 @@ body.mode-setup .setup-screen {
   font-weight: 600;
   cursor: pointer;
 }
-.welcome-panel .setup-secondary {
-  box-shadow: inset 0 0 0 1px var(--border);
-}
 .welcome-arrow {
   transition: transform 220ms var(--spring);
 }
 .setup-primary:hover .welcome-arrow {
   transform: translateX(4px);
-}
-.welcome-or {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 18px 0;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--secondary);
-}
-.welcome-or::before,
-.welcome-or::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-.welcome-note {
-  margin: 12px 0 0;
-  font-size: 12px;
-  color: var(--secondary);
-  text-align: center;
 }
 .welcome-back {
   margin: 0 0 18px -8px;
@@ -325,8 +297,27 @@ body.mode-setup .setup-screen {
 .welcome-view[data-view='manual'] .setup-primary {
   margin-top: 8px;
 }
-.welcome-view[data-view='waiting'] .text-button {
-  margin: 0 4px 0 -8px;
+.waiting-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--muted-surface);
+  box-shadow: inset 0 0 0 0.5px var(--hairline);
+  font-size: 13px;
+  color: var(--secondary);
+}
+.waiting-status .welcome-orbit {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border-width: 2px;
+}
+.welcome-view[data-view='waiting'] #btn-signin-again {
+  width: 100%;
 }
 .welcome-orbit {
   display: block;
@@ -622,6 +613,80 @@ body.mode-setup .setup-screen {
   outline-offset: 2px;
 }
 /* The quiet ways out, side by side under everything. */
+.stepper-segment {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--muted-surface);
+  box-shadow: inset 0 0 0 0.5px var(--hairline);
+}
+.stepper-segment button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: calc(var(--radius) - 3px);
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 180ms var(--ease),
+    color 180ms var(--ease);
+}
+.stepper-segment .way-icon,
+.stepper-segment .icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+.stepper-segment button:hover:not(:disabled) {
+  color: var(--text);
+}
+.stepper-segment button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: inset 0 0 0 0.5px var(--hairline);
+}
+.stepper-inline-link {
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--secondary);
+  text-align: left;
+  cursor: pointer;
+}
+.stepper-inline-link:hover {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.stepper-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.stepper-form .field {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.stepper-form .field label {
+  margin-bottom: 5px;
+}
+.stepper-form .stepper-inline-link {
+  margin-top: 6px;
+}
 .stepper-links {
   display: flex;
   justify-content: center;
