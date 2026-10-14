@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.194](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.194) · 2026-10-14
+
 ### Fixed
 
 - Tabs drag into another window in AI Mode again. With no agent running, the shown tab in each window was marked as the agent's, so a one-tab window, or the tab just clicked, could not be dragged.
