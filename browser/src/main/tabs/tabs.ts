@@ -184,15 +184,22 @@ function createPageView(deps: Deps, session?: Session): BrowserView {
   return view;
 }
 
-/** The tabs agents claimed; none while an agent drives whichever tab is shown. */
-const claimedTabs = ({ agentTab }: Pick<AppServices, 'agentTab'>): number[] =>
-  agentTab.scoped() ? agentTab.claimed() : [];
+/**
+ * The tabs agents drive: the ones they claimed while agents work in their own tabs,
+ * none while the person holds control, and null (whichever tab is shown) while an
+ * agent holds the whole browser. Idle AI Mode claims nothing: marking the shown tab
+ * there made the strip refuse to drag it, so a one-tab window could never be moved.
+ */
+function agentTabs({ agentTab, control }: Pick<AppServices, 'agentTab' | 'control'>): number[] | null {
+  if (agentTab.scoped()) return agentTab.claimed();
+  return control.snapshot().interactive ? [] : null;
+}
 
 /** Hidden transfer shells render metadata without owning a second copy of the page. */
-function windowTabSummaries(tabs: TabManager, agentTabs: number[], staged?: Tab) {
+function windowTabSummaries(tabs: TabManager, driven: number[] | null, staged?: Tab) {
   const visible = tabs.list.length ? tabs.list : staged ? [staged] : [];
   const active = tabs.activeTabId ?? staged?.id ?? null;
-  return visible.map((tab) => tabSummary(tab, active, agentTabs.length ? agentTabs : [active]));
+  return visible.map((tab) => tabSummary(tab, active, driven ?? [active]));
 }
 /** The events a new tab is wired to: its window's, when the app has several, else this manager's own. */
 function eventsFor(deps: AppServices, tab: Tab, own: TabEvents): TabEvents {
@@ -340,7 +347,7 @@ export class TabManager {
 
   /** Sends the tab strip to the shell. */
   sendTabList(): void {
-    this.deps.shell.send('tabs-updated', windowTabSummaries(this, claimedTabs(this.deps), this.deps.shell.stagedTab));
+    this.deps.shell.send('tabs-updated', windowTabSummaries(this, agentTabs(this.deps), this.deps.shell.stagedTab));
     this.deps.windows?.tabEvents?.changed();
   }
 

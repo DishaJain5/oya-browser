@@ -257,6 +257,47 @@ describe('TabManager', () => {
     assert.deepEqual([first, second], [1, 2]);
   });
 
+  it("marks no tab as the agent's in idle AI Mode, so the shown tab can still be dragged", () => {
+    ctx.tabs.createTab('https://a.test/');
+    ctx.control.state = { connected: true, mode: 'agent', mine: false, localClients: 0, interactive: false };
+    ctx.tabs.sendTabList();
+    assert.deepEqual(
+      ctx.shell
+        .sentOn('tabs-updated')
+        .at(-1)
+        .map((t) => t.agent),
+      [false],
+    );
+  });
+
+  it("marks the shown tab as the agent's while an agent holds the whole browser", () => {
+    ctx.tabs.createTab('https://a.test/');
+    ctx.control.state = { connected: false, mode: 'agent', mine: false, localClients: 1, interactive: false };
+    ctx.tabs.sendTabList();
+    assert.deepEqual(
+      ctx.shell
+        .sentOn('tabs-updated')
+        .at(-1)
+        .map((t) => t.agent),
+      [true],
+    );
+  });
+
+  it('marks only the tab an agent claimed while agents work in their own tabs', () => {
+    const first = ctx.tabs.createTab('https://a.test/');
+    ctx.tabs.createTab('https://b.test/');
+    ctx.control.state = { connected: true, mode: 'agent', mine: false, localClients: 0, interactive: false };
+    ctx.agentTab.claim(first);
+    ctx.tabs.sendTabList();
+    assert.deepEqual(
+      ctx.shell
+        .sentOn('tabs-updated')
+        .at(-1)
+        .map((t) => t.agent),
+      [true, false],
+    );
+  });
+
   it('summarizes each tab for the strip', () => {
     const tab = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
     tab.navigationPending = true;
@@ -270,7 +311,7 @@ describe('TabManager', () => {
         favicon: null,
         pinned: false,
         active: true,
-        agent: true,
+        agent: false,
         loading: true,
         loadError: null,
         canGoBack: false,

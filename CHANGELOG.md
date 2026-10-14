@@ -8,6 +8,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ### Fixed
 
+- Tabs drag into another window in AI Mode again. With no agent running, the shown tab in each window was marked as the agent's, so a one-tab window, or the tab just clicked, could not be dragged.
+
+### Fixed
+
 - Playbook replay now re-finds a recorded control and retries when its native agent frame detaches before the action runs.
 
 ## [1.0.193](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.193) · 2026-10-14
