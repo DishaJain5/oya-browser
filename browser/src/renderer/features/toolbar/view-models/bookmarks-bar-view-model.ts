@@ -3,6 +3,7 @@
  * bookmarks on it, following the main process (a bookmark added or removed, the
  * bar turned on or off from the View menu or Cmd/Ctrl+Shift+B).
  */
+import type { LibraryKind } from '../../../../shared/library.ts';
 import { ViewModel } from '../../../core/view-model.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
 import type { Payload } from '../../../../shared/ipc.ts';
@@ -73,7 +74,7 @@ export class BookmarksBarViewModel extends ViewModel<BookmarksBarState> {
   }
 
   /** Opens or selects a collection tab. */
-  showAll(kind: 'bookmarks' | 'history' = 'bookmarks'): void {
+  showAll(kind: LibraryKind = 'bookmarks'): void {
     void this.bridge.showLibrary(kind);
   }
 }

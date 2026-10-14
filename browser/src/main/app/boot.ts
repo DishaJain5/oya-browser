@@ -23,6 +23,7 @@ type Deps = Pick<
   | 'agentTab'
   | 'electron'
   | 'library'
+  | 'downloads'
   | 'config'
   | 'socket'
   | 'persona'

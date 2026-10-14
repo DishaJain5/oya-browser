@@ -1,7 +1,7 @@
 /** Search the whole library literally, with separate sorting and local-calendar grouping. */
 import { it } from 'node:test';
 import assert from 'node:assert/strict';
-import { matching, dayLabel, sites } from '../../../src/preload/library-model.ts';
+import { matching, dayLabel, sites, fileSize } from '../../../src/preload/library-model.ts';
 const pages = [
   { url: 'https://docs.test/api', title: 'API Guide', time: 10 },
   { url: 'https://notes.test/guide', title: 'Travel notes', time: 20 },
@@ -26,4 +26,14 @@ it('groups history by local calendar days rather than elapsed 24-hour periods', 
   assert.equal(dayLabel(new Date(2026, 10, 2).getTime(), now), 'Today');
   assert.equal(dayLabel(new Date(2026, 10, 1, 0, 1).getTime(), now), 'Yesterday');
   assert.notEqual(dayLabel(new Date(2026, 9, 31).getTime(), now), 'Yesterday');
+});
+
+it('reads a byte count the way people do', () => {
+  assert.deepEqual([0, 512, 3_500, 3_565_158, 12 * 1024 ** 3].map(fileSize), [
+    '0 B',
+    '512 B',
+    '3.4 KB',
+    '3.4 MB',
+    '12 GB',
+  ]);
 });

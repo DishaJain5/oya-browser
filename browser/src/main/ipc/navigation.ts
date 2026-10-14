@@ -19,6 +19,7 @@ type Deps = Pick<
   | 'control'
   | 'electron'
   | 'library'
+  | 'downloads'
   | 'sitePermissions'
   | 'persona'
   | 'windows'

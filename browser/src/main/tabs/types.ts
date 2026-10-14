@@ -42,7 +42,7 @@ export interface Tab {
   /** Whether it is on the Oya start page (the shell draws it, no view is shown). */
   home?: boolean;
   /** Local collection drawn by the shell, never inside the website view. */
-  collection?: 'bookmarks' | 'history';
+  collection?: import('../../shared/library.ts').LibraryKind;
   /** Profile that opened the private collection. */
   libraryPartition?: string;
   /** The real window, for a popup the page opened. */

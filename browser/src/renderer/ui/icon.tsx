@@ -32,6 +32,8 @@ export const ICON_PATHS = {
   scan: 'M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M7 8h10M7 12h10M7 16h6',
   camera: 'M3 7h4l2-3h6l2 3h4v13H3ZM16 13a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
   down: 'M12 4v16m-6-6 6 6 6-6',
+  download: 'M12 4v11m-5-5 5 5 5-5M5 20h14',
+  file: 'M14 3H6v18h12V7Zm0 0v4h4',
   up: 'M12 20V4m-6 6 6-6 6 6',
   expand: 'M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7',
   more: 'M5.5 12h.5M11.75 12h.5M18 12h.5',

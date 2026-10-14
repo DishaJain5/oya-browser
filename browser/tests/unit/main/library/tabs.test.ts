@@ -80,3 +80,48 @@ it('agent-written blank-page content cannot retain a private collection marker',
   assert.equal(contentReady(tab), true);
   assert.equal(tab.collection, undefined);
 });
+
+/** The Downloads tab over one saved download (`d1`) in the opening profile. */
+function downloadsFixture() {
+  const deps = fixture();
+  const entry = {
+    id: 'd1',
+    url: 'https://f.test/a.pdf',
+    title: 'a.pdf',
+    time: 1,
+    state: 'completed',
+    received: 2,
+    total: 2,
+  };
+  const calls: string[] = [];
+  deps.downloads = {
+    list: () => [entry],
+    open: (id: string) => (calls.push(`open ${id}`), true),
+    reveal: (id: string) => (calls.push(`reveal ${id}`), false),
+    forget: (id: string) => void calls.push(`forget ${id}`),
+  };
+  showLibrary(deps, 'downloads');
+  return { deps, calls };
+}
+
+it('opens a Downloads tab that lists the profile’s downloads', () => {
+  const { deps } = downloadsFixture();
+  assert.equal(deps.tabs.list[0].title, 'Downloads');
+  const shown = readLibrary(deps, 1);
+  assert.deepEqual([shown.kind, shown.downloads.map((d) => d.id)], ['downloads', ['d1']]);
+});
+
+it('opens, shows in its folder or forgets a listed download by id, and says when its file is gone', () => {
+  const { deps, calls } = downloadsFixture();
+  changeLibrary(deps, 1, 'open', 'd1');
+  assert.throws(() => changeLibrary(deps, 1, 'reveal', 'd1'), /moved or deleted/);
+  changeLibrary(deps, 1, 'remove', 'd1');
+  assert.deepEqual(calls, ['open d1', 'reveal d1', 'forget d1']);
+});
+
+it('refuses a download id the profile does not list, and actions downloads do not have', () => {
+  const { deps, calls } = downloadsFixture();
+  assert.throws(() => changeLibrary(deps, 1, 'open', 'not-listed'), /no longer in your list/);
+  assert.throws(() => changeLibrary(deps, 1, 'bookmark', 'd1'), /no longer in your list/);
+  assert.deepEqual(calls, []);
+});

@@ -66,6 +66,8 @@ export interface AppServices {
   notifications: import('../notifications/index.ts').Notifications;
   /** Local history and bookmarks for the current persona. */
   library: import('../library/index.ts').BrowsingLibrary;
+  /** The person's downloads, listed on the Downloads page. */
+  downloads: import('../downloads/index.ts').Downloads;
   /** Electron's main-process API; only the composition root imports it. */
   electron: typeof Electron;
   /** The app's folder: the package root in development, the asar when packaged. */

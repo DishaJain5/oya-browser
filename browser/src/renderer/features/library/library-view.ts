@@ -9,7 +9,7 @@ import {
 } from '../../../shared/library.ts';
 import { matching, sites, dayLabel, type LibrarySort } from './library-model.ts';
 import { heading, emptyState } from './library-copy.ts';
-import { text, row, button } from './library-dom.ts';
+import { text, row, button, downloadRow } from './library-dom.ts';
 /** Library calls remain on the trusted shell bridge. */
 type LibraryBridge = Pick<OyaBrowser, 'readLibrary' | 'libraryAction' | 'onBookmarksBar'>;
 /** Filter state belongs to this window and never changes saved data. */
@@ -17,7 +17,7 @@ export class LibraryView {
   /** Cancels global listeners and fences late IPC responses on tab switches. */
   private readonly lifetime = new AbortController();
   /** Latest main-process snapshot for this one profile. */
-  private data: LibrarySnapshot = { bookmarks: [], history: [] };
+  private data: LibrarySnapshot = { bookmarks: [], history: [], downloads: [] };
   /** Start with deliberately saved pages. */
   private kind: LibraryKind = 'bookmarks';
   /** Literal multiword search across title and URL. */
@@ -123,7 +123,7 @@ export class LibraryView {
       const data = await this.bridge.libraryAction(this.tabId, action, url);
       this.changed(data, action, url);
     } catch {
-      this.element('status').textContent = 'That page could not be changed. Refresh the library and try again.';
+      this.element('status').textContent = this.failedText();
     }
   }
   /** Preserve keyboard focus after a bookmark change, including when its row disappears. */
@@ -132,8 +132,18 @@ export class LibraryView {
     this.data = data;
     this.render();
     if (action !== 'bookmark' && action !== 'remove') return;
-    this.element('status').textContent = action === 'bookmark' ? 'Bookmark saved' : 'Bookmark removed';
+    this.element('status').textContent = this.changedText(action);
     this.focusChanged(url);
+  }
+  /** What a failed action says. */
+  private failedText(): string {
+    if (this.kind === 'downloads') return 'That file was moved or deleted.';
+    return 'That page could not be changed. Refresh the library and try again.';
+  }
+  /** What a change says to screen readers. */
+  private changedText(action: LibraryAction): string {
+    if (this.kind === 'downloads') return 'Removed from downloads';
+    return action === 'bookmark' ? 'Bookmark saved' : 'Bookmark removed';
   }
   /** Keep a bookmark toggle or the next remaining page in the keyboard sequence. */
   private focusChanged(url?: string): void {
@@ -184,7 +194,7 @@ export class LibraryView {
   private rows(pages: LibrarySnapshot['history'], content: DocumentFragment): void {
     let group = '';
     pages.forEach((page) => {
-      const label = this.kind === 'history' && this.sort === 'recent' ? dayLabel(page.time) : '';
+      const label = this.kind !== 'bookmarks' && this.sort === 'recent' ? dayLabel(page.time) : '';
       if (label && label !== group) content.append(text('li', 'day-heading', label));
       group = label;
       content.append(this.pageRow(page));
@@ -192,6 +202,8 @@ export class LibraryView {
   }
   /** Bookmark controls always reflect the current snapshot, including in History. */
   private pageRow(page: LibrarySnapshot['history'][number]): HTMLElement {
+    const act = (action: LibraryAction, key: string) => void this.action(action, key);
+    if (this.kind === 'downloads') return downloadRow(page as LibrarySnapshot['downloads'][number], act);
     const saved = this.data.bookmarks.some((entry) => entry.url === page.url);
     return row(page, saved, (action, url) => void this.action(action, url));
   }

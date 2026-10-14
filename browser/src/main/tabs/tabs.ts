@@ -47,7 +47,7 @@ export interface TabSummary {
   /** Whether it is on the start page. */
   home: boolean;
   /** Local collection drawn by the shell, never inside the website view. */
-  collection?: 'bookmarks' | 'history';
+  collection?: import('../../shared/library.ts').LibraryKind;
   /** Its icon as a data: URL, or null. */
   favicon: string | null;
   /** Whether it is the one on screen. */

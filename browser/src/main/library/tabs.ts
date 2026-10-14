@@ -8,7 +8,7 @@ import type { LibraryKind, LibraryAction, LibraryPresentation } from '../../shar
 /** Full services are needed only for native maintenance menus. */
 type MenuDeps = ConstructorParameters<typeof LibraryMenu>[0];
 /** Read and saved-page operations need no native window services. */
-type Deps = Pick<AppServices, 'tabs' | 'library' | 'persona' | 'agentTab'>;
+type Deps = Pick<AppServices, 'tabs' | 'library' | 'downloads' | 'persona' | 'agentTab'>;
 /** Open once per collection per window, then use normal selection, close and transfer behavior. */
 export function showLibrary(deps: Deps, kind: LibraryKind): void {
   deps.agentTab.requireFor(null);
@@ -25,7 +25,7 @@ export function readLibrary(deps: Deps, id: number): LibraryPresentation {
   deps.agentTab.requireFor(id);
   if (!tab?.collection || id !== deps.tabs.activeTabId || tab.libraryPartition !== deps.persona.partitionName())
     throw Error('This library is no longer available');
-  return { ...deps.library.snapshot(), kind: tab.collection };
+  return { ...deps.library.snapshot(), downloads: deps.downloads.list(), kind: tab.collection };
 }
 /** Fixed renderer command arguments after the shell sender has been checked. */
 type LibraryCommand = [id: number, action: LibraryAction, url?: string];
@@ -35,25 +35,48 @@ export function changeLibrary(deps: MenuDeps, ...args: LibraryCommand): LibraryP
   const snapshot = readLibrary(deps, id);
   if (action === 'manage') return new LibraryMenu(deps).manage(snapshot.kind);
   changeEntry(deps, snapshot, action, url);
-  return action === 'open' ? undefined : readLibrary(deps, id);
+  return action === 'open' || action === 'reveal' ? undefined : readLibrary(deps, id);
 }
+
+/** Each collection's tab title. */
+const TITLES: Record<LibraryKind, string> = { bookmarks: 'Bookmarks', history: 'History', downloads: 'Downloads' };
 
 /** Collection identity is native metadata, not a URL any website can impersonate. */
 function describeTab(deps: Deps, tab: Tab, kind: LibraryKind): void {
   Object.assign(tab, {
     collection: kind,
     libraryPartition: deps.persona.partitionName(),
-    title: kind === 'history' ? 'History' : 'Bookmarks',
+    title: TITLES[kind],
     url: `oya://${kind}`,
   });
 }
 
-/** Validate and apply a single idempotent saved-page action. */
+/** What a download's row can do, by id: open the file, show it in its folder, take it off the list. */
+const DOWNLOAD_ACTIONS: Partial<Record<LibraryAction, (deps: Deps, id: string) => unknown>> = {
+  open: (deps, id) => deps.downloads.open(id) || fail('This file was moved or deleted'),
+  reveal: (deps, id) => deps.downloads.reveal(id) || fail('This file was moved or deleted'),
+  remove: (deps, id) => deps.downloads.forget(id),
+};
+
+/** Throws `message` for the page to show. */
+function fail(message: string): never {
+  throw Error(message);
+}
+
+/** Validate and apply a single idempotent saved-page action; a download's names its id, not an address. */
 function changeEntry(deps: Deps, snapshot: LibraryPresentation, action: LibraryAction, url?: string): void {
+  if (snapshot.kind === 'downloads') return changeDownload(deps, snapshot, action, url);
   const entry = [...snapshot.bookmarks, ...snapshot.history].find((page) => page.url === url);
   if (!entry) throw Error('This page is no longer in your library');
   if (action === 'bookmark') deps.library.addBookmark(entry.url, entry.title);
   else if (action === 'remove') deps.library.removeBookmark(entry.url);
   else if (action === 'open') return void deps.tabs.createTab(entry.url, true);
   else throw Error('Unknown library action');
+}
+
+/** Runs a download row's action, for a download this profile lists. */
+function changeDownload(deps: Deps, snapshot: LibraryPresentation, action: LibraryAction, id?: string): void {
+  const run = Object.hasOwn(DOWNLOAD_ACTIONS, action) ? DOWNLOAD_ACTIONS[action] : undefined;
+  if (!run || !snapshot.downloads.some((d) => d.id === id)) throw Error('This download is no longer in your list');
+  run(deps, id!);
 }

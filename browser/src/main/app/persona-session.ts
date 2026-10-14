@@ -20,6 +20,7 @@ type Deps = Pick<
   | 'protection'
   | 'passkeys'
   | 'workers'
+  | 'downloads'
 >;
 /** The exact identity and resolved egress of an already configured partition. */
 interface NativeSessionPlan {
@@ -110,6 +111,8 @@ export class PersonaSessionSetup {
     const assertCurrent = capturePersonaPolicy(this.persona, governance);
     const profile = this.persona.active;
     this.deps.passkeys?.install(session);
+    // A governed browser keeps Electron's own download handling; the person's downloads list is for the desktop.
+    if (!governance.configuration) this.deps.downloads?.install(session, this.persona.partitionName());
     await configureSession(this.deps.electron.app, session, profile, this.sessionExtras());
     assertCurrent();
     // Only a proxied persona asks: without one the zone is this machine's own, known already.

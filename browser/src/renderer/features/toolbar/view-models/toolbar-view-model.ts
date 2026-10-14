@@ -5,6 +5,7 @@
  * becoming Stop), and the page's title for the window. Other features ask
  * it to focus the address bar (the command palette's Cmd/Ctrl L).
  */
+import type { LibraryKind } from '../../../../shared/library.ts';
 import { BookmarksBarViewModel } from './bookmarks-bar-view-model.ts';
 import { AddressCompletion } from './address-completion.ts';
 import { ViewModel } from '../../../core/view-model.ts';
@@ -158,7 +159,7 @@ export class ToolbarViewModel extends ViewModel<ToolbarState> {
   }
 
   /** Opens the native history and bookmarks menu above the page. */
-  showLibrary(kind: 'bookmarks' | 'history' = 'history'): void {
+  showLibrary(kind: LibraryKind = 'history'): void {
     void this.bridge.showLibrary(kind);
   }
 

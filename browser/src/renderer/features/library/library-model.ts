@@ -14,7 +14,11 @@ export function matching(pages: SavedPage[], query: string, site: string, sort: 
 }
 /** Full host disambiguates similarly named saved pages, without tracking favicon requests. */
 export function host(page: SavedPage): string {
-  return new URL(page.url).host;
+  try {
+    return new URL(page.url).host;
+  } catch {
+    return '';
+  }
 }
 /** Local calendar boundaries keep yesterday correct across daylight-saving changes. */
 export function dayLabel(time: number, now = new Date()): string {
@@ -23,6 +27,20 @@ export function dayLabel(time: number, now = new Date()): string {
   if (date.toDateString() === now.toDateString()) return 'Today';
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
   return date.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+}
+/** Bytes in the next unit up. */
+const BYTES_PER_UNIT = 1024;
+/** Size units, smallest first. */
+const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
+/** Sizes of ten units and more need no decimal. */
+const WHOLE_FROM = 10;
+
+/** A byte count as people read it: "512 B", "3.4 MB", "12 GB". */
+export function fileSize(bytes: number): string {
+  let [value, unit] = [Math.max(bytes, 0), 0];
+  while (value >= BYTES_PER_UNIT && unit < SIZE_UNITS.length - 1) [value, unit] = [value / BYTES_PER_UNIT, unit + 1];
+  const shown = unit === 0 || value >= WHOLE_FROM ? Math.round(value) : value.toFixed(1);
+  return `${shown} ${SIZE_UNITS[unit]}`;
 }
 /** Most-used sites come first, with stable alphabetical ties. */
 export function sites(pages: SavedPage[]): [string, number][] {

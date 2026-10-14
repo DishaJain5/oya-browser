@@ -3,6 +3,7 @@ import type { MenuItemConstructorOptions } from 'electron';
 import { showLibrary } from './tabs.ts';
 import type { AppServices } from '../app/services.ts';
 import { CLEAR_HISTORY_CONFIRMATION, CONFIRM_RESPONSE } from './constants.ts';
+import type { LibraryKind } from '../../shared/library.ts';
 
 /** The Forget item's label, counting the sites it would forget. */
 function forgetLabel(count: number): string {
@@ -15,6 +16,7 @@ type Deps = Pick<
   | 'windows'
   | 'appDir'
   | 'library'
+  | 'downloads'
   | 'tabs'
   | 'electron'
   | 'shell'
@@ -36,18 +38,19 @@ export class LibraryMenu {
     return this.deps.agentTab.humanMay(this.deps.tabs.activeTabId);
   }
   /** Opens the library with fresh contents, even after a profile switch. */
-  show(kind: 'bookmarks' | 'history' = 'history'): void {
-    if (kind !== 'bookmarks' && kind !== 'history') throw Error('Unknown collection');
+  show(kind: LibraryKind = 'history'): void {
+    if (kind !== 'bookmarks' && kind !== 'history' && kind !== 'downloads') throw Error('Unknown collection');
     const scope = this.deps.windows?.fromContents(this.deps.shell.window!.webContents) ?? this.deps;
     if (scope.agentTab.humanMay(null)) showLibrary(scope, kind);
   }
   /** Native maintenance actions retain their existing confirmations. */
-  manage(kind: 'bookmarks' | 'history' = 'history'): void {
+  manage(kind: LibraryKind = 'history'): void {
     if (!this.mayUse()) return;
     this.deps.electron.Menu.buildFromTemplate(this.items(kind)).popup({ window: this.deps.shell.window! });
   }
   /** The native list is built afresh for the current profile. */
-  private items(kind: 'bookmarks' | 'history'): MenuItemConstructorOptions[] {
+  private items(kind: LibraryKind): MenuItemConstructorOptions[] {
+    if (kind === 'downloads') return [this.clearDownloadsItem()];
     return kind === 'history'
       ? this.housekeeping(this.deps.library.snapshot().history.length).slice(1)
       : [this.forgetItem()];
@@ -68,6 +71,15 @@ export class LibraryMenu {
       if (this.mayUse() && partition === this.deps.persona.partitionName()) this.deps.sitePermissions.forget(partition);
     };
     return { label: forgetLabel(count), enabled: count > 0, click };
+  }
+  /** Clears the finished downloads off this profile's list; the files stay, so no confirmation. */
+  private clearDownloadsItem(): MenuItemConstructorOptions {
+    const count = this.deps.downloads.list().filter((d) => d.state !== 'progressing').length;
+    return {
+      label: 'Clear downloads list',
+      enabled: count > 0,
+      click: () => this.mayUse() && this.deps.downloads.clear(),
+    };
   }
   /** Bookmarking uses the active page, not user-editable address-bar text. */
   toggle(): void {

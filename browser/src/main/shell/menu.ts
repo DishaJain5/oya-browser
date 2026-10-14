@@ -18,6 +18,7 @@ type Deps = Pick<
   | 'tabs'
   | 'control'
   | 'library'
+  | 'downloads'
   | 'persona'
   | 'shell'
   | 'windows'
@@ -130,8 +131,14 @@ function libraryMenus(deps: Deps): MenuItemConstructorOptions[] {
   const save = humanItem(deps, 'browser-bookmark', 'Toggle Bookmark', 'CmdOrCtrl+D', () => menu.toggle());
   return [
     { label: 'Bookmarks', submenu: [bookmarks, save] },
-    { label: 'History', submenu: [history] },
+    { label: 'History', submenu: [history, downloadsItem(deps, menu)] },
   ];
+}
+
+/** The Downloads page, on Chrome's shortcut: Cmd+Shift+J on a Mac, Ctrl+J elsewhere. */
+function downloadsItem(deps: Deps, menu: LibraryMenu): MenuItemConstructorOptions {
+  const key = process.platform === 'darwin' ? 'Cmd+Shift+J' : 'Ctrl+J';
+  return humanItem(deps, 'browser-downloads', 'Show Downloads', key, () => menu.show('downloads'));
 }
 
 /** The bookmark manager has its own native shortcut and menu. */

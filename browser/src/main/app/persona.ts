@@ -26,6 +26,7 @@ type Deps = Pick<
   | 'electron'
   | 'observer'
   | 'workers'
+  | 'downloads'
   | 'socket'
   | 'shell'
   | 'tabs'

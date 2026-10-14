@@ -209,6 +209,7 @@ function nativePersonaFixture() {
   const session = {
     setPermissionRequestHandler() {},
     setPermissionCheckHandler() {},
+    on() {},
     async setProxy() {
       events.push('proxy');
     },

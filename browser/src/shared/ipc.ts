@@ -42,7 +42,7 @@ export interface TabSummary {
   /** Whether the tab shows the start page. */
   home: boolean;
   /** Local collection drawn by the shell, never inside the website view. */
-  collection?: 'bookmarks' | 'history';
+  collection?: import('./library.ts').LibraryKind;
   /** The page's icon as a data URL, once fetched. */
   favicon: string | null;
   /** Whether this is the tab on screen. */
@@ -254,7 +254,7 @@ export interface ShellCalls {
   /** Opens the page where the person turns this browser's key into an Oya account. */
   openClaim(): Promise<void>;
   /** Opens local bookmarks and browsing history. */
-  showLibrary(kind?: 'bookmarks' | 'history'): Promise<void>;
+  showLibrary(kind?: import('./library.ts').LibraryKind): Promise<void>;
   /** Reads only the active local collection in the current profile. */
   readLibrary(tabId: number): Promise<LibraryPresentation>;
   /** Changes an existing saved page after checking this tab and profile. */
