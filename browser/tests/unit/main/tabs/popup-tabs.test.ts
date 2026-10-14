@@ -6,7 +6,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import * as popups from '../../../../src/main/tabs/popup-tabs.ts';
-import { isAuthPopup, opensNamedWindow } from '../../../../src/main/tabs/auth-popup.ts';
+import { isAuthPopup, opensBlankWindow, opensNamedWindow } from '../../../../src/main/tabs/auth-popup.ts';
 
 /** A stand-in for the tab manager: just what the collaborator touches. */
 function manager() {
@@ -63,6 +63,16 @@ describe('opensNamedWindow', () => {
   it('leaves the sign-in popup rule alone', () => {
     assert.equal(isAuthPopup('https://accounts.google.com/o/oauth2', ''), true);
     assert.equal(isAuthPopup('https://vendor.example.com/sso', ''), false);
+  });
+});
+
+describe('opensBlankWindow', () => {
+  it('is true for window.open with no address, which the page fills itself', () => {
+    for (const url of ['', 'about:blank', undefined]) assert.equal(opensBlankWindow(url), true, `${url} is blank`);
+  });
+
+  it('is false for a real address', () => {
+    assert.equal(opensBlankWindow('https://app.rippling.com/course'), false);
   });
 });
 

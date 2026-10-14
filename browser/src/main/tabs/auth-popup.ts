@@ -29,6 +29,16 @@ export function opensNamedWindow(frameName: string | undefined): boolean {
   return !RESERVED_TARGETS.has(String(frameName ?? '').trim());
 }
 
+/**
+ * `window.open()` with no address opens a blank window the page fills itself:
+ * it keeps the handle and sets its location (Rippling's course player does). A
+ * tab would leave the page `null`, its "allow popups" error, and a tab stuck on
+ * about:blank.
+ */
+export function opensBlankWindow(url: string | undefined): boolean {
+  return !url || url === 'about:blank';
+}
+
 /** Whether `url` (opened with window `features`) must stay a real popup window rather than become a tab. */
 export function isAuthPopup(url: string, features: string | undefined): boolean {
   if (features && features.includes('popup')) return true;

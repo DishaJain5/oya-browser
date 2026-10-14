@@ -228,6 +228,13 @@ describe('tab events', () => {
     assert.equal(ctx.tabs.list.length, before, 'no tab is opened behind its back');
   });
 
+  it('keeps a blank window the page fills itself, so window.open does not return null', () => {
+    const before = ctx.tabs.list.length;
+    const decision = tab.view.webContents.openHandler({ url: 'about:blank', features: '', frameName: '_blank' });
+    assert.equal(decision.action, 'allow');
+    assert.equal(ctx.tabs.list.length, before, 'no about:blank tab is left behind');
+  });
+
   it('still turns an anonymous target=_blank into a tab', () => {
     const decision = tab.view.webContents.openHandler({
       url: 'https://example.test/page',

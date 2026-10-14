@@ -1,11 +1,11 @@
 /**
  * Windows a tab's page opens, and its right-click menu. An anonymous
- * target="_blank" becomes a tab; a sign-in popup and a window the page named
- * stay real windows, protected and adopted onto the tab list.
+ * target="_blank" becomes a tab; a sign-in popup, a window the page named and a
+ * blank one it fills itself stay real windows, protected and adopted onto the tab list.
  */
 import type { BrowserWindow, HandlerDetails, LoadURLOptions, WindowOpenHandlerResponse } from 'electron';
 import type { AppServices } from '../app/services.ts';
-import { isAuthPopup, opensNamedWindow } from './auth-popup.ts';
+import { isAuthPopup, opensBlankWindow, opensNamedWindow } from './auth-popup.ts';
 import { recordingPreferences } from '../recording/preload.ts';
 import { isNativeEngine } from '../native-policy/index.ts';
 import { GmailPopup } from './gmail-popup.ts';
@@ -104,7 +104,7 @@ export class TabWindows {
     const webPreferences = { ...recordingPreferences(this.deps.appDir, !isNativeEngine(session)), session };
     if (isAuthPopup(details.url, details.features))
       return { action: 'allow', overrideBrowserWindowOptions: { ...AUTH_POPUP_SIZE, webPreferences } };
-    if (opensNamedWindow(details.frameName))
+    if (opensNamedWindow(details.frameName) || opensBlankWindow(details.url))
       return { action: 'allow', overrideBrowserWindowOptions: { webPreferences } };
     return null;
   }

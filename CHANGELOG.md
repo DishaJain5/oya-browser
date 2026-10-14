@@ -6,6 +6,11 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- The active tab's close button works again when many tabs are open. The tab's title covered it, so a click only selected the tab.
+- Sites that open a blank window and then load their own page into it, such as Rippling's course player, get that window. They used to see "your browser is blocking popups", and a tab was left on about:blank.
+
 ## [1.0.191](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.191) · 2026-10-14
 
 ### Changed

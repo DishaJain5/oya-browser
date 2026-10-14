@@ -203,6 +203,9 @@ body.mode-browsing .tab-bar {
   transform: none;
 }
 .tab-close {
+  /* Above the tiny or pinned tab's title, which is stretched over the whole tab and would take the click. */
+  position: relative;
+  z-index: 1;
   flex: none;
   display: grid;
   place-items: center;
