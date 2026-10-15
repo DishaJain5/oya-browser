@@ -24,6 +24,7 @@ type Deps = Pick<
   | 'persona'
   | 'windows'
   | 'agentTab'
+  | 'shareIndicator'
 >;
 
 /** The channels this group answers. */
@@ -47,6 +48,7 @@ type Channel =
   | 'end-tab-drag'
   | 'close-tab'
   | 'activate-tab'
+  | 'go-to-share-call'
   | 'move-tab'
   | 'tab-menu';
 
@@ -76,6 +78,8 @@ export class NavigationHandlers {
       this.deps.tabs.closeTab(id);
     },
     'activate-tab': (_e, id) => this.deps.tabs.activateTab(id),
+    // No tab id from the shell: main already knows which tab the call is in.
+    'go-to-share-call': () => this.deps.shareIndicator?.goToCall(),
     // A drag on the strip: the main process owns the order, and the strip redraws from it.
     'move-tab': (_e, id, toIndex) => (this.deps.agentTab.requireFor(id), moveTabTo(this.deps.tabs, id, toIndex)),
     'tab-menu': (_e, id) => {
