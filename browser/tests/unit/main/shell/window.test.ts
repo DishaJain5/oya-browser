@@ -7,8 +7,9 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { ShellWindow } from '../../../../src/main/shell/window.ts';
 import { installApplicationMenu } from '../../../../src/main/shell/menu.ts';
-import { mainCtx } from '../../support/main-ctx.cjs';
-import { SHELL_BACKGROUND } from '../../../../src/main/shell/constants.ts';
+import { WindowBounds } from '../../../../src/main/shell/window-bounds.ts';
+import { mainCtx, memoryFile } from '../../support/main-ctx.cjs';
+import { SHELL_BACKGROUND, WINDOW_SIZE } from '../../../../src/main/shell/constants.ts';
 
 describe('ShellWindow', () => {
   let ctx: any;
@@ -59,6 +60,38 @@ describe('ShellWindow', () => {
     ctx.shell.window.webContents.emit('will-navigate', event);
     assert.equal(event.prevented, true);
     assert.deepEqual(ctx.shell.window.webContents.openHandler(), { action: 'deny' });
+  });
+
+  it('the primary window opens at its saved bounds and maximized', () => {
+    ctx.windowBounds = new WindowBounds(ctx, memoryFile({ x: 40, y: 30, width: 900, height: 600, maximized: true }));
+    ctx.shell.create();
+    const { x, y, width, height } = ctx.shell.window.options;
+    assert.deepEqual({ x, y, width, height }, { x: 40, y: 30, width: 900, height: 600 });
+    assert.equal(ctx.shell.window.maximized, true);
+  });
+
+  it('a secondary window ignores saved bounds and never saves them', () => {
+    const file = memoryFile({ x: 40, y: 30, width: 900, height: 600, maximized: true });
+    ctx.windowBounds = new WindowBounds(ctx, file);
+    ctx.shell.create(true);
+    ctx.shell.window.emit('close');
+    assert.equal(ctx.shell.window.options.width, WINDOW_SIZE.width);
+    assert.equal(file.read().width, 900);
+  });
+
+  it('in a container the saved bounds are ignored and the window still fills the screen', () => {
+    const file = memoryFile({ x: 40, y: 30, width: 900, height: 600, maximized: false });
+    ctx.windowBounds = new WindowBounds(ctx, file);
+    process.env.OYA_DOCKER = 'true';
+    try {
+      ctx.shell.create();
+      ctx.shell.window.emit('close');
+    } finally {
+      delete process.env.OYA_DOCKER;
+    }
+    assert.equal(ctx.shell.window.options.width, WINDOW_SIZE.width);
+    assert.equal(ctx.shell.window.maximized, true);
+    assert.equal(file.read().width, 900);
   });
 
   it('undoes a zoom left on the shell, whose layout is in window pixels', () => {

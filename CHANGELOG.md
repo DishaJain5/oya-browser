@@ -10,6 +10,22 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 - A ChatGPT account that cannot connect is told so in plain words (Oya needs a ChatGPT Plus or Pro plan; sign in with an account that has one) instead of OpenAI's error code, and a passing OpenAI problem says to try again rather than to upgrade.
 
+## [1.0.194](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.194) · 2026-10-14
+
+### Fixed
+
+- Tabs drag into another window in AI Mode again. With no agent running, the shown tab in each window was marked as the agent's, so a one-tab window, or the tab just clicked, could not be dragged.
+
+### Fixed
+
+- Playbook replay now re-finds a recorded control and retries when its native agent frame detaches before the action runs.
+
+## [1.0.193](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.193) · 2026-10-14
+
+### Fixed
+
+- Saving a playbook from an agent run now removes unsupported tab and reload commands that could trigger avoidable replay healing.
+
 ## [1.0.192](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.192) · 2026-10-14
 
 ### Fixed

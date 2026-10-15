@@ -325,6 +325,27 @@ describe('play', () => {
       await failed;
       assert.equal(browser.calls.filter((c) => c.action === 'analyze').length, FIND_ATTEMPTS);
     });
+
+    it('re-finds and retries an element action after its native frame detaches', async () => {
+      let analyses = 0;
+      let clicks = 0;
+      answer = (action) => {
+        if (action === 'analyze') {
+          analyses++;
+          return {
+            ok: true,
+            data: { elements: [{ id: analyses, tag: 'button', type: 'button', text: 'Go', visible: true }] },
+          };
+        }
+        if (action === 'click' && clicks++ === 0) return { ok: false, error: 'Native agent frame is detached' };
+        return page(action);
+      };
+      mock.timers.enable({ apis: ['setTimeout'] });
+      const result = await settled(noHeal([{ action: 'click', el: { text: 'Go', type: 'button' } }]));
+      assert.deepEqual(result, { steps: 1, total: 1, fellBack: false });
+      assert.equal(analyses, 2);
+      assert.equal(clicks, 2);
+    });
   });
 
   describe('a link replay cannot find', () => {

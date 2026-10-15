@@ -4,11 +4,12 @@
  */
 import * as workflow from '../../../../browser/src/workflow/index.ts';
 
-import { lastRun, hasReplayableSteps } from '../agent/chat.ts';
+import { lastRun } from '../agent/chat.ts';
 import * as keyConfig from '../config/service.ts';
 import { HttpError } from '../../platform/errors.ts';
 import { Status } from '../../platform/http-status.ts';
 import { WORKFLOW_SCHEMA } from './constants.ts';
+import { sanitizeSteps } from './sanitize.ts';
 import { namesOf, templateValues } from './variables.ts';
 import { renderPlaywright } from './playwright.ts';
 
@@ -33,8 +34,8 @@ export function checkName(name) {
 }
 
 /** Refuses a run with nothing to replay, saying whether there was a run at all. */
-function checkReplayable(run) {
-  if (hasReplayableSteps(run)) return;
+function checkReplayable(run, steps) {
+  if (steps.some((s) => s.action !== 'navigate')) return;
   const why = run
     ? 'Nothing to replay: this run only visited pages. Playbooks replay clicks, typing and other actions.'
     : 'Nothing to save: run ask() on this browser first.';
@@ -44,10 +45,21 @@ function checkReplayable(run) {
 /** `run` defaults to the browser's last ask(); a recording passes its own steps in. */
 export async function create(apiKey, browserId, name, run = lastRun(browserId)) {
   checkName(name);
-  checkReplayable(run);
-  const pb = fromRun(name, run);
+  const steps = replayableSteps(run);
+  checkReplayable(run, steps);
+  const pb = fromRun(name, { ...run, steps });
   await keyConfig.savePlaybook(apiKey, name, pb);
   return describe(pb);
+}
+
+/** The legacy run's supported steps, with unsupported commands removed. */
+function replayableSteps(run) {
+  if (!run) return [];
+  if (run.schemaVersion === WORKFLOW_SCHEMA) return structuredClone(run.steps || []);
+  const steps = Array.isArray(run.steps) ? run.steps : [];
+  if (!steps.some((s) => ['click', 'type', 'select_option', 'upload_file', 'press_key', 'scroll'].includes(s?.action)))
+    return [];
+  return sanitizeSteps(steps);
 }
 
 /** The playbook a run becomes. */
