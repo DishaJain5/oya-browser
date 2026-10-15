@@ -312,11 +312,24 @@ describe('TabManager', () => {
         pinned: false,
         active: true,
         agent: false,
+        sharing: false,
         loading: true,
         loadError: null,
         canGoBack: false,
         canGoForward: false,
       },
     ]);
+  });
+
+  it('a shared tab is listed with sharing: true, and every other tab false', () => {
+    const shared = ctx.tabs.createTab('https://a.test/');
+    ctx.tabs.createTab('https://b.test/');
+    ctx.shareIndicator = { has: (id) => id === shared };
+    ctx.tabs.sendTabList();
+    const list = ctx.shell.sentOn('tabs-updated').at(-1);
+    assert.deepEqual(
+      list.map((t) => t.sharing),
+      [true, false],
+    );
   });
 });

@@ -44,3 +44,20 @@ export const SUBMIT_KEY = 'Enter';
 
 /** A dedicated overlay prevents native page views from covering the suggestions. */
 export const ADDRESS_OVERLAY = 'address';
+
+/** What the share chip says. `shared` is the shared tab's host, `call` the calling tab's. */
+export const SHARE_TEXT = {
+  /** The shared tab when it is not a website. */
+  oyaPage: 'an Oya page',
+  /** The calling tab when it is not a website. */
+  theCall: 'the call',
+  /** The chip's action. */
+  action: 'Go to call',
+  /** The chip's status text. */
+  status: (shared: string) => `Sharing ${shared}`,
+  /** The chip's accessible name. */
+  label: (shared: string, call: string) => `Go to call on ${call}. You're sharing ${shared}.`,
+  /** The chip's tooltip: why it does not simply share this tab instead. */
+  title: (shared: string, call: string) =>
+    `You're sharing ${shared} with ${call}. Oya can't move a live share to another tab, so this takes you to the call. Stop sharing there, then share again and pick the tab you want.`,
+} as const;

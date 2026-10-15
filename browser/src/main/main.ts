@@ -29,7 +29,7 @@ declare const __OYA_WEBAUTHN_GROUP__: string;
 import { MediaPermissions } from './app/media-permissions.ts';
 import { CallGuard } from './app/call-guard.ts';
 import { ScreenShare } from './app/screen-share.ts';
-import { ScreenPicker } from './screen-share/index.ts';
+import { ScreenPicker, ShareIndicator } from './screen-share/index.ts';
 import { SitePermissionStore } from './app/site-permissions.ts';
 import { JsonFile } from './app/json-file.ts';
 import { SessionTabs } from './tabs/session-tabs.ts';
@@ -162,6 +162,9 @@ ctx.sitePermissions = new SitePermissionStore(new JsonFile(userFile(SITE_PERMISS
 ctx.mediaPermissions = new MediaPermissions(ctx);
 ctx.callGuard = new CallGuard(ctx);
 ctx.screenPicker = new ScreenPicker(ctx);
+ctx.shareIndicator = new ShareIndicator(ctx);
+// Every strip change re-sends the share chip, and drops a shared tab the moment it closes.
+ctx.windows.tabEvents.subscribe(() => ctx.shareIndicator!.tabsChanged());
 ctx.screenShare = new ScreenShare(ctx);
 ctx.sessionTabs = new SessionTabs(ctx, new JsonFile(userFile(SESSION_TABS_FILE)));
 ctx.windowBounds = new WindowBounds(ctx, new JsonFile(userFile(WINDOW_BOUNDS_FILE)));
