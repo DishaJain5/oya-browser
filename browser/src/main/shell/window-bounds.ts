@@ -17,17 +17,21 @@ export interface SavedWindow extends Rectangle {
 }
 
 /** A whole number a window coordinate can be; anything else in the file is rejected. */
-const coordinate = (value: unknown): value is number => Number.isSafeInteger(value);
+const windowCoordinate = (value: unknown): value is number => Number.isSafeInteger(value);
 
 /** A positive size no larger than any real display. */
-const size = (value: unknown): value is number => coordinate(value) && value > 0 && value <= WINDOW_SIZE_MAX;
+const windowSide = (value: unknown): value is number =>
+  windowCoordinate(value) && value > 0 && value <= WINDOW_SIZE_MAX;
+
+/** Whether the saved position and size are numbers a real window could have. */
+function plausible(s: Partial<SavedWindow>): boolean {
+  return windowCoordinate(s.x) && windowCoordinate(s.y) && windowSide(s.width) && windowSide(s.height);
+}
 
 /** Whether the file's value has the saved window's shape. */
 function wellFormed(saved: unknown): saved is SavedWindow {
   const s = saved as Partial<SavedWindow> | null;
-  return (
-    !!s && coordinate(s.x) && coordinate(s.y) && size(s.width) && size(s.height) && typeof s.maximized === 'boolean'
-  );
+  return !!s && plausible(s) && typeof s.maximized === 'boolean';
 }
 
 /** How far two spans overlap along one axis. */
@@ -41,7 +45,7 @@ function topOn(bounds: Rectangle, area: Rectangle): boolean {
 }
 
 /** Whether enough of `bounds` is on `area` to be seen and dragged: a sliver of overlap is still unreachable. */
-function reachable(bounds: Rectangle, area: Rectangle): boolean {
+function onDisplay(bounds: Rectangle, area: Rectangle): boolean {
   const across = overlap(bounds.x, bounds.width, area.x, area.width);
   return across >= WINDOW_VISIBLE_MIN && topOn(bounds, area);
 }
@@ -52,7 +56,7 @@ export function placement(saved: unknown, areas: Rectangle[]): SavedWindow | nul
   const width = Math.max(saved.width, WINDOW_SIZE.minWidth);
   const height = Math.max(saved.height, WINDOW_SIZE.minHeight);
   const bounds = { x: saved.x, y: saved.y, width, height, maximized: saved.maximized };
-  return areas.some((area) => reachable(bounds, area)) ? bounds : null;
+  return areas.some((area) => onDisplay(bounds, area)) ? bounds : null;
 }
 
 /** The saved main-window bounds: read once at launch, written when the window closes. */
