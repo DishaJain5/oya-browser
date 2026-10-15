@@ -69,7 +69,7 @@ export interface Refusal extends Error {
 }
 
 /** The error a refused token request throws, logged with OpenAI's code and description. */
-function refusal(status: number, body: Record<string, string | undefined>): Refusal {
+function tokenRefusal(status: number, body: Record<string, string | undefined>): Refusal {
   const why = [body?.error || status, body?.error_description].filter(Boolean).join(': ');
   console.warn('[chatgpt] token request refused:', why);
   return Object.assign(Error(`ChatGPT refused the sign-in (${why}). Try again.`), { code: body?.error, status });
@@ -82,7 +82,7 @@ export async function tokenRequest(form: Record<string, string>, fetchImpl: Fetc
   const res = await fetchImpl(C.TOKEN_URL, { ...init, headers, body: new URLSearchParams(form).toString() });
   const body = await res.json().catch(() => ({}));
   if (res.ok) return body;
-  throw refusal(res.status, body);
+  throw tokenRefusal(res.status, body);
 }
 
 /** An ID token's claims, read without verifying it: it came straight from the token endpoint over TLS. */
