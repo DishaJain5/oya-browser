@@ -12,11 +12,12 @@ import { redact } from '../../workflow/index.ts';
 import { JSON_INDENT } from '../app/constants.ts';
 import { WINDOW_SIZE, TRAFFIC_LIGHTS, SHELL_BACKGROUND, PANEL_WIDTH, DEV_LOG_MAX_CHARS } from './constants.ts';
 import { holdStill, inContainer, stillWhileAway } from './hold-still.ts';
+import type { SavedWindow } from './window-bounds.ts';
 
 /** The services the shell window uses. */
 type Deps = Pick<
   AppServices,
-  'electron' | 'appDir' | 'config' | 'layout' | 'shortcuts' | 'shield' | 'tabs' | 'windows'
+  'electron' | 'appDir' | 'config' | 'layout' | 'shortcuts' | 'shield' | 'tabs' | 'windows' | 'windowBounds'
 >;
 
 /** The shell page's preload bridge (built to out/preload/), isolated from the page's own scripts. */
@@ -38,6 +39,14 @@ function titleBar(mac: boolean): BrowserWindowConstructorOptions {
 interface OpenShell {
   /** The open window. */
   window: BrowserWindow;
+}
+
+/** A window just built, and the saved bounds it was built at. */
+interface Opened {
+  /** The new window. */
+  win: BrowserWindow;
+  /** The main window's saved bounds, or null when it opened at the default size. */
+  placed: SavedWindow | null;
 }
 
 /** The window and whether it is showing web pages yet. */
@@ -122,13 +131,40 @@ export class ShellWindow {
   /** Opens the window and wires what it listens to. */
   create(hidden = false): void {
     this.deps.layout.width = Number(this.deps.config.values.ui?.panelWidth) || PANEL_WIDTH;
-    const win = (this.window = new this.deps.electron.BrowserWindow({ ...this.options(), show: !hidden }));
+    const { win, placed } = this.open(hidden);
     this.deps.windows?.watch(this.deps as AppServices);
     this.loadShellPage(win, hidden);
     this.deps.shortcuts.install(win.webContents);
     this.lockToShellPage(win);
     this.followTheme();
+    this.place(win, placed);
+  }
+
+  /** Builds the BrowserWindow, at the main window's saved bounds when there are any; returns it and them. */
+  private open(hidden: boolean): Opened {
+    const placed = this.remembered(hidden);
+    const at = placed && { x: placed.x, y: placed.y, width: placed.width, height: placed.height };
+    const win = (this.window = new this.deps.electron.BrowserWindow({ ...this.options(), ...at, show: !hidden }));
+    return { win, placed };
+  }
+
+  /** Sizes the new window: filling a container, or as the main window was left. */
+  private place(win: BrowserWindow, placed: SavedWindow | null): void {
     this.fitContainer(win);
+    this.remember(win, placed);
+  }
+
+  /** The main window's saved bounds. Torn-off and new windows (`hidden`) keep the default, and a container never reads them: its viewport is fixed. */
+  private remembered(hidden: boolean): SavedWindow | null {
+    if (hidden || inContainer()) return null;
+    return this.deps.windowBounds?.saved() ?? null;
+  }
+
+  /** Maximizes the main window if it closed maximized, and saves its bounds when it closes; never for other windows or in a container. */
+  private remember(win: BrowserWindow, placed: SavedWindow | null): void {
+    if (this.secondary || inContainer()) return;
+    if (placed?.maximized) win.maximize();
+    this.deps.windowBounds?.track(win);
   }
 
   /** In a container the window fills the virtual screen. */
