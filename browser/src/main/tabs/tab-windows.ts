@@ -10,6 +10,7 @@ import { recordingPreferences } from '../recording/preload.ts';
 import { isNativeEngine } from '../native-policy/index.ts';
 import { GmailPopup } from './gmail-popup.ts';
 import { ContextMenu } from './context-menu.ts';
+import { openLink } from './tab-order.ts';
 import { AUTH_POPUP_SIZE, LOCAL_FILE } from './constants.ts';
 import type { Tab, TabView } from './types.ts';
 
@@ -92,10 +93,19 @@ export class TabWindows {
     return { action: 'deny' };
   }
 
-  /** Ordinary links inherit the exact opener session, including ephemeral contexts. */
+  /**
+   * Ordinary links open beside the opener in its exact session, including
+   * ephemeral contexts. A Cmd- or middle-click asks for a background tab, so
+   * the person stays on the page; a plain target="_blank" click shows it.
+   */
   private openSibling(details: HandlerDetails, opener: Tab): void {
-    const id = this.deps.tabs.createTab(details.url, true, loadOptionsFor(details), opener.view.webContents.session);
-    this.markOpener(id, opener);
+    const show = details.disposition !== 'background-tab';
+    const id = openLink(this.deps.tabs, {
+      page: opener.view,
+      url: details.url,
+      show,
+      options: loadOptionsFor(details),
+    });
     this.deps.agentTab.handOff(opener.id, id); // the agent's page opened it: still the agent's
   }
   /** Preserve sign-in and named windows with the opener's persona partition. */
@@ -108,12 +118,6 @@ export class TabWindows {
       return { action: 'allow', overrideBrowserWindowOptions: { webPreferences } };
     return null;
   }
-  /** Notes which tab opened a tab, so what a test run's tabs open closes with them. */
-  private markOpener(id: number, opener: Tab): void {
-    const tab: Tab | undefined = this.deps.tabs.list.find((t: Tab) => t.id === id);
-    if (tab && opener) tab.openerId = opener.id;
-  }
-
   /** Protocol interception is installed before a popup can navigate. */
   private protectPopup(window: BrowserWindow): void {
     this.followPopupFocus(window);

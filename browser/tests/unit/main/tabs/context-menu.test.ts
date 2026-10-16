@@ -6,6 +6,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { ContextMenu, inspectScript } from '../../../../src/main/tabs/context-menu.ts';
 import { PageSource } from '../../../../src/main/tabs/page-source.ts';
+import { TabManager } from '../../../../src/main/tabs/tabs.ts';
 import { mainCtx, FakeBrowserView } from '../../support/main-ctx.cjs';
 import { flush } from '../../support/fakes.cjs';
 
@@ -37,6 +38,21 @@ describe('context menu', () => {
       'Open Link in New Tab',
       'separator',
     ]);
+  });
+
+  it('opens a link in a new tab in the background, right of the page', () => {
+    ctx.tabs = new TabManager(ctx);
+    const [first] = ['https://a.test/', 'https://c.test/'].map((url) => ctx.tabs.createTab(url));
+    ctx.tabs.activateTab(first);
+    const page = ctx.tabs.find(first).view;
+    menuFor(ctx, page, { ...PARAMS, linkURL: 'https://b.test/' })
+      .find((i) => i.label === 'Open Link in New Tab')
+      .click();
+    assert.equal(ctx.tabs.activeTabId, first, 'the person stays on the page');
+    assert.deepEqual(
+      ctx.tabs.list.map((t) => t.url),
+      ['https://a.test/', 'https://b.test/', 'https://c.test/'],
+    );
   });
 
   it('mirrors the clipboard state', () => {
