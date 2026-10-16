@@ -10,12 +10,14 @@ import { ERR_ABORTED } from './constants.ts';
 import { wireHome } from './home.ts';
 import { wireFavicon } from './favicon.ts';
 import { TabProtector } from './tab-protector.ts';
+import { rendererGone } from './tab-recovery.ts';
 import { TabWindows, joinRecording, type TabWindowsDeps } from './tab-windows.ts';
 import type { Tab, TabView } from './types.ts';
 
 /** The services a tab's listeners use. */
 export type TabEventsDeps = TabWindowsDeps &
-  Pick<AppServices, 'shortcuts' | 'shield' | 'observer' | 'library' | 'agentTab'>;
+  Pick<AppServices, 'shortcuts' | 'shield' | 'observer' | 'library' | 'agentTab'> &
+  Partial<Pick<AppServices, 'tabHealthLog'>>;
 
 /**
  * Makes view-source pages readable (forces the light theme). This text runs
@@ -98,9 +100,9 @@ export class TabEvents {
       if (!mainFrame || code === ERR_ABORTED) return;
       failed(`Page could not load: ${description}. Try Reload.`);
     });
-    tab.view.webContents.on('render-process-gone', (_event, details) => {
-      failed(`Page renderer stopped (${details.reason}). Reload to recover.`);
-    });
+    tab.view.webContents.on('render-process-gone', (_event, details) =>
+      rendererGone(this.deps, tab, details.reason, failed),
+    );
   }
 
   /** A finished load, the address, the title, and joining a recording in progress. */

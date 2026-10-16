@@ -56,10 +56,16 @@ export interface AppServices {
   screenShare?: import('./screen-share.ts').ScreenShare;
   /** Native tab/window/display previews and an explicit source choice on each share. */
   screenPicker: import('../screen-share/index.ts').ScreenPicker;
+  /** Which tabs a call is capturing, for the strip's ring and the toolbar's share chip. */
+  shareIndicator?: import('../screen-share/index.ts').ShareIndicator;
   /** The sites each profile allowed a device on, on disk. */
   sitePermissions: import('./site-permissions.ts').SitePermissionStore;
   /** The tabs open at quit, brought back at the next sign-in. */
   sessionTabs?: import('../tabs/session-tabs.ts').SessionTabs;
+  /** The log of tab renderer deaths, Reload recoveries and helper-process deaths (tabs/tab-health.ts). */
+  tabHealthLog?: import('../tabs/tab-health.ts').TabHealthLog;
+  /** The main window's position and size at quit, reopened at the next launch. */
+  windowBounds?: import('../shell/window-bounds.ts').WindowBounds;
   /** Human-approved desktop app protocol handoff. */
   externalApps: import('./external-apps.ts').ExternalApps;
   /** Session-only alert inbox. */

@@ -51,6 +51,8 @@ export interface TabSummary {
   pinned?: boolean;
   /** Whether the agent drives this tab; the strip marks it while the agent works. */
   agent?: boolean;
+  /** Whether a call is capturing this tab, so the strip rings its icon. */
+  sharing?: boolean;
   /** Whether the page is loading. */
   loading?: boolean;
   /** Why the last load failed, if it did. */
@@ -73,6 +75,21 @@ export interface IncomingTab {
   home: boolean;
   /** The pointer's x in this window's content pixels. */
   x: number;
+}
+
+/**
+ * The live tab share the toolbar chip names: the most recent one whose calling tab
+ * still exists. Hosts only, never a full address; null for a page that is not a website.
+ */
+export interface ShareChip {
+  /** The tab being captured. */
+  sharedTabId: number;
+  /** The tab whose page asked to capture it. */
+  callTabId: number;
+  /** The shared tab's web host, or null. */
+  shared: string | null;
+  /** The calling tab's web host, or null. */
+  call: string | null;
 }
 
 /** A rectangle in window pixels. */
@@ -358,6 +375,8 @@ export interface ShellCalls {
   closeTab(id: number): Promise<void>;
   /** Shows a tab. */
   activateTab(id: number): Promise<void>;
+  /** Shows the tab of the call sharing a tab, in whichever window holds it; main knows which, so the shell names none. */
+  goToShareCall(): Promise<void>;
   /** Moves a tab in the strip. */
   moveTab(id: number, toIndex: number): Promise<unknown>;
   /** Opens a tab's right-click menu. */
@@ -460,6 +479,8 @@ export interface ShellEvents {
   onTabsUpdated: TabSummary[];
   /** A tab carried in another window hovers this strip (null once it leaves). */
   onTabIncoming: IncomingTab | null;
+  /** A tab share started, moved or ended (null). */
+  onShareChip: ShareChip | null;
   /** The bookmarks bar changed: shown or hidden, or a bookmark added or removed. */
   onBookmarksBar: Payload;
   /** The routines or their runs changed. */
@@ -574,6 +595,8 @@ export const CALL_CHANNELS = {
   closeTab: 'close-tab',
   /** Shows a tab. */
   activateTab: 'activate-tab',
+  /** Shows the tab of the call sharing a tab. */
+  goToShareCall: 'go-to-share-call',
   /** Moves a tab in the strip. */
   moveTab: 'move-tab',
   /** Opens a tab's right-click menu. */
@@ -676,6 +699,8 @@ export const EVENT_CHANNELS = {
   onTabsUpdated: 'tabs-updated',
   /** A tab carried in another window hovers this strip (null once it leaves). */
   onTabIncoming: 'tab-incoming',
+  /** A tab share started, moved or ended. */
+  onShareChip: 'share-chip',
   /** The bookmarks bar changed: shown or hidden, or a bookmark added or removed. */
   onBookmarksBar: 'bookmarks-bar',
   /** The routines or their runs changed. */

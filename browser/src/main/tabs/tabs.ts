@@ -17,6 +17,7 @@ import { ClosedTabs, reopenable } from './tab-order.ts';
 import { recordingPreferences } from '../recording/preload.ts';
 import { isNativeEngine } from '../native-policy/index.ts';
 import type { Tab, TabView } from './types.ts';
+import { reloadOrRecover } from './tab-recovery.ts';
 
 export { normalizeAddress } from './navigation.ts';
 
@@ -24,7 +25,15 @@ export { normalizeAddress } from './navigation.ts';
 type Deps = TabEventsDeps &
   Pick<
     AppServices,
-    'electron' | 'layout' | 'overlays' | 'cookies' | 'windows' | 'nativeBrowsing' | 'appDir' | 'agentTab'
+    | 'electron'
+    | 'layout'
+    | 'overlays'
+    | 'cookies'
+    | 'windows'
+    | 'nativeBrowsing'
+    | 'appDir'
+    | 'agentTab'
+    | 'shareIndicator'
   >;
 
 /** Optional native session is application-owned, never chosen by page-supplied partition strings. */
@@ -56,6 +65,8 @@ export interface TabSummary {
   pinned: boolean;
   /** Whether the agent drives it. */
   agent: boolean;
+  /** Whether a call is capturing it. */
+  sharing: boolean;
   /** Whether it is loading. */
   loading: boolean;
   /** Why its page failed, or null. */
@@ -66,13 +77,27 @@ export interface TabSummary {
   canGoForward: boolean;
 }
 
+/** Per-tab marks that come from other services: which tabs the agent drives, which a call captures. */
+interface TabMarks {
+  /** Tabs the agent drives, or null for whichever tab is shown. */
+  agentTabs: Array<number | null> | null;
+  /** Whether a call is capturing the tab. */
+  sharing: (id: number) => boolean;
+}
+
+/** Whether the agent drives the tab, and whether a call captures it. */
+const markSummary = (t: Tab, marks: TabMarks): Pick<TabSummary, 'agent' | 'sharing'> => ({
+  agent: !!marks.agentTabs?.includes(t.id),
+  sharing: marks.sharing(t.id),
+});
+
 /** What the tab strip shows for one tab. */
-function tabSummary(t: Tab, activeTabId: number | null, agentTabs: Array<number | null>): TabSummary {
+function tabSummary(t: Tab, activeTabId: number | null, marks: TabMarks): TabSummary {
   return {
     id: t.id,
     ...placeSummary(t),
     active: t.id === activeTabId,
-    agent: agentTabs.includes(t.id),
+    ...markSummary(t, marks),
     ...loadSummary(t),
     ...historySummary(t.view.webContents.navigationHistory),
   };
@@ -195,11 +220,17 @@ function agentTabs({ agentTab, control }: Pick<AppServices, 'agentTab' | 'contro
   return control.snapshot().interactive ? [] : null;
 }
 
+/** The strip's marks from the agent's claims and the live tab shares. */
+const tabMarks = (deps: Deps): TabMarks => ({
+  agentTabs: agentTabs(deps),
+  sharing: (id) => !!deps.shareIndicator?.has(id),
+});
+
 /** Hidden transfer shells render metadata without owning a second copy of the page. */
-function windowTabSummaries(tabs: TabManager, driven: number[] | null, staged?: Tab) {
+function windowTabSummaries(tabs: TabManager, marks: TabMarks, staged?: Tab) {
   const visible = tabs.list.length ? tabs.list : staged ? [staged] : [];
   const active = tabs.activeTabId ?? staged?.id ?? null;
-  return visible.map((tab) => tabSummary(tab, active, driven ?? [active]));
+  return visible.map((tab) => tabSummary(tab, active, { ...marks, agentTabs: marks.agentTabs ?? [active] }));
 }
 /** The events a new tab is wired to: its window's, when the app has several, else this manager's own. */
 function eventsFor(deps: AppServices, tab: Tab, own: TabEvents): TabEvents {
@@ -347,7 +378,7 @@ export class TabManager {
 
   /** Sends the tab strip to the shell. */
   sendTabList(): void {
-    this.deps.shell.send('tabs-updated', windowTabSummaries(this, agentTabs(this.deps), this.deps.shell.stagedTab));
+    this.deps.shell.send('tabs-updated', windowTabSummaries(this, tabMarks(this.deps), this.deps.shell.stagedTab));
     this.deps.windows?.tabEvents?.changed();
   }
 
@@ -394,12 +425,11 @@ export class TabManager {
     return new AddressBar(this.deps).navigate(url);
   }
 
-  /** Reload, or stop a load in progress. */
-  reloadActivePage(): void {
-    this.deps.agentTab.requireFor(this.activeTabId);
+  /** The person's Reload: recovers a stuck page (tab-recovery.ts), else reloads, or stops a load in progress. */
+  reloadActivePage(): Promise<void> {
+    this.deps.agentTab.requireFor(this.activeTabId); // refuses at once, before any wait
     const tab = this.find(this.activeTabId);
-    if (!tab) return;
-    reloadOrStop(this, tab);
+    return tab ? reloadOrRecover(this.deps, tab, () => reloadOrStop(this, tab)) : Promise.resolve();
   }
 
   /** Reloads a tab, clearing its error; one that could not be protected keeps saying so (only about:blank reloads). */

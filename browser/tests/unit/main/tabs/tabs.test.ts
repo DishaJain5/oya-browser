@@ -6,7 +6,7 @@ import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { TabManager } from '../../../../src/main/tabs/tabs.ts';
-import { HOME_URL, PAGE_BACKGROUND } from '../../../../src/main/tabs/constants.ts';
+import { HOME_URL, PAGE_BACKGROUND, TAB_PROBE_MS } from '../../../../src/main/tabs/constants.ts';
 import { mainCtx } from '../../support/main-ctx.cjs';
 import { flush } from '../../support/fakes.cjs';
 
@@ -198,17 +198,105 @@ describe('TabManager', () => {
     assert.ok(!ctx.shell.sentOn('url-changed').includes('https://a.test/next'));
   });
 
-  it('stops a page that is still loading instead of reloading it', () => {
+  it('stops a page that is still loading instead of reloading it', async () => {
     const tab = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
     tab.view.webContents.loading = true;
-    ctx.tabs.reloadActivePage();
-    assert.deepEqual(tab.view.webContents.calls, ['stop']);
+    await ctx.tabs.reloadActivePage();
+    assert.deepEqual(tab.view.webContents.calls, ['probe', 'stop']);
     assert.equal(tab.navigationRequest, 1);
     tab.view.webContents.loading = false;
     tab.loadError = 'x';
-    ctx.tabs.reloadActivePage();
-    assert.deepEqual(tab.view.webContents.calls, ['stop', 'reload']);
+    await ctx.tabs.reloadActivePage();
+    assert.deepEqual(tab.view.webContents.calls, ['probe', 'stop', 'probe', 'reload']);
     assert.equal(tab.loadError, null);
+  });
+
+  describe('a person reloading a page that does not answer', () => {
+    let tab;
+    beforeEach(() => {
+      tab = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
+      tab.view.webContents.probeImpl = () => new Promise(() => {});
+    });
+
+    /** Clicks Reload and lets the page's answer time run out. */
+    async function reloadHung() {
+      const done = ctx.tabs.reloadActivePage();
+      await flush();
+      mock.timers.tick(TAB_PROBE_MS);
+      await done;
+    }
+
+    it('ends its renderer and waits for it to be gone before reloading: reloading at once never loads', async () => {
+      await reloadHung();
+      assert.deepEqual(tab.view.webContents.calls, ['probe', 'crash']);
+      assert.equal(tab.recovering, true);
+    });
+
+    it('ends the renderer of a page stuck loading in it, instead of stopping it', async () => {
+      tab.view.webContents.loading = true;
+      await reloadHung();
+      assert.deepEqual(tab.view.webContents.calls, ['probe', 'crash']);
+    });
+
+    it('does not end the renderer of a page an agent claimed while it was being asked', async () => {
+      const done = ctx.tabs.reloadActivePage();
+      ctx.agentTab.humanMay = () => false;
+      mock.timers.tick(TAB_PROBE_MS);
+      await done;
+      assert.deepEqual(tab.view.webContents.calls, ['probe']);
+    });
+
+    it('does not end the renderer of a tab closed while it was being asked', async () => {
+      const done = ctx.tabs.reloadActivePage();
+      ctx.tabs.closeTab(tab.id);
+      mock.timers.tick(TAB_PROBE_MS);
+      await done;
+      assert.ok(!tab.view.webContents.calls.includes('crash'));
+    });
+
+    it('ends it once for a double click', async () => {
+      const first = ctx.tabs.reloadActivePage();
+      const second = ctx.tabs.reloadActivePage();
+      mock.timers.tick(TAB_PROBE_MS);
+      await Promise.all([first, second]);
+      await ctx.tabs.reloadActivePage();
+      assert.deepEqual(tab.view.webContents.calls, ['probe', 'crash']);
+    });
+  });
+
+  it('never asks a patched-engine tab, whose preload cannot answer: a slow load there would read as a hang', async () => {
+    const tab = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
+    tab.view.webContents.session = { _setOyaPreScriptPolicy: () => {} };
+    await ctx.tabs.reloadActivePage();
+    assert.deepEqual(tab.view.webContents.calls, ['reload']);
+  });
+
+  it('reloads a tab whose renderer already died, without asking it or ending it again', async () => {
+    const tab = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
+    tab.view.webContents.crashed = true;
+    await ctx.tabs.reloadActivePage();
+    await ctx.tabs.reloadActivePage();
+    assert.deepEqual(tab.view.webContents.calls, ['reload', 'reload']);
+  });
+
+  it('never ends the renderer of a page that answers', async () => {
+    const tab = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
+    await ctx.tabs.reloadActivePage();
+    assert.deepEqual(tab.view.webContents.calls, ['probe', 'reload']);
+  });
+
+  it('counts a page whose frame was replaced while it was asked as alive', async () => {
+    const tab = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
+    tab.view.webContents.probeImpl = () => Promise.reject(new Error('Render frame was disposed'));
+    await ctx.tabs.reloadActivePage();
+    assert.deepEqual(tab.view.webContents.calls, ['probe', 'reload']);
+  });
+
+  it("refuses to reload the agent's page at once, and never asks or ends it", () => {
+    const tab = ctx.tabs.find(ctx.tabs.createTab('https://a.test/'));
+    ctx.control.state = { interactive: false, mode: 'agent', mine: false };
+    assert.throws(() => ctx.tabs.reloadActivePage(), /Switch to Human Mode/);
+    assert.deepEqual(tab.view.webContents.calls, []);
   });
 
   it('refuses a reload while an agent has control', () => {
@@ -312,11 +400,24 @@ describe('TabManager', () => {
         pinned: false,
         active: true,
         agent: false,
+        sharing: false,
         loading: true,
         loadError: null,
         canGoBack: false,
         canGoForward: false,
       },
     ]);
+  });
+
+  it('a shared tab is listed with sharing: true, and every other tab false', () => {
+    const shared = ctx.tabs.createTab('https://a.test/');
+    ctx.tabs.createTab('https://b.test/');
+    ctx.shareIndicator = { has: (id) => id === shared };
+    ctx.tabs.sendTabList();
+    const list = ctx.shell.sentOn('tabs-updated').at(-1);
+    assert.deepEqual(
+      list.map((t) => t.sharing),
+      [true, false],
+    );
   });
 });

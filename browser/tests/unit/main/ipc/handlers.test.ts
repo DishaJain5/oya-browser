@@ -26,6 +26,13 @@ describe('IPC handlers', () => {
     assert.equal((await call('get-status')).browsing, false);
   });
 
+  it('go-to-share-call asks the indicator and ignores renderer arguments', async () => {
+    const asked = [];
+    ctx.shareIndicator = { goToCall: (...args) => asked.push(args) };
+    await call('go-to-share-call', 99, { tabId: 3 });
+    assert.deepEqual(asked, [[]]);
+  });
+
   it('opens only the console of a ws or wss server, never another scheme', async () => {
     assert.equal(
       await call('open-console', 'wss://oyabrowser.com/ws'),

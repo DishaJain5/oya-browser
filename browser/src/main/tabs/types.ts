@@ -59,6 +59,10 @@ export interface Tab {
   navigationPending?: boolean;
   /** Why its page failed, shown on the tab; null when it did not. */
   loadError?: string | null;
+  /** The person's Reload just ended its renderer to recover it: the page reloads when that renderer is reported gone, with no crash message. */
+  recovering?: boolean;
+  /** A person's Reload is asking the page whether it still answers: a second click waits for that. */
+  probing?: boolean;
   /** Its icon as a data: URL, or null. */
   favicon?: string | null;
   /** The icon address last asked for. */
