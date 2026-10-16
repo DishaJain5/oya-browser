@@ -41,7 +41,7 @@ export interface TabHealthEntry {
 type LogDeps = Pick<AppServices, 'tabs' | 'agentTab'>;
 
 /** The site of the tab's page, or '' for a private tab or an address with none. */
-function originOf(tab: Tab): string {
+function siteForLog(tab: Tab): string {
   if (privateSession(tab.view.webContents.session)) return '';
   try {
     return new URL(tab.view.webContents.getURL()).origin;
@@ -68,7 +68,7 @@ export class TabHealthLog {
     const pid = tab.view.webContents.getOSProcessId?.() || 0;
     const peers = pid ? this.peersOf(tab, pid) : [];
     const agent = this.deps.agentTab.claimed().includes(tab.id);
-    this.append({ event, tab: tab.id, origin: originOf(tab), pid, agent, peers, ...(reason ? { reason } : {}) });
+    this.append({ event, tab: tab.id, origin: siteForLog(tab), pid, agent, peers, ...(reason ? { reason } : {}) });
   }
 
   /** Records a helper process (GPU, audio, a utility) that went away: no tab event says so. */
