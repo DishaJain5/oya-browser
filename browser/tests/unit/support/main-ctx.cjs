@@ -76,6 +76,27 @@ class FakePageContents extends FakeWebContents {
     this.record('reload');
   }
 
+  /** As Electron's: runs code in an isolated world; `probeImpl` answers (a hung page never does). */
+  executeJavaScriptInIsolatedWorld() {
+    this.record('probe');
+    return this.probeImpl ? this.probeImpl() : Promise.resolve(1);
+  }
+
+  /** As Electron's: whether the renderer died (`crashed`, set by a test). */
+  isCrashed() {
+    return !!this.crashed;
+  }
+
+  /** As Electron's: ends the renderer. */
+  forcefullyCrashRenderer() {
+    this.record('crash');
+  }
+
+  /** As Electron's: the renderer's OS process id (`pid`, 0 by default). */
+  getOSProcessId() {
+    return this.pid || 0;
+  }
+
   /** As Electron's. */
   goBack() {
     this.record('goBack');
