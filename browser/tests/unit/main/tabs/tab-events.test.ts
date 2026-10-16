@@ -245,6 +245,16 @@ describe('tab events', () => {
     assert.equal(ctx.tabs.list.at(-1).url, 'https://example.test/page');
   });
 
+  it('shows a target=_blank tab, but keeps the page on screen for a Cmd- or middle-click', () => {
+    const open = (disposition) =>
+      tab.view.webContents.openHandler({ url: 'https://b.test/', features: '', disposition });
+    open('foreground-tab');
+    assert.equal(ctx.tabs.activeTabId, ctx.tabs.list.at(-1).id, 'a plain click shows the new tab');
+    ctx.tabs.activateTab(tab.id);
+    open('background-tab');
+    assert.equal(ctx.tabs.activeTabId, tab.id, 'a background click stays on the page');
+  });
+
   it('joins a recording once the tab is protected', async () => {
     const join = mock.method(ctx.recorder, 'joinIfRecording', () => {});
     await tab.setup;
