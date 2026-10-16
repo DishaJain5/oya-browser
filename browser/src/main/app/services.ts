@@ -62,6 +62,8 @@ export interface AppServices {
   sitePermissions: import('./site-permissions.ts').SitePermissionStore;
   /** The tabs open at quit, brought back at the next sign-in. */
   sessionTabs?: import('../tabs/session-tabs.ts').SessionTabs;
+  /** The log of tab renderer deaths, Reload recoveries and helper-process deaths (tabs/tab-health.ts). */
+  tabHealthLog?: import('../tabs/tab-health.ts').TabHealthLog;
   /** The main window's position and size at quit, reopened at the next launch. */
   windowBounds?: import('../shell/window-bounds.ts').WindowBounds;
   /** Human-approved desktop app protocol handoff. */

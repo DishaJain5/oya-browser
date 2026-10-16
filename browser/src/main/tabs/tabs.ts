@@ -17,6 +17,7 @@ import { ClosedTabs, reopenable } from './tab-order.ts';
 import { recordingPreferences } from '../recording/preload.ts';
 import { isNativeEngine } from '../native-policy/index.ts';
 import type { Tab, TabView } from './types.ts';
+import { reloadOrRecover } from './tab-recovery.ts';
 
 export { normalizeAddress } from './navigation.ts';
 
@@ -424,12 +425,11 @@ export class TabManager {
     return new AddressBar(this.deps).navigate(url);
   }
 
-  /** Reload, or stop a load in progress. */
-  reloadActivePage(): void {
-    this.deps.agentTab.requireFor(this.activeTabId);
+  /** The person's Reload: recovers a stuck page (tab-recovery.ts), else reloads, or stops a load in progress. */
+  reloadActivePage(): Promise<void> {
+    this.deps.agentTab.requireFor(this.activeTabId); // refuses at once, before any wait
     const tab = this.find(this.activeTabId);
-    if (!tab) return;
-    reloadOrStop(this, tab);
+    return tab ? reloadOrRecover(this.deps, tab, () => reloadOrStop(this, tab)) : Promise.resolve();
   }
 
   /** Reloads a tab, clearing its error; one that could not be protected keeps saying so (only about:blank reloads). */

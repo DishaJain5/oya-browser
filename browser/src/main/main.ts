@@ -33,7 +33,8 @@ import { ScreenPicker, ShareIndicator } from './screen-share/index.ts';
 import { SitePermissionStore } from './app/site-permissions.ts';
 import { JsonFile } from './app/json-file.ts';
 import { SessionTabs } from './tabs/session-tabs.ts';
-import { SESSION_TABS_FILE } from './tabs/constants.ts';
+import { SESSION_TABS_FILE, TAB_HEALTH_FILE } from './tabs/constants.ts';
+import { TabHealthLog } from './tabs/tab-health.ts';
 import { WindowBounds } from './shell/window-bounds.ts';
 import { WINDOW_BOUNDS_FILE } from './shell/constants.ts';
 import { Downloads, DOWNLOADS_FILE, closeDownloadOnlyTab, personMayUse } from './downloads/index.ts';
@@ -168,6 +169,9 @@ ctx.windows.tabEvents.subscribe(() => ctx.shareIndicator!.tabsChanged());
 ctx.screenShare = new ScreenShare(ctx);
 ctx.sessionTabs = new SessionTabs(ctx, new JsonFile(userFile(SESSION_TABS_FILE)));
 ctx.windowBounds = new WindowBounds(ctx, new JsonFile(userFile(WINDOW_BOUNDS_FILE)));
+ctx.tabHealthLog = new TabHealthLog(ctx, new JsonFile(userFile(TAB_HEALTH_FILE)));
+// A GPU or audio process that dies blanks pages or stops their sound with no tab event: the log keeps it.
+app.on('child-process-gone', (_event, details) => ctx.tabHealthLog!.processGone(details));
 // Every strip change, from any window, schedules a save of the session.
 ctx.windows.tabEvents.subscribe(() => ctx.sessionTabs!.changed());
 ctx.externalApps = new ExternalApps(ctx);

@@ -9,7 +9,7 @@ import { TabManager } from '../../../../src/main/tabs/tabs.ts';
 import { VIEW_SOURCE_LIGHT } from '../../../../src/main/tabs/tab-events.ts';
 import { mainCtx, FakeBrowserView } from '../../support/main-ctx.cjs';
 import { flush } from '../../support/fakes.cjs';
-import { TAB_UNPROTECTED_DESKTOP } from '../../../../src/main/tabs/constants.ts';
+import { TAB_UNPROTECTED_DESKTOP, TAB_PROBE_MS } from '../../../../src/main/tabs/constants.ts';
 
 describe('tab events', () => {
   let ctx, tab;
@@ -118,6 +118,45 @@ describe('tab events', () => {
     assert.equal(tab.loadError, 'Page renderer stopped (crashed). Reload to recover.');
     tab.view.webContents.emit('did-start-loading');
     assert.equal(tab.loadError, null);
+  });
+
+  /** The person clicks Reload on a page that never answers, and the wait runs out. */
+  async function reloadHung() {
+    tab.view.webContents.probeImpl = () => new Promise(() => {});
+    const done = ctx.tabs.reloadActivePage();
+    await flush();
+    mock.timers.tick(TAB_PROBE_MS);
+    await done;
+  }
+
+  it('reloads the page the person recovered once its renderer is gone, with no crash message, while a tab sharing it says it stopped', async () => {
+    const peer = ctx.tabs.find(ctx.tabs.createTab('https://a.test/other'));
+    ctx.tabs.activateTab(tab.id);
+    await reloadHung();
+    assert.deepEqual(tab.view.webContents.calls, ['probe', 'crash'], 'no reload before the renderer is gone');
+    tab.view.webContents.emit('render-process-gone', {}, { reason: 'killed' });
+    peer.view.webContents.emit('render-process-gone', {}, { reason: 'killed' });
+    assert.deepEqual(tab.view.webContents.calls, ['probe', 'crash', 'reload']);
+    assert.equal(tab.loadError, null);
+    assert.equal(peer.loadError, 'Page renderer stopped (killed). Reload to recover.');
+  });
+
+  it('still shows a real crash after a recovery', async () => {
+    await reloadHung();
+    tab.view.webContents.emit('render-process-gone', {}, { reason: 'killed' });
+    tab.view.webContents.emit('render-process-gone', {}, { reason: 'crashed' });
+    assert.equal(tab.loadError, 'Page renderer stopped (crashed). Reload to recover.');
+  });
+
+  it('logs a page that did not answer a Reload before its renderer is ended', async () => {
+    const events = [];
+    ctx.tabHealthLog = { record: (_tab, event, reason) => events.push([event, reason]) };
+    await reloadHung();
+    tab.view.webContents.emit('render-process-gone', {}, { reason: 'killed' });
+    assert.deepEqual(events, [
+      ['probe-failed', undefined],
+      ['gone', 'killed'],
+    ]);
   });
 
   it('lightens view-source pages and loads the analyzer on every page', () => {
