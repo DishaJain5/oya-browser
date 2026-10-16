@@ -4,7 +4,7 @@ import type { AppServices } from '../app/services.ts';
 import type { Tab } from '../tabs/types.ts';
 import { closeWindowTabs, disposeWindow } from './cleanup.ts';
 import { inTabStrip, inWindow } from './geometry.ts';
-import { TabDragPreview } from './drag-preview.ts';
+import { TabTearOff } from './tear-off.ts';
 import { WindowOpening } from './opening.ts';
 import { WindowContext } from './context.ts';
 import { WindowServiceRouter } from './service-router.ts';
@@ -17,8 +17,8 @@ export class BrowserWindows {
   readonly tabEvents = new WindowTabEvents();
   /** Shared application services; never replaced by a per-window dependency object. */
   private readonly root: AppServices;
-  /** Native visual feedback shared by all shell windows. */
-  readonly drag = new TabDragPreview();
+  /** A tab pulled off a strip, carried in its own window under the pointer. */
+  readonly drag: TabTearOff = new TabTearOff(this);
   /** Live dependency scopes, including the primary before its native window is created. */
   private readonly scopes: AppServices[] = [];
   /** Last selected window; remains available during final application shutdown. */
@@ -123,8 +123,12 @@ export class BrowserWindows {
     return this.opening.newWindow();
   }
   /** Move a live tab only after the destination chrome is drawn. */
-  detach(id: number, point?: Point): Promise<void> {
-    return this.opening.detach(id, point);
+  async detach(id: number, point?: Point): Promise<void> {
+    await this.opening.detach(id, point);
+  }
+  /** Moves a live tab into a new window at `point`, whatever is under it; answers that window. */
+  tearOff(id: number, point: Point): Promise<AppServices | undefined> {
+    return this.opening.detach(id, point, true);
   }
   /** Reveal an already-painted window as one complete surface. */
   present(scope: AppServices): void {
@@ -138,17 +142,23 @@ export class BrowserWindows {
     this.root.agentTab.requireFor(id);
     if (source.overlays.names.size) throw new Error('Close the open menu or dialog before moving this tab');
   }
-  /** A drop over another shell's tab strip joins that window, otherwise it creates a new one. */
+  /**
+   * The window whose tab strip is under `point`: the frontmost other window there,
+   * so a drop never falls through it into a strip it covers. `source` is skipped,
+   * since a torn-off tab's own window sits under the pointer that carries it.
+   */
   dropTarget(source: AppServices, point: Point): AppServices | undefined {
-    const hit = [...this.scopes]
-      .reverse()
-      .find(
-        (scope) =>
-          scope.shell.alive() && scope.shell.window.isVisible() && inWindow(point, scope.shell.window.getBounds()),
-      );
-    if (!hit || hit === source) return undefined;
-    return inTabStrip(point, hit.shell.window!.getContentBounds()) ? hit : undefined;
+    const hit = this.frontmostAt(point, source);
+    return hit && inTabStrip(point, hit.shell.window!.getContentBounds()) ? hit : undefined;
   }
+  /** The frontmost open window under `point`, other than `skip`. */
+  private frontmostAt(point: Point, skip: AppServices): AppServices | undefined {
+    const open = (scope: AppServices) => scope.shell.alive() && scope.shell.window.isVisible();
+    return [...this.scopes]
+      .reverse()
+      .find((scope) => scope !== skip && open(scope) && inWindow(point, scope.shell.window!.getBounds()));
+  }
+
   /**
    * The original tab object, webContents, history and renderer survive the
    * transfer. The tab arrives unpinned: the target appends it, which is the

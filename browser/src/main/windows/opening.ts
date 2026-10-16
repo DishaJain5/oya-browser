@@ -26,25 +26,26 @@ export class WindowOpening {
       throw error;
     }
   }
-  /** Serialize repeated drops for the same page. */
-  async detach(id: number, point?: Point): Promise<void> {
+  /** Serialize repeated drops for the same page; `fresh` always opens a new window. Answers where the tab went. */
+  async detach(id: number, point?: Point, fresh = false): Promise<AppServices | undefined> {
     if (this.pending.has(id)) return;
     this.pending.add(id);
     try {
-      await this.move(id, point);
+      return await this.move(id, point, fresh);
     } finally {
       this.pending.delete(id);
     }
   }
   /** Source stays mounted until a hidden shell is ready. */
-  private async move(id: number, point?: Point): Promise<void> {
+  private async move(id: number, point: Point | undefined, fresh: boolean): Promise<AppServices | undefined> {
     const source = this.windows.owner(id);
     const tab = source?.tabs.find(id);
     if (!source || !tab || tab.window) return;
     this.windows.assertMovable(source, id);
-    const existing = point ? this.windows.dropTarget(source, point) : undefined;
+    const existing = point && !fresh ? this.windows.dropTarget(source, point) : undefined;
     const target = existing ?? (await this.prepare(tab, point));
     this.commit(source, target, tab, !existing);
+    return target;
   }
   /** A failed handoff removes only an uncommitted destination. */
   private commit(source: AppServices, target: AppServices, tab: Tab, fresh: boolean): void {

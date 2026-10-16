@@ -16,7 +16,7 @@ import type { TabDragViewModel } from '../view-models/tab-drag-view-model.ts';
 import type { TabCardViewModel } from '../view-models/tab-card-view-model.ts';
 
 /** What a tab's icon is told. */
-interface TabIconProps {
+export interface TabIconProps {
   /** What it shows. */
   kind: ReturnType<typeof iconKind>;
 }
@@ -30,7 +30,7 @@ function Favicon({ src }: { /** The data: URL. */ src: string }) {
 }
 
 /** The tab's icon. */
-function TabIcon({ kind }: TabIconProps) {
+export function TabIcon({ kind }: TabIconProps) {
   const key = typeof kind === 'string' ? kind : kind.favicon;
   return (
     <span className="tab-icon" aria-hidden="true" data-key={key}>

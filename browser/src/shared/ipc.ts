@@ -61,6 +61,20 @@ export interface TabSummary {
   canGoForward?: boolean;
 }
 
+/** A tab carried in another window over this window's strip, which opens a gap for it at `x`. */
+export interface IncomingTab {
+  /** The tab's id in the main process. */
+  id: number;
+  /** The page's title. */
+  title: string;
+  /** The page's icon as a data URL, once fetched. */
+  favicon: string | null;
+  /** Whether it shows the start page, which draws the Oya mark. */
+  home: boolean;
+  /** The pointer's x in this window's content pixels. */
+  x: number;
+}
+
 /** A rectangle in window pixels. */
 export interface Bounds {
   /** Left edge. */
@@ -444,6 +458,8 @@ export interface ShellEvents {
   onViewSource: PageSource;
   /** The tab list changed. */
   onTabsUpdated: TabSummary[];
+  /** A tab carried in another window hovers this strip (null once it leaves). */
+  onTabIncoming: IncomingTab | null;
   /** The bookmarks bar changed: shown or hidden, or a bookmark added or removed. */
   onBookmarksBar: Payload;
   /** The routines or their runs changed. */
@@ -658,6 +674,8 @@ export const EVENT_CHANNELS = {
   onViewSource: 'view-source',
   /** The tab list changed. */
   onTabsUpdated: 'tabs-updated',
+  /** A tab carried in another window hovers this strip (null once it leaves). */
+  onTabIncoming: 'tab-incoming',
   /** The bookmarks bar changed: shown or hidden, or a bookmark added or removed. */
   onBookmarksBar: 'bookmarks-bar',
   /** The routines or their runs changed. */

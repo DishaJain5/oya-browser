@@ -70,7 +70,7 @@ export class NavigationHandlers {
     'new-window': () => this.deps.windows?.newWindow(),
     'detach-tab': (_e, id) => this.detach(id),
     'begin-tab-drag': (_e, id) => this.deps.windows?.drag.begin(this.deps as AppServices, id),
-    'end-tab-drag': () => this.deps.windows?.drag.stop(this.deps as AppServices),
+    'end-tab-drag': () => this.deps.windows?.drag.drop(),
     'close-tab': (_e, id) => {
       this.deps.agentTab.requireFor(id);
       this.deps.tabs.closeTab(id);
@@ -91,15 +91,12 @@ export class NavigationHandlers {
     this.deps = deps;
   }
 
-  /** The sender can only transfer a tab that still belongs to its own window. */
+  /** A tab let go off the strip: a tear-off under way lands where it was let go; otherwise the sender can only transfer a tab still in its own window. */
   private async detach(id: number): Promise<void> {
     this.deps.agentTab.requireFor(id);
+    if (this.deps.windows?.drag.carrying(id)) return this.deps.windows.drag.drop();
     if (!Number.isSafeInteger(id) || !this.deps.tabs.find(id)) throw new Error('Tab is not in this window');
-    try {
-      await this.deps.windows?.detach(id, this.deps.electron.screen.getCursorScreenPoint());
-    } finally {
-      this.deps.windows?.drag.stop(this.deps as AppServices);
-    }
+    await this.deps.windows?.detach(id, this.deps.electron.screen.getCursorScreenPoint());
   }
 
   /** Throws unless the person may use the tab their window shows: under the agent, any tab but the agent's. */
