@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.196](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.196) · 2026-10-17
+
 ### Changed
 
 - The console follows your system's light or dark appearance until you pick one with the sun/moon button, and switches live when the system does. It used to open dark every time.
