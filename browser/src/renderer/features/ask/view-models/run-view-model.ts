@@ -72,6 +72,8 @@ export class RunViewModel extends ViewModel<RunState> {
   private live = false;
   /** When the run began. */
   private started = 0;
+  /** The run's tokens so far, as the server last told them: a run stopped before its answer still shows them. */
+  private used: RunUsage | undefined;
   /** The timer that keeps the elapsed count moving. */
   private ticker: ReturnType<typeof setInterval> | undefined;
   /** The timer that rests the orb after a run. */
@@ -92,7 +94,7 @@ export class RunViewModel extends ViewModel<RunState> {
   /** A question was asked: a new card with its live line, and the orb starts thinking. */
   begin(): void {
     this.stopTimers();
-    Object.assign(this, { runId: null, live: false, started: Date.now() });
+    Object.assign(this, { runId: null, live: false, started: Date.now(), used: undefined });
     this.set({ card: { plan: [], steps: [] }, label: '', count: 0, seconds: 0, orb: 'thinking' });
     this.ticker = setInterval(() => this.tick(), C.CHAT_PROGRESS_TICK_MS);
   }
@@ -105,8 +107,13 @@ export class RunViewModel extends ViewModel<RunState> {
     this.set({ card: null });
     this.settle(ok);
     if (!card.steps.length && !card.plan.length) return null;
-    const summary = card.steps.length ? runSummary(card.steps.length, this.elapsed(), usage) : '';
-    return { ...card, outcome: ok ? 'done' : 'failed', summary, title: summary ? usageTitle(usage) : '' };
+    return this.folded(card, ok, usage ?? this.used);
+  }
+
+  /** The finished card: how it went, and its summary and tooltip with the tokens the answer, or else the live run, gave. */
+  private folded(card: RunCard, ok: boolean, used?: RunUsage): FinishedRun {
+    const summary = card.steps.length ? runSummary(card.steps.length, this.elapsed(), used) : '';
+    return { ...card, outcome: ok ? 'done' : 'failed', summary, title: summary ? usageTitle(used) : '' };
   }
 
   /** The chat was cleared mid-run: the card goes with it, and the orb rests. */
@@ -124,6 +131,7 @@ export class RunViewModel extends ViewModel<RunState> {
     if (!this.runId || runId !== this.runId) return;
     if (run.kind === 'plan') this.setPlan(run.steps ?? []);
     if (run.kind === 'step') this.step(run.line || run.tool || '');
+    if (run.kind === 'usage') this.used = { input: run.input, output: run.output };
   }
 
   /** Redraws the plan. */

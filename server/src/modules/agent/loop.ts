@@ -117,6 +117,8 @@ export type LoopContext = {
   signal?: AbortSignal;
   /** The run's tokens so far, every model call and the check before done included, for the caller to show per run. */
   usage?: RunUsage;
+  /** Told the run's tokens so far after each model call, so a run the caller stops still shows what it used. */
+  onUsage?: (usage: RunUsage) => void;
 };
 
 /** A run's tokens, as the providers report them: what was sent and what came back. */
@@ -380,6 +382,7 @@ function billUsage(ctx: LoopContext, used) {
   ctx.usage ??= { input: 0, output: 0 };
   ctx.usage.input += used?.prompt_tokens || 0;
   ctx.usage.output += used?.completion_tokens || 0;
+  ctx.onUsage?.({ ...ctx.usage });
   bill(ctx.apiKey, 'input', 'chat_input_tokens', used?.prompt_tokens || 0);
   bill(ctx.apiKey, 'output', 'chat_output_tokens', used?.completion_tokens || 0);
   if (ctx.llm.hosted) usage.record(ctx.apiKey, 'hosted_llm_microusd', llmCost(ctx.llm.model, used));

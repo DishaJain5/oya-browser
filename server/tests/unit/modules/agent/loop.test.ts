@@ -511,6 +511,16 @@ describe('agentLoop', () => {
     assert.deepEqual(result.usage, { input: 30, output: 15 });
   });
 
+  it('tells the tokens so far after each model call, so a stopped run can still show them', async () => {
+    stubLlm([toolReply(['press_key', { key: 'Tab' }]), textReply('DONE')]);
+    const told: any[] = [];
+    await agentLoop(ctx({ onUsage: (used) => told.push(used) }), start());
+    assert.deepEqual(told, [
+      { input: 10, output: 5 },
+      { input: 20, output: 10 },
+    ]);
+  });
+
   it('counts each model call as one agent step, whoever’s model it is', async () => {
     const before = usage.current(KEY);
     stubLlm([toolReply(['press_key', { key: 'Tab' }]), textReply('DONE')]);

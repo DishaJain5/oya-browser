@@ -229,14 +229,20 @@ function chatAnswer(result, toolCalls, replayable: boolean) {
   return { text: result.text, failed: !!result.failed, toolCalls, replayable, ...answerExtras(result) };
 }
 
-/** The run's options: the key, the task, a listener that keeps and tells each tool call, and the walls it may clear. */
+/** What the run tells as it goes: each tool call (kept for the answer) and the tokens so far, both to the browser that asked. */
+const listeners = (toolCalls: any[], live: LiveRun) => ({
+  onToolCall: collecting(toolCalls, live),
+  onUsage: (used) => live.usage(used),
+  onText: () => {},
+});
+
+/** The run's options: the key, the task, listeners that tell what it does and uses, and the walls it may clear. */
 function chatOptions(req, task, toolCalls: any[], live: LiveRun) {
   const key = getKey(req);
   return {
     apiKey: key,
     ...task,
-    onToolCall: collecting(toolCalls, live),
-    onText: () => {},
+    ...listeners(toolCalls, live),
     ...walls(key, req.params.browserId),
   };
 }

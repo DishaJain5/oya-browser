@@ -110,6 +110,10 @@ export interface AgentRunEvent {
   line?: string;
   /** A step's tool, when it has no line. */
   tool?: string;
+  /** A usage event's prompt tokens so far. */
+  input?: number;
+  /** A usage event's completion tokens so far. */
+  output?: number;
 }
 
 /** An activity entry (`onDevLog`). */

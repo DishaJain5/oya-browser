@@ -95,6 +95,34 @@ describe('RunViewModel', () => {
       assert.equal(finished?.title, '');
     });
 
+    it('a run stopped before its answer shows the tokens the server last told', () => {
+      agent('r1', { kind: 'start' });
+      agent('r1', { kind: 'step', line: 'Opening linkedin.com' });
+      agent('r1', { kind: 'usage', input: 40000, output: 2000 });
+      agent('r1', { kind: 'usage', input: 90000, output: 4000 });
+      const finished = run.finish(false);
+      assert.match(finished?.summary ?? '', / · 94K tokens$/);
+      assert.equal(finished?.title, '90,000 input · 4,000 output tokens');
+    });
+
+    it('the answer’s own usage wins over what the live run told', () => {
+      agent('r1', { kind: 'start' });
+      agent('r1', { kind: 'step', line: 'Opening linkedin.com' });
+      agent('r1', { kind: 'usage', input: 1000, output: 10 });
+      assert.match(run.finish(true, { input: 5000, output: 100 })?.summary ?? '', / · 5.1K tokens$/);
+    });
+
+    it('a new run does not show the last run’s tokens', () => {
+      agent('r1', { kind: 'start' });
+      agent('r1', { kind: 'step', line: 'a' });
+      agent('r1', { kind: 'usage', input: 1000, output: 10 });
+      run.finish(true);
+      run.begin();
+      agent('r2', { kind: 'start' });
+      agent('r2', { kind: 'step', line: 'b' });
+      assert.doesNotMatch(run.finish(true)?.summary ?? '', /token/);
+    });
+
     it('leaves no card for a run that had neither steps nor a plan', () => {
       assert.equal(run.finish(false), null);
       assert.equal(run.state.orb, 'failed');
