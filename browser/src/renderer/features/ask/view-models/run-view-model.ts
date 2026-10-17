@@ -16,8 +16,8 @@ import { RendererConstants as C } from '../../../core/constants.ts';
 import type { OrbState } from '../../../ui/index.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
 import type { AgentEvent } from '../../../../shared/ipc.ts';
-import type { AgentRunEvent, DevLogEntry, PlanStep } from '../model/types.ts';
-import { commandAction, commandParams, elapsedSeconds, runSummary, stepLabel } from '../model/steps.ts';
+import type { AgentRunEvent, DevLogEntry, PlanStep, RunUsage } from '../model/types.ts';
+import { commandAction, commandParams, elapsedSeconds, runSummary, stepLabel, usageTitle } from '../model/steps.ts';
 
 /** One narrated action in a run's timeline. */
 export interface StepRow {
@@ -39,8 +39,10 @@ export interface RunCard {
 export interface FinishedRun extends RunCard {
   /** How it went. */
   outcome: 'done' | 'failed';
-  /** "3 steps · 12s", or '' for a run with a plan and no steps (shown open, without a summary). */
+  /** "3 steps · 12s · 212K tokens", or '' for a run with a plan and no steps (shown open, without a summary). */
   summary: string;
+  /** The summary's tooltip: the exact input and output tokens, or '' when the run reported none. */
+  title: string;
 }
 
 /** What the live run shows. */
@@ -96,15 +98,15 @@ export class RunViewModel extends ViewModel<RunState> {
   }
 
   /** The answer came: the card folds (or goes, with neither steps nor a plan) and the orb shows how it went. */
-  finish(ok: boolean): FinishedRun | null {
+  finish(ok: boolean, usage?: RunUsage): FinishedRun | null {
     const card = this.state.card;
     if (!card) return null;
     clearInterval(this.ticker);
     this.set({ card: null });
     this.settle(ok);
     if (!card.steps.length && !card.plan.length) return null;
-    const summary = card.steps.length ? runSummary(card.steps.length, this.elapsed()) : '';
-    return { ...card, outcome: ok ? 'done' : 'failed', summary };
+    const summary = card.steps.length ? runSummary(card.steps.length, this.elapsed(), usage) : '';
+    return { ...card, outcome: ok ? 'done' : 'failed', summary, title: summary ? usageTitle(usage) : '' };
   }
 
   /** The chat was cleared mid-run: the card goes with it, and the orb rests. */

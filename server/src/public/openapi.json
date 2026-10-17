@@ -1752,6 +1752,14 @@
                     },
                     "data": {
                       "description": "The answer in the shape of the request's schema, when one was given and the agent returned it"
+                    },
+                    "usage": {
+                      "type": "object",
+                      "description": "The tokens the run used, every model call included, as the provider reported them. Left out when the model reported none.",
+                      "properties": {
+                        "input": { "type": "integer", "description": "Prompt tokens, cached ones included" },
+                        "output": { "type": "integer", "description": "Completion tokens, reasoning included" }
+                      }
                     }
                   }
                 }

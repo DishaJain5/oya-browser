@@ -6,7 +6,14 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Added
+
+- A finished run's summary on the desktop shows the tokens it used, after the time ("14 steps · 48s · 212K tokens"), with the exact input and output split on hover. The chat API's answer carries the same figure as `usage: { input, output }`; the SDK's `ask()` still returns the text, and the raw answer carries it.
+
 ### Fixed
+
+- A follow-up in a desktop chat can use what the earlier runs read, even a run that was stopped, hit its step limit or failed. Asking "what did you find?" after stopping a research run used to get "0 candidates were reviewed", because only what was said in the chat carried over. Kept in the server's memory for the tab's chat, capped, and started over when the chat is cleared.
+- A file downloaded from a page the agent drives now appears on the Downloads page, with Show in folder, once you pick where to save it in Save As. It used to be saved wherever you chose without being listed.
 
 - Cap ready and desktop-pairing poll sleeps to the remaining timeout, and check once more after the deadline, so a short `readyTimeoutMs` is not overshot by a full poll interval and a browser that dials in during the last pause is not reported as a 504.
 

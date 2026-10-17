@@ -244,7 +244,7 @@ export class Routines {
   constructor(ctx: Deps, run?: RunChat, play?: (playbook: string) => Promise<ChatAnswer>) {
     this.ctx = ctx;
     this.api = new ServerApi(ctx);
-    this.run = run ?? ((messages) => new Chat(ctx).send(messages, undefined, this.current?.tab));
+    this.run = run ?? ((messages) => new Chat(ctx).send(messages, undefined, this.current?.tab, false));
     this.play = play ?? ((playbook) => playOnServer(this.api, playbook, () => !!this.current?.stopped));
   }
 

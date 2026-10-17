@@ -78,6 +78,23 @@ describe('RunViewModel', () => {
       assert.equal(run.state.orb, 'idle');
     });
 
+    it('a finished run’s summary and title come from the answer’s usage', () => {
+      agent('r1', { kind: 'start' });
+      agent('r1', { kind: 'step', line: 'Opening amazon.com' });
+      mock.timers.tick(4 * C.MS_PER_SECOND);
+      const finished = run.finish(true, { input: 148210, output: 63904 });
+      assert.equal(finished?.summary, '1 step · 4s · 212.1K tokens');
+      assert.equal(finished?.title, '148,210 input · 63,904 output tokens');
+    });
+
+    it('a finished run without usage has no token figure and no title', () => {
+      agent('r1', { kind: 'start' });
+      agent('r1', { kind: 'step', line: 'Opening amazon.com' });
+      const finished = run.finish(false);
+      assert.doesNotMatch(finished?.summary ?? '', /token/);
+      assert.equal(finished?.title, '');
+    });
+
     it('leaves no card for a run that had neither steps nor a plan', () => {
       assert.equal(run.finish(false), null);
       assert.equal(run.state.orb, 'failed');
