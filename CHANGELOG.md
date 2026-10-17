@@ -6,6 +6,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- Cap ready and desktop-pairing poll sleeps to the remaining timeout, and check once more after the deadline, so a short `readyTimeoutMs` is not overshot by a full poll interval and a browser that dials in during the last pause is not reported as a 504.
+
 ## [1.0.196](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.196) · 2026-10-17
 
 ### Changed
