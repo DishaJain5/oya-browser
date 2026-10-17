@@ -67,11 +67,16 @@ export class Chat {
     this.api = new ServerApi(deps);
   }
 
-  /** Sends the chat (and any attached files, as `data`) to the server's agent from tab `tabId` (the active one by default), with control lent to it; answers its reply or `{ error }`. */
-  send(messages: unknown[], data?: unknown, tabId?: unknown): Promise<ChatAnswer> {
+  /**
+   * Sends the chat (and any attached files, as `data`) to the server's agent from tab `tabId` (the active one by
+   * default), with control lent to it; answers its reply or `{ error }`. `remember` false (a routine) asks the
+   * server to leave the tab's chat memory alone: a routine is not a message in the person's chat, and its one
+   * message would otherwise start that memory over.
+   */
+  send(messages: unknown[], data?: unknown, tabId?: unknown, remember = true): Promise<ChatAnswer> {
     if (!this.api.canCall()) return Promise.resolve({ error: OFFLINE });
     const tab = Number.isSafeInteger(tabId) ? (tabId as number) : (this.deps.tabs.activeTabId ?? 0);
-    const payload = data ? { messages, data, lane: tabLane(tab) } : { messages, lane: tabLane(tab) };
+    const payload = { messages, ...(data ? { data } : {}), lane: tabLane(tab), ...(remember ? {} : { remember }) };
     return this.asOnlyChat(tab, (signal) => this.inTab(tab, () => this.ask('chat', payload, signal)));
   }
 

@@ -178,6 +178,14 @@ describe('fromGemini', () => {
     });
   });
 
+  it('counts a thinking model’s thoughts as output, as Gemini bills them', () => {
+    const out = fromGemini({
+      candidates: [{ content: { parts: [{ text: 'a' }] } }],
+      usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 2, thoughtsTokenCount: 30 },
+    });
+    assert.deepEqual(out.usage, { prompt_tokens: 4, completion_tokens: 32 });
+  });
+
   it('turns function calls into tool calls whose id carries the tool name', () => {
     const out = fromGemini({
       candidates: [

@@ -151,9 +151,13 @@ export function fromGemini(body) {
   };
 }
 
-/** Gemini's token counts in OpenAI's usage shape, zero when absent. */
+/**
+ * Gemini's token counts in OpenAI's usage shape, zero when absent. A thinking model reports its thoughts
+ * apart from the answer and bills them as output, so they count as completion tokens, as OpenAI's do.
+ */
 function tokenUsage(meta) {
-  return { prompt_tokens: meta?.promptTokenCount || 0, completion_tokens: meta?.candidatesTokenCount || 0 };
+  const output = (meta?.candidatesTokenCount || 0) + (meta?.thoughtsTokenCount || 0);
+  return { prompt_tokens: meta?.promptTokenCount || 0, completion_tokens: output };
 }
 
 /** The text parts of a Gemini response, concatenated. */
