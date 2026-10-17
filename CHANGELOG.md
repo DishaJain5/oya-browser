@@ -6,6 +6,11 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Changed
+
+- The console follows your system's light or dark appearance until you pick one with the sun/moon button, and switches live when the system does. It used to open dark every time.
+- Light mode reads correctly everywhere: text selection, focus rings, the health dot, error messages and the "Saved" notes now use the theme's colours instead of ones fixed for dark.
+
 ## [1.0.195](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.195) · 2026-10-16
 
 ### Fixed
