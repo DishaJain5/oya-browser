@@ -221,7 +221,7 @@ describe('runChat', () => {
     { role: 'user', content: next },
   ];
 
-  it('the digest of what earlier runs read rides in the newest user turn, never the system prompt', async () => {
+  it('what earlier runs read comes back as a tool result after the newest message, never in it or the system prompt', async () => {
     pageSays('Andy Bacon worked on Apple Vision Pro');
     const llm = stubLlm([toolReply(['analyze_page', {}]), textReply('FAILED: stopped'), textReply('DONE')]);
     await inLane('tab-7', async () => {
@@ -236,7 +236,12 @@ describe('runChat', () => {
     });
     const messages = llm.requests.at(-1).messages;
     assert.doesNotMatch(messages[0].content, /Andy Bacon/, 'never in the system prompt');
-    assert.match(messages.at(-1).content, /^Earlier in this chat[^]*Andy Bacon[^]*what did you find\?$/);
+    const [asked, call, recall] = messages.slice(-3);
+    assert.deepEqual(asked, { role: 'user', content: 'what did you find?' }, 'the person’s message is their own words');
+    assert.equal(call.tool_calls[0].function.name, 'recall_earlier_results');
+    assert.equal(recall.role, 'tool', 'page text comes back as a tool result');
+    assert.equal(recall.tool_call_id, call.tool_calls[0].id);
+    assert.match(recall.content, /^Earlier in this chat[^]*Andy Bacon/);
     assert.equal(
       lastRun(BROWSER).prompt,
       'research candidates\n\nwhat did you find?',

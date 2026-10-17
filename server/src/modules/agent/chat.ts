@@ -16,7 +16,7 @@ import { Status } from '../../platform/http-status.ts';
 import { redact, isFileValue } from './placeholders.ts';
 import { startRun, lastRun, markMessage } from './recorder.ts';
 import { forgetPage } from './changes.ts';
-import { AGENT_VERIFY } from './constants.ts';
+import { AGENT_VERIFY, RECALL_TOOL } from './constants.ts';
 import { systemPrompt, FOLLOW_UP_NOTE, todayLine } from './prompt.ts';
 import { agentLoop, type AgentResult } from './loop.ts';
 import { fenced, startFindings, statusOf, type KeptRun, type Started } from './findings.ts';
@@ -204,21 +204,25 @@ const keeping = (memory: Started | null) => (memory ? { onToolResult: memory.kep
  * names one per tab). A lane this server names is new on every request, so nothing could ever read it back.
  */
 const remembering = (browserId, messages, options): Started | null =>
-  (options.remember && startFindings(browserId, followUp(messages), !Object.keys(options.secrets ?? {}).length)) ||
+  (options.remember && startFindings(browserId, followUp(messages), !!Object.keys(options.secrets ?? {}).length)) ||
   null;
 
 /**
- * The conversation with what earlier runs read put in front of the newest message, fenced off from the
- * person's words and redacted with this message's secrets too (one given only now was not redacted when
- * read). Never in the system prompt: it is page text, which the page controls. A new object, so the chat
- * itself (the recorded prompt, the check before done) never sees it.
+ * The conversation with what earlier runs read handed back after the newest message, as the result of a
+ * recall tool call: page text keeps the authority of a page read and never sits in the person's message or
+ * the system prompt. Redacted with this message's secrets too (one given only now was not redacted when
+ * read). New objects, so the chat itself (the recorded prompt, the check before done) never sees it.
  */
 function withDigest(allMessages: any[], memory: Started | null, secrets) {
-  const at = allMessages.findLastIndex((m) => m.role === 'user');
-  if (!memory?.digest || at < 0 || typeof allMessages[at].content !== 'string') return allMessages;
+  if (!memory?.digest || allMessages.at(-1)?.role !== 'user') return allMessages;
+  const id = `${RECALL_TOOL}:${randomUUID()}`;
+  const call = { id, type: 'function', function: { name: RECALL_TOOL, arguments: '{}' } };
   const digest = redact(fenced(memory.digest, randomUUID()), secrets);
-  return allMessages.with(at, { ...allMessages[at], content: digest + allMessages[at].content });
+  return [...allMessages, { role: 'assistant', content: null, tool_calls: [call] }, recalled(id, digest)];
 }
+
+/** The recall call's result: what earlier runs read, as a tool result. */
+const recalled = (id: string, digest: string) => ({ role: 'tool', tool_call_id: id, content: digest });
 
 /** Runs the loop and records how it ended for the next message: a Stop at once, since the run finishes its model call first. */
 function settled(work: () => Promise<AgentResult>, kept: KeptRun | undefined, signal?: AbortSignal) {
