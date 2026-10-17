@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.197](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.197) · 2026-10-17
+
 ### Added
 
 - A finished run's summary on the desktop shows the tokens it used, after the time ("14 steps · 48s · 212K tokens"), with the exact input and output split on hover. A run you stop shows the tokens counted up to its last finished model call. The chat API's answer carries the same figure as `usage: { input, output }`; the SDK's `ask()` still returns the text, and the raw answer carries it.
