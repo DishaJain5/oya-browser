@@ -25,6 +25,7 @@ type Deps = Pick<
   | 'agentTab'
   | 'config'
   | 'sitePermissions'
+  | 'findBar'
 >;
 
 /** A menu item's id, label and keys. */
@@ -117,6 +118,29 @@ function fileMenu(deps: Deps, mac: boolean): MenuItemConstructorOptions {
   return { label: 'File', submenu: [newWindow, newTab, closeTab, ...(mac ? [] : [QUIT])] };
 }
 
+/** The standard editing items, spelled out so Find can follow them (the built-in editMenu role takes no extra items). */
+const EDIT_ITEMS: MenuItemConstructorOptions[] = [
+  { role: 'undo' },
+  { role: 'redo' },
+  { type: 'separator' },
+  { role: 'cut' },
+  { role: 'copy' },
+  { role: 'paste' },
+  { role: 'pasteAndMatchStyle' },
+  { role: 'delete' },
+  { role: 'selectAll' },
+  { type: 'separator' },
+];
+
+/** Edit: the standard items, then Find in page with the keys Safari and Chrome use. */
+function editMenu(deps: Deps): MenuItemConstructorOptions {
+  const find = humanItem(deps, 'browser-find', 'Find…', 'CmdOrCtrl+F', () => deps.findBar.open());
+  const next = humanItem(deps, 'browser-find-next', 'Find Next', 'CmdOrCtrl+G', () => deps.findBar.step(true));
+  const back = () => deps.findBar.step(false);
+  const previous = humanItem(deps, 'browser-find-previous', 'Find Previous', 'Shift+CmdOrCtrl+G', back);
+  return { label: 'Edit', submenu: [...EDIT_ITEMS, find, next, previous] };
+}
+
 /** View: reload, zoom and full screen. */
 function viewMenu(deps: Deps): MenuItemConstructorOptions {
   const reload = humanItem(deps, 'browser-reload', 'Reload Page', 'CmdOrCtrl+R', () => deps.tabs.reloadActivePage());
@@ -151,7 +175,7 @@ export function installApplicationMenu(deps: Deps): void {
   const { app, Menu } = deps.electron;
   const mac = process.platform === 'darwin';
   app.setAboutPanelOptions({ applicationName: 'Oya Browser', applicationVersion: app.getVersion() });
-  const template = [...(mac ? [macAppMenu(deps)] : []), fileMenu(deps, mac), { role: 'editMenu' as const }];
+  const template = [...(mac ? [macAppMenu(deps)] : []), fileMenu(deps, mac), editMenu(deps)];
   const trailing: MenuItemConstructorOptions[] = [viewMenu(deps), { role: 'windowMenu' }, defaultMenu(deps)];
   Menu.setApplicationMenu(Menu.buildFromTemplate([...template, ...libraryMenus(deps), ...trailing]));
 }

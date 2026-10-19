@@ -208,6 +208,7 @@ ctx.world = new World({ analyzerScript, worldName: ISOLATED_WORLD });
 ctx.agentTab = new AgentTab(ctx, () =>
   ctx.windows?.each((scope) => {
     scope.shield.sync();
+    scope.findBar.sync();
     scope.tabs.sendTabList();
   }),
 );
@@ -217,6 +218,7 @@ ctx.control = new DesktopControl({
     ctx.agentTab.sync(state);
     ctx.dialogs.controlChanged();
     ctx.shield.controlChanged(state);
+    ctx.windows?.each((scope) => scope.findBar.sync());
   },
 });
 ctx.cookies = new CookieSync({

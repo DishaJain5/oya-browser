@@ -124,6 +124,16 @@ export interface ShellLayout {
   page: Bounds;
 }
 
+/** The find bar on the shown tab (src/main/shell/find-bar.ts): whether it is open, and the count to show. */
+export interface FindBarState {
+  /** Whether the bar shows. */
+  open: boolean;
+  /** Which match is selected, from 1; 0 when there is none. */
+  active: number;
+  /** How many matches the page has, or null before any search (no count is shown). */
+  total: number | null;
+}
+
 /** Who drives the browser (src/main/control/control-state.ts `snapshot()`). */
 export interface ControlState extends Payload {
   /** 'agent' or 'human'. */
@@ -296,6 +306,12 @@ export interface ShellCalls {
   setBookmarksBar(shown: boolean): Promise<void>;
   /** Bookmarks the page in the shown tab, or removes its bookmark (the toolbar's star, Cmd/Ctrl+D). */
   toggleBookmark(): Promise<void>;
+  /** Searches the shown page for `text` as the person types; empty text clears the highlights. */
+  findInPage(text: string): Promise<void>;
+  /** Moves to the next (`forward`) or previous match of the current search. */
+  findStep(forward: boolean): Promise<void>;
+  /** Closes the find bar, clears its highlights and gives the keyboard back to the page. */
+  closeFind(): Promise<void>;
   /** Confirms handoff when the person interacts with an agent-owned page. */
   requestTakeover(): Promise<void>;
   /** Lists, manages, imports, exports, and runs project playbooks on this browser. */
@@ -483,6 +499,8 @@ export interface ShellEvents {
   onShareChip: ShareChip | null;
   /** The bookmarks bar changed: shown or hidden, or a bookmark added or removed. */
   onBookmarksBar: Payload;
+  /** The find bar opened, closed, or has a new count. */
+  onFindBar: FindBarState;
   /** The routines or their runs changed. */
   onRoutinesChanged: Payload;
   /** The server stored the profile. */
@@ -586,6 +604,12 @@ export const CALL_CHANNELS = {
   setBookmarksBar: 'set-bookmarks-bar',
   /** Bookmarks the page in the shown tab, or removes its bookmark (the toolbar's star, Cmd/Ctrl+D). */
   toggleBookmark: 'toggle-bookmark',
+  /** Searches the shown page as the person types. */
+  findInPage: 'find-in-page',
+  /** The next or previous match. */
+  findStep: 'find-step',
+  /** Closes the find bar. */
+  closeFind: 'close-find',
   newTab: 'new-tab',
   newWindow: 'new-window',
   detachTab: 'detach-tab',
@@ -703,6 +727,8 @@ export const EVENT_CHANNELS = {
   onShareChip: 'share-chip',
   /** The bookmarks bar changed: shown or hidden, or a bookmark added or removed. */
   onBookmarksBar: 'bookmarks-bar',
+  /** The find bar opened, closed, or has a new count. */
+  onFindBar: 'find-bar',
   /** The routines or their runs changed. */
   onRoutinesChanged: 'routines-changed',
   /** The server stored the profile. */
