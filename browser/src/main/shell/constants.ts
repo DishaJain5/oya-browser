@@ -50,6 +50,10 @@ export const TRANSPARENT = '#00000000';
 
 /** One zoom step, in Chromium zoom levels (each level is 20% larger). */
 export const ZOOM_STEP = 0.5;
+/** How much larger each Chromium zoom level is than the one below it. */
+export const ZOOM_BASE = 1.2;
+/** A page at its actual size, as a percentage. */
+export const FULL_SIZE_PERCENT = 100;
 /** A resize is saved once the drag has been still this long. */
 export const PANEL_SAVE_DELAY_MS = 180;
 /** How long the dev panel takes to slide open or shut. */

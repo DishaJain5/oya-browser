@@ -134,6 +134,14 @@ export interface FindBarState {
   total: number | null;
 }
 
+/** The shown tab's zoom (src/main/shell/page-zoom.ts), for the address bar's chip. */
+export interface PageZoom {
+  /** The zoom as a percentage; 100 is actual size, and hides the chip. */
+  percent: number;
+  /** A person just zoomed: a screen reader says the new size. A tab switch or a new page says nothing. */
+  announce: boolean;
+}
+
 /** Who drives the browser (src/main/control/control-state.ts `snapshot()`). */
 export interface ControlState extends Payload {
   /** 'agent' or 'human'. */
@@ -312,6 +320,8 @@ export interface ShellCalls {
   findStep(forward: boolean): Promise<void>;
   /** Closes the find bar, clears its highlights and gives the keyboard back to the page. */
   closeFind(): Promise<void>;
+  /** Puts the shown page back to actual size (the address bar's zoom chip); refused while an agent holds it. */
+  resetZoom(): Promise<void>;
   /** Confirms handoff when the person interacts with an agent-owned page. */
   requestTakeover(): Promise<void>;
   /** Lists, manages, imports, exports, and runs project playbooks on this browser. */
@@ -501,6 +511,8 @@ export interface ShellEvents {
   onBookmarksBar: Payload;
   /** The find bar opened, closed, or has a new count. */
   onFindBar: FindBarState;
+  /** The shown tab's zoom: a person zoomed, the tab switched, or the page went to another site. */
+  onPageZoom: PageZoom;
   /** The routines or their runs changed. */
   onRoutinesChanged: Payload;
   /** The server stored the profile. */
@@ -610,6 +622,8 @@ export const CALL_CHANNELS = {
   findStep: 'find-step',
   /** Closes the find bar. */
   closeFind: 'close-find',
+  /** Puts the shown page back to actual size. */
+  resetZoom: 'reset-zoom',
   newTab: 'new-tab',
   newWindow: 'new-window',
   detachTab: 'detach-tab',
@@ -729,6 +743,8 @@ export const EVENT_CHANNELS = {
   onBookmarksBar: 'bookmarks-bar',
   /** The find bar opened, closed, or has a new count. */
   onFindBar: 'find-bar',
+  /** The shown tab's zoom. */
+  onPageZoom: 'page-zoom',
   /** The routines or their runs changed. */
   onRoutinesChanged: 'routines-changed',
   /** The server stored the profile. */

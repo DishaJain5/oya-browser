@@ -9,6 +9,7 @@ import { DefaultBrowser } from '../app/default-browser.ts';
 import { LibraryMenu } from '../library/index.ts';
 import { HOME_URL } from '../tabs/constants.ts';
 import { ZOOM_STEP } from './constants.ts';
+import { zoomShownPage } from './page-zoom.ts';
 
 /** The services the menu uses. */
 type Deps = Pick<
@@ -57,16 +58,13 @@ function makeDefaultItem(deps: Deps): MenuItemConstructorOptions {
 }
 
 /**
- * A zoom item that zooms the page, never the shell. The built-in zoom roles act
- * on whatever has focus, and while an agent drives that is the shell: its CSS
- * shrinks while the page's view stays placed in window pixels, leaving gaps.
+ * A zoom item that zooms the page, never the shell, and only while the person may
+ * use it. The built-in zoom roles act on whatever has focus, and while an agent
+ * drives that is the shell: its CSS shrinks while the page's view stays placed in
+ * window pixels, leaving gaps.
  */
 function zoomItem(deps: Deps, item: ItemName, level: (current: number) => number): MenuItemConstructorOptions {
-  const click = (): void => {
-    const contents = deps.tabs.getActiveView()?.webContents;
-    if (contents) contents.setZoomLevel(level(contents.getZoomLevel()));
-  };
-  return { ...item, click };
+  return { ...item, click: () => zoomShownPage(deps, level) };
 }
 
 /** View's zoom and full-screen items, after Reload. */
