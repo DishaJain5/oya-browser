@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.199](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.199) · 2026-10-19
+
 ### Fixed
 
 - Pages on the desktop could stop taking clicks, in every tab, until a restart: when your Human Mode hold ran out or its renewal was refused, the browser paused with nobody driving and kept every tab fenced, with nothing on screen saying why. It now takes control back once, as it already did after a reconnect, also when the connection drops partway through. It never takes control from an agent or another person who holds it, never while you are handing back to AI Mode, and a clock running ahead of the server's gets one retake rather than one a second.
