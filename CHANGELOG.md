@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.200](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.200) · 2026-10-19
+
 ### Added
 
 - The desktop address bar shows the page's zoom, as Chrome does: a "110%" chip beside the star whenever a page is not at actual size, following every zoom, tab switch and change of site. Click it, or press Enter on it, to put the page back to 100%. It is hidden at 100%, on the start page and in the library, and refuses while OyaAI holds the tab.
