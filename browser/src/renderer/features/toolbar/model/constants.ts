@@ -37,6 +37,16 @@ export const TEXT = {
   ask: 'Assistant',
   askTitle: 'Open Assistant (⌘/Ctrl Shift D)',
   askRecordingTitle: 'Oya Agent · recording',
+  /** The find bar's name, and its field's placeholder. */
+  find: 'Find in page',
+  /** The find bar's count when the page has no match. */
+  findNone: 'No results',
+  /** Between the selected match and the total ("3 of 17"). */
+  findOf: ' of ',
+  /** The find bar's buttons; the previous and next names get their shortcut appended. */
+  findPrevious: 'Previous match',
+  findNext: 'Next match',
+  findClose: 'Close find bar (Esc)',
 } as const;
 
 /** The key that sends the address bar. */

@@ -26,6 +26,7 @@ type Deps = Pick<
   | 'windows'
   | 'agentTab'
   | 'sitePermissions'
+  | 'findBar'
 >;
 
 /** A command the main process runs itself. */
@@ -90,6 +91,9 @@ const LOCAL_COMMANDS: Record<string, LocalCommand> = {
   'reopen-tab': (deps) => deps.agentTab.humanMay(null) && reopenClosed(deps.tabs),
   'move-tab-left': (deps) => moveActive(deps, -1),
   'move-tab-right': (deps) => moveActive(deps, 1),
+  find: (deps) => deps.findBar.open(),
+  'find-next': (deps) => deps.findBar.step(true),
+  'find-previous': (deps) => deps.findBar.step(false),
 };
 
 /** The shared registry is also the guide's source of truth. */

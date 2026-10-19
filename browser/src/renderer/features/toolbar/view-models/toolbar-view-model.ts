@@ -8,6 +8,7 @@
 import type { LibraryKind } from '../../../../shared/library.ts';
 import { BookmarksBarViewModel } from './bookmarks-bar-view-model.ts';
 import { ShareChipViewModel, type ShareChipBridge } from './share-chip-view-model.ts';
+import { FindBarViewModel, type FindBarBridge } from './find-bar-view-model.ts';
 import { AddressCompletion } from './address-completion.ts';
 import { ViewModel } from '../../../core/view-model.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
@@ -79,7 +80,8 @@ export type ToolbarBridge = Pick<
   | 'onTitleChanged'
   | 'onTabsUpdated'
 > &
-  ShareChipBridge;
+  ShareChipBridge &
+  FindBarBridge;
 
 /** Before any tab: nothing loading, nowhere to go. */
 const IDLE: NavState = { loading: false, error: '', canGoBack: false, canGoForward: false };
@@ -117,6 +119,8 @@ export class ToolbarViewModel extends ViewModel<ToolbarState> {
   readonly bookmarks: BookmarksBarViewModel;
   /** The share chip: what a call is capturing, and the way back to it. */
   readonly share: ShareChipViewModel;
+  /** The find bar under that (Cmd/Ctrl+F). */
+  readonly find: FindBarViewModel;
   /** The main process. */
   private readonly bridge: ToolbarBridge;
   /** Last selected tab, to focus a new start page only once. */
@@ -129,7 +133,8 @@ export class ToolbarViewModel extends ViewModel<ToolbarState> {
     this.completion = new AddressCompletion(bridge);
     this.bookmarks = new BookmarksBarViewModel(bridge);
     this.share = new ShareChipViewModel(bridge);
-    this.own(() => (this.completion.dispose(), this.bookmarks.dispose(), this.share.dispose()));
+    this.find = new FindBarViewModel(bridge);
+    this.own(() => (this.completion.dispose(), this.bookmarks.dispose(), this.share.dispose(), this.find.dispose()));
     this.follow(bridge);
   }
 

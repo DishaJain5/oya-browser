@@ -25,6 +25,7 @@ type Deps = Pick<
   | 'windows'
   | 'agentTab'
   | 'shareIndicator'
+  | 'findBar'
 >;
 
 /** The channels this group answers. */
@@ -36,6 +37,9 @@ type Channel =
   | 'bookmarks-bar-state'
   | 'set-bookmarks-bar'
   | 'toggle-bookmark'
+  | 'find-in-page'
+  | 'find-step'
+  | 'close-find'
   | 'navigate'
   | 'go-back'
   | 'go-forward'
@@ -63,6 +67,9 @@ export class NavigationHandlers {
     'bookmarks-bar-state': () => bookmarksBar(this.deps as AppServices),
     'set-bookmarks-bar': (_e, shown) => setBookmarksBar(this.deps as AppServices, shown === true),
     'toggle-bookmark': () => new LibraryMenu(this.deps).toggle(),
+    'find-in-page': (_e, text) => this.deps.findBar.search(text),
+    'find-step': (_e, forward) => this.deps.findBar.step(forward === true),
+    'close-find': () => this.deps.findBar.dismiss(),
     navigate: (_e, url) => this.navigate(url),
     'go-back': () => this.goInHistory('go_back'),
     'go-forward': () => this.goInHistory('go_forward'),

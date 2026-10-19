@@ -121,6 +121,22 @@ describe('IPC handlers', () => {
     }
   });
 
+  it("hands find's typing, steps and close to the window's find bar, which checks them", async () => {
+    const search = mock.method(ctx.findBar, 'search');
+    const step = mock.method(ctx.findBar, 'step');
+    const dismiss = mock.method(ctx.findBar, 'dismiss');
+    await call('find-in-page', 'cat');
+    await call('find-step', true);
+    await call('find-step', 'yes');
+    await call('close-find');
+    assert.deepEqual(search.mock.calls[0].arguments, ['cat']);
+    assert.deepEqual(
+      step.mock.calls.map((c) => c.arguments),
+      [[true], [false]],
+    );
+    assert.equal(dismiss.mock.callCount(), 1);
+  });
+
   it('enters browsing mode on the first navigation', async () => {
     let entered;
     ctx.shell.browsingMode = false;
