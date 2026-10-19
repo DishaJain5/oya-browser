@@ -13,6 +13,7 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 ### Fixed
 
 - The View menu's Zoom In, Zoom Out and Actual Size could zoom a tab OyaAI was driving; they now do nothing there, like the keyboard shortcuts.
+- After a short network drop, the desktop no longer overrides the latest decision on who drives: pressing AI Mode just as the connection dropped no longer lands you back in Human Mode, and an agent handed control while the connection was down keeps it. A hold the server forgot, or one that lapsed while offline, is still taken back.
 
 ## [1.0.199](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.199) · 2026-10-19
 

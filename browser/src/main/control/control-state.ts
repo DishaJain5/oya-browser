@@ -102,7 +102,7 @@ class ControlState {
   localInFlight = 0;
   /** A person took control locally, with no server involved. */
   localHeld = false;
-  /** A person held control, or was taking it (a retake after a lapse included), when the socket dropped, so a reconnect takes it back. */
+  /** A person held control, or was taking it (a retake after a lapse included), and was not giving it back, when the socket dropped, so a reconnect takes it back. */
   heldAtDrop = false;
   /** desktop_control requests waiting on the server. */
   protected readonly requests: ControlRequests;
@@ -271,18 +271,45 @@ class ControlState {
  * control state: what the socket and the front door report.
  */
 export class DesktopControl extends ControlState {
+  /** The newest server revision this desktop saw before the socket dropped. */
+  private seen = 0;
+
   /**
    * The socket authenticated; `value` is the server's control state, if it supports control.
    * A server that forgot the person's hold (a restart, a lapse while offline) is asked for it
-   * again, so a network blip never hands a person's page to the agent mid-task.
+   * again, so a network blip never hands a person's page to the agent mid-task. An agent
+   * handed control after the drop (a newer revision) keeps it.
    */
   connect(value: ControlValue | null | undefined): void {
-    const reclaim = this.heldAtDrop && !!value && !(value.mode === 'human' && value.mine);
+    const reclaim = this.reclaimsOn(value);
     Object.assign(this, { heldAtDrop: false, connected: true, supported: !!value, localHeld: false });
-    this.state =
-      reclaim && value ? { ...value, mode: 'paused', mine: false, reclaiming: true } : value || { mode: 'unavailable' };
-    if (reclaim && value) this.reclaim(value);
+    this.state = reclaim
+      ? { ...value, mode: 'paused', mine: false, reclaiming: true }
+      : value || { mode: 'unavailable' };
+    if (reclaim) this.reclaim(value);
     else this.publish();
+  }
+
+  /**
+   * Whether a reconnect to `value` takes control back: the person held it at the drop,
+   * does not hold it now, and nobody handed it to the agent since. A new or forgotten
+   * session (revision 0, or no newer) and a lapse swept to paused still come back.
+   */
+  private reclaimsOn(value: ControlValue | null | undefined): value is ControlValue {
+    if (!this.heldAtDrop || !value || held(value)) return false;
+    return !(value.mode === 'agent' && (value.revision || 0) > this.seen);
+  }
+
+  /** Notes, as the socket drops, whether a reconnect takes control back and the newest revision seen. */
+  private rememberAtDrop(wasConnected: boolean): void {
+    this.heldAtDrop = this.holdsAtDrop(wasConnected);
+    this.seen = Math.max(this.seen, this.state.revision || 0);
+  }
+
+  /** Whether the reconnect should take control back: the person held it or was taking it, and was not giving it back. */
+  private holdsAtDrop(wasConnected: boolean): boolean {
+    if (this.busyAction === 'return') return false;
+    return this.heldAtDrop || (wasConnected && (held(this.state) || this.busyAction === 'acquire'));
   }
 
   /** The socket closed: fall back to local control and fail every pending request. */
@@ -290,7 +317,7 @@ export class DesktopControl extends ControlState {
     const wasConnected = this.connected;
     const { localClients } = this;
     this.localHeld = localClients > 0 && (this.localHeld || this.busy || this.state.mode !== 'agent');
-    this.heldAtDrop ||= wasConnected && (held(this.state) || this.busyAction === 'acquire');
+    this.rememberAtDrop(wasConnected);
     Object.assign(this, { connected: false, supported: false });
     this.state = { mode: this.disconnectedMode(wasConnected), mine: this.localHeld, local: localClients > 0 };
     this.requests.failAll();

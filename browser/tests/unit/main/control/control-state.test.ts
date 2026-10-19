@@ -247,6 +247,56 @@ describe('DesktopControl', () => {
     assert.deepEqual([ctx.control.snapshot().mode, ctx.control.snapshot().interactive], ['human', true]);
   });
 
+  /** Holds control, then sends a return whose answer never comes, and drops the socket under it. */
+  async function dropDuringReturn(ctx): Promise<void> {
+    await holdConnected(ctx);
+    ctx.server.answer = () => undefined;
+    const returning = ctx.control.change('return').catch(() => {});
+    ctx.control.disconnect();
+    await returning;
+    ctx.server.answer = answer;
+    ctx.sent.length = 0;
+  }
+
+  it('never takes control back after a reconnect when the socket dropped while the person was giving it back', async () => {
+    await dropDuringReturn(ctx);
+    ctx.control.connect({ mode: 'paused', mine: false, revision: ctx.server.revision + 1 });
+    await flush();
+    assert.deepEqual(actions(ctx), []);
+  });
+
+  it("leaves the agent in control after a reconnect when the person's return was applied but its answer was lost", async () => {
+    await dropDuringReturn(ctx);
+    ctx.control.connect({ mode: 'agent', mine: false, revision: ctx.server.revision + 1 });
+    await flush();
+    assert.deepEqual(actions(ctx), []);
+    assert.deepEqual([ctx.control.snapshot().mode, ctx.control.snapshot().mine], ['agent', false]);
+  });
+
+  it('leaves the agent in control after a reconnect when someone handed it over while the socket was down', async () => {
+    await holdConnected(ctx);
+    ctx.server.answer = () => undefined;
+    ctx.control.receive({ mode: 'paused', mine: false, revision: ctx.server.revision + 1 });
+    ctx.control.disconnect();
+    await flush();
+    ctx.server.answer = answer;
+    ctx.sent.length = 0;
+    ctx.control.connect({ mode: 'agent', mine: false, revision: ctx.server.revision + 2 });
+    await flush();
+    assert.deepEqual(actions(ctx), []);
+    assert.deepEqual([ctx.control.snapshot().mode, ctx.control.snapshot().mine], ['agent', false]);
+  });
+
+  it('takes control back after a reconnect to a new session that says agent with revision 0', async () => {
+    await holdConnected(ctx);
+    ctx.control.disconnect();
+    ctx.sent.length = 0;
+    ctx.control.connect({ mode: 'agent', mine: false, revision: 0 });
+    await flush();
+    assert.deepEqual(actions(ctx), ['request', 'acquire']);
+    assert.equal(ctx.control.snapshot().interactive, true);
+  });
+
   it('leaves control with the agent after a reconnect when the person did not hold it', async () => {
     ctx.control.connect({ mode: 'agent', mine: false, revision: 1 });
     ctx.control.disconnect();
