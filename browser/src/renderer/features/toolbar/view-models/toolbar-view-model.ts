@@ -67,6 +67,8 @@ export type ToolbarBridge = Pick<
   | 'showOverlay'
   | 'hideOverlay'
   | 'showLibrary'
+  | 'onDownloadBubble'
+  | 'downloadAction'
   | 'navigate'
   | 'bookmarksBar'
   | 'onBookmarksBar'
