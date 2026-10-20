@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.201](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.201) · 2026-10-20
+
 ### Added
 
 - The desktop Downloads button shows each download as it happens: "Downloading" with how far it has got (bytes of the total and a percent, with a bar along the button), then "Saved" with the file's name and Open and Show in Finder. It shows in the window the download started in, never takes focus, and goes back to the plain button a few seconds after you have seen it. A failed or cancelled download says so instead.
