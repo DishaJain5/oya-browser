@@ -1,0 +1,40 @@
+name: Keel review
+
+# The repository's team (.claude/agents: pm, designer, principal, reviewer, security,
+# reliability, qa) reviews every pull request and posts one comment, edited on each push. A
+# "do not ship" verdict fails the check, and so does a review that could not finish.
+#
+# Its own workflow rather than a job in ci.yaml: ci.yaml is also called by the deploys, and the
+# review must run with nothing before it but the checkout — no `npm ci`, no PR code.
+#
+# pull_request, never pull_request_target: the second would run a fork's code with these secrets.
+# A fork's PR gets no secrets here, so the review skips it with one line and passes. Until
+# ANTHROPIC_API_KEY (or the proxy pair) is set, every PR skips the same way.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: keel-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Team review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      # Full history: the review diffs against origin/<base>.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: OyadotAI/keel-releases/review@v0.4.13
+        with:
+          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Or through a gateway in front of the Anthropic API:
+          # api-proxy-url: ${{ secrets.KEEL_PROXY_URL }}
+          # api-proxy-token: ${{ secrets.KEEL_PROXY_TOKEN }}
+          minutes: 30
