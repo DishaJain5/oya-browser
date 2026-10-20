@@ -20,18 +20,22 @@ permissions:
   contents: read
   pull-requests: write
 
-concurrency:
-  group: keel-review-${{ github.event.pull_request.number }}-${{ github.event_name }}
-  cancel-in-progress: true
 
 jobs:
   review:
-    name: Team review
-    # A collaborator's reply, never a bot's comment (Keel's own line comments included).
+    # The review on a push, the replies on a collaborator's reply in a thread. Never a bot's
+    # comment: Keel's own line comments would each start a run, and anyone can comment on a PR
+    # while this job holds the secrets.
+    name: ${{ github.event_name == 'pull_request' && 'Team review' || 'Keel replies' }}
     if: >-
       github.event_name == 'pull_request' ||
-      (github.event.comment.user.type != 'Bot' &&
+      (github.event.comment.in_reply_to_id && github.event.comment.user.type != 'Bot' &&
        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    # In the job, not the workflow, so a skipped run never touches it. One queue per PR: a push
+    # cancels whatever runs, and a reply waits its turn, so two runs never answer one thread.
+    concurrency:
+      group: keel-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     # Secrets cannot be read in `if:`, so the job says whether the app's are set. A fork's PR has
@@ -54,7 +58,7 @@ jobs:
           permission-contents: read
           permission-issues: write
           permission-pull-requests: write
-      - uses: OyadotAI/keel-releases/review@review-v7
+      - uses: OyadotAI/keel-releases/review@review-v8
         with:
           github-token: ${{ steps.keel.outputs.token || github.token }}
           # A Claude subscription token, from `claude setup-token`. Or an API key, or a gateway:
