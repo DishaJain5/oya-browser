@@ -170,7 +170,8 @@ export function modeSwitch(state: ControlState): ModeSwitch {
   const look = controlLook(state);
   const mine = !!state.control && isMine(state.control);
   const yours = shownIsYours(state.control);
-  const human = { on: yours, disabled: yours || look.action.hidden || look.action.disabled, title: TEXT.take };
+  // Still clickable on your own tab beside a working agent: it is the one way to take over from there.
+  const human = { on: yours, disabled: mine || look.action.hidden || look.action.disabled, title: TEXT.take };
   const hidden = look.action.hidden && look.resume.hidden;
   return { hidden, agent: agentSide(look, mine, yours), human, status: statusOf(state, look, mine) };
 }

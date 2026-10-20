@@ -271,6 +271,9 @@ async function personBesideAgent(page, views) {
   await page.evaluate((url) => window.oyaBrowser.newTab(url), mine);
   await page.waitForFunction(() => !document.getElementById('url-bar').hasAttribute('readonly'));
   await waitFor(async () => (await shownPage(app)).top === mine);
+  // On their own tab the person sees Human Mode, and can still choose it to take over from the agent.
+  await page.locator('#control-action[aria-pressed="true"]').waitFor();
+  assert.equal(await page.locator('#control-action').isEnabled(), true, 'Human Mode still takes over');
   const stack = await views();
   assert.deepEqual(
     stack.map((v) => v.url),
