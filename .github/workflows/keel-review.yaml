@@ -62,7 +62,7 @@ jobs:
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
-      - uses: OyadotAI/keel-releases/review@review-v8
+      - uses: OyadotAI/keel-releases/review@review-v9
         with:
           github-token: ${{ steps.keel.outputs.token || github.token }}
           # A Claude subscription token, from `claude setup-token`. Or an API key, or a gateway:
