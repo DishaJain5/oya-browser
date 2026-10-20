@@ -47,6 +47,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # The review reads git history and needs no credential left in .git/config.
+          persist-credentials: false
       # Posts as Keel-ADE rather than github-actions: a token minted from the org's Keel-ADE app,
       # scoped to this repository and to the three permissions the review uses.
       - uses: actions/create-github-app-token@v2
@@ -55,7 +57,9 @@ jobs:
         with:
           app-id: ${{ secrets.KEEL_APP_ID }}
           private-key: ${{ secrets.KEEL_APP_PRIVATE_KEY }}
-          permission-contents: read
+          # Write only because GitHub's resolveReviewThread requires it, to close a settled
+          # thread. The token lives in the step that posts; the reviewing agent never has it.
+          permission-contents: write
           permission-issues: write
           permission-pull-requests: write
       - uses: OyadotAI/keel-releases/review@review-v8
