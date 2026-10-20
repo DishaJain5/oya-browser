@@ -163,9 +163,12 @@ try {
     'human native input is not intercepted',
   );
   await page.locator('#control-agent').click();
-  await page.locator('#control-agent[aria-pressed="true"]').waitFor();
-  // Released to the agent, its next command takes the page back.
+  // Handed back, the page stays the person's until the agent acts: Human Mode shows.
+  await waitFor(async () => (await page.evaluate(() => window.oyaBrowser.getControlState())).mode === 'agent');
+  await page.locator('#control-action[aria-pressed="true"]').waitFor();
+  // Released to the agent, its next command takes the page back, and AI Mode shows.
   assert.equal((await command('run_script', { script: 'return 1' })).ok, true);
+  await page.locator('#control-agent[aria-pressed="true"]').waitFor();
   await app.evaluate(async ({ BrowserWindow }) => {
     const view = BrowserWindow.getAllWindows()[0]
       .getBrowserViews()
