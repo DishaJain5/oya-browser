@@ -10,7 +10,7 @@ import { ViewModel } from '../../../core/view-model.ts';
 import type { OyaBrowser } from '../../../core/bridge.ts';
 import type { DownloadAction, DownloadBubbleState } from '../../../../shared/ipc.ts';
 import { isMac } from '../../../../shared/shortcuts.ts';
-import { CHIP_DONE_MS, CHIP_FAILED_MS } from '../model/constants.ts';
+import { CHIP_ARM_MS, CHIP_DONE_MS, CHIP_FAILED_MS } from '../model/constants.ts';
 import {
   ENDED,
   announcement,
@@ -71,6 +71,12 @@ export class DownloadChipViewModel extends ViewModel<DownloadChipState> {
   private seen: Seen | null = null;
   /** Whether the pointer or focus is on the chip: either holds an ended download on it. */
   private held: Held = { pointer: false, focus: false };
+  /** The saved file Open and Show may act on: one that has been on screen long enough to be seen. */
+  private armed: string | null = null;
+  /** The saved file on screen, and the wait before it takes clicks. */
+  private arming: { /** The file. */ id: string | null; /** The wait. */ handle?: ReturnType<typeof setTimeout> } = {
+    id: null,
+  };
   /** The pending return to the plain button, and which download and phase it is for. */
   private timer: Wait | null = null;
 
@@ -79,7 +85,7 @@ export class DownloadChipViewModel extends ViewModel<DownloadChipState> {
     super({ ...chipView(null, 'idle'), announce: '', mac: isMac(platform) });
     this.bridge = bridge;
     this.own(bridge.onDownloadBubble((s) => this.heard(s)));
-    this.own(() => this.stopTimer());
+    this.own(() => (this.stopTimer(), clearTimeout(this.arming.handle)));
   }
 
   /** The body: opens the Downloads page, and puts an ended download away. */
@@ -88,16 +94,18 @@ export class DownloadChipViewModel extends ViewModel<DownloadChipState> {
     this.putAway();
   }
 
-  /** Open or Show: done puts the chip away; a missing file says so instead. */
-  async act(action: DownloadAction): Promise<void> {
+  /**
+   * Open or Show on the file `shown` on screen when clicked: done puts the chip away; a missing file says so
+   * instead. Refused when another file has taken the chip since, or this one arrived too recently to have been
+   * seen: a page cannot swap its own download in under a click meant for another.
+   */
+  async act(action: DownloadAction, shown: string): Promise<void> {
     const id = this.state.id;
-    try {
-      await this.bridge.downloadAction(id, action);
-      this.putAway();
-    } catch {
-      this.missing = id;
-      this.redraw();
-    }
+    if (shown !== id || this.armed !== id) return;
+    await this.bridge.downloadAction(id, action).then(
+      () => this.putAway(),
+      () => ((this.missing = id), this.redraw()),
+    );
   }
 
   /** Escape: puts an ended download away; answers whether it did, so the view can keep focus on the button. */
@@ -156,6 +164,15 @@ export class DownloadChipViewModel extends ViewModel<DownloadChipState> {
     const view = chipView(this.bubble, this.phase());
     this.set({ ...view, announce: this.announceFor(view) });
     this.schedule();
+    this.arm(view.phase === 'saved' ? view.id : null);
+  }
+
+  /** A file newly saved on the chip takes Open and Show only after CHIP_ARM_MS on screen. */
+  private arm(id: string | null): void {
+    if (id === this.arming.id) return;
+    clearTimeout(this.arming.handle);
+    this.armed = null;
+    this.arming = { id, handle: id ? setTimeout(() => (this.armed = id), CHIP_ARM_MS) : undefined };
   }
 
   /**

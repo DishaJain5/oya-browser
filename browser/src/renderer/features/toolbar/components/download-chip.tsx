@@ -57,7 +57,7 @@ export function DownloadChip({ vm }: DownloadChipProps) {
   const body = useRef<HTMLButtonElement>(null);
   const box = useFocusKept(vm, s, body);
   const settle = (done: boolean) => done && body.current?.focus();
-  const act = (action: DownloadAction) => void vm.act(action).then(() => settle(vm.state.phase === 'idle'));
+  const act = (action: DownloadAction) => void vm.act(action, s.id).then(() => settle(vm.state.phase === 'idle'));
   const onKeyDown = (e: KeyboardEvent) => e.key === 'Escape' && settle(vm.escape());
   return (
     <span

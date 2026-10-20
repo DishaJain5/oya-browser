@@ -6,6 +6,10 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+### Fixed
+
+- The Downloads button's Open and Show in Finder act only on the file that was on screen when you clicked, and only once it has been there for half a second, so a page cannot start a download that swaps its own file in under your click.
+
 ## [1.0.201](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.201) · 2026-10-20
 
 ### Added

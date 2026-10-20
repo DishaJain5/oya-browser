@@ -7,7 +7,11 @@
 import { it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { DownloadChipViewModel } from '../../../../../../src/renderer/features/toolbar/view-models/download-chip-view-model.ts';
-import { CHIP_DONE_MS, CHIP_FAILED_MS } from '../../../../../../src/renderer/features/toolbar/model/constants.ts';
+import {
+  CHIP_ARM_MS,
+  CHIP_DONE_MS,
+  CHIP_FAILED_MS,
+} from '../../../../../../src/renderer/features/toolbar/model/constants.ts';
 import { fakeBridge } from '../../../support/bridge.ts';
 
 beforeEach(() => mock.timers.enable({ apis: ['setTimeout'] }));
@@ -181,7 +185,8 @@ it('the body opens the Downloads page and puts an ended download away', () => {
 it('Open and Show act on the file by id, then put the chip away', async () => {
   const { vm, send, fake } = chip();
   send(entry('completed'));
-  await vm.act('reveal');
+  mock.timers.tick(CHIP_ARM_MS);
+  await vm.act('reveal', 'd1');
   assert.deepEqual(fake.called('downloadAction'), [['d1', 'reveal']]);
   assert.equal(vm.state.phase, 'idle');
 });
@@ -189,7 +194,8 @@ it('Open and Show act on the file by id, then put the chip away', async () => {
 it('a file moved or deleted since says so and stays until its longer wait', async () => {
   const { vm, send } = chip({ downloadAction: () => Promise.reject(Error('This file was moved or deleted')) });
   send(entry('completed'));
-  await vm.act('open');
+  mock.timers.tick(CHIP_ARM_MS);
+  await vm.act('open', 'd1');
   assert.deepEqual([vm.state.phase, vm.state.status], ['gone', 'Moved or deleted']);
   assert.equal(vm.state.announce, 'That file was moved or deleted.');
   mock.timers.tick(CHIP_DONE_MS);
@@ -215,4 +221,26 @@ it('stops listening and waiting when disposed', () => {
   vm.dispose();
   assert.equal(fake.listeners('onDownloadBubble'), 0);
   assert.doesNotThrow(() => mock.timers.tick(CHIP_FAILED_MS));
+});
+
+it('Open and Show ignore a click on a file that just arrived: a page cannot swap one in under a click', async () => {
+  const { vm, send, fake } = chip();
+  send(entry('completed'));
+  mock.timers.tick(CHIP_ARM_MS - 1);
+  await vm.act('open', 'd1');
+  assert.equal(fake.called('downloadAction').length, 0);
+  mock.timers.tick(1);
+  await vm.act('open', 'd1');
+  assert.deepEqual(fake.called('downloadAction'), [['d1', 'open']]);
+});
+
+it('Open and Show act only on the file that was on screen when clicked', async () => {
+  const { vm, send, fake } = chip();
+  send(entry('completed'));
+  mock.timers.tick(CHIP_ARM_MS);
+  send(entry('completed', { id: 'page-file' }));
+  await vm.act('open', 'd1');
+  mock.timers.tick(CHIP_ARM_MS);
+  await vm.act('open', 'd1');
+  assert.equal(fake.called('downloadAction').length, 0, 'the click was meant for d1, which is no longer shown');
 });

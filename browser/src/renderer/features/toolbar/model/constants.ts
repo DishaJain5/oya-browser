@@ -91,6 +91,8 @@ export const SHARE_TEXT = {
 
 /** How long a saved or cancelled download stays on the chip while the person can see it. */
 export const CHIP_DONE_MS = 8000;
+/** How long a newly saved file is on the chip before Open and Show act on it, so a page cannot swap one in under a click. */
+export const CHIP_ARM_MS = 500;
 /** How long a failed or moved download stays: longer, so it is read, but never all day. */
 export const CHIP_FAILED_MS = 30000;
 
