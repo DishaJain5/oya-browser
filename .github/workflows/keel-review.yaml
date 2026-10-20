@@ -9,7 +9,7 @@ name: Keel review
 #
 # pull_request, never pull_request_target: the second would run a fork's code with these secrets.
 # A fork's PR gets no secrets here, so the review skips it with one line and passes. Until
-# ANTHROPIC_API_KEY (or the proxy pair) is set, every PR skips the same way.
+# CLAUDE_CODE_OAUTH_TOKEN (or an API key, or the proxy pair) is set, every PR skips the same way.
 on:
   pull_request:
 
@@ -33,8 +33,9 @@ jobs:
           fetch-depth: 0
       - uses: OyadotAI/keel-releases/review@v0.4.13
         with:
-          anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Or through a gateway in front of the Anthropic API:
+          # A Claude subscription token, from `claude setup-token`. Or an API key, or a gateway:
+          claude-code-oauth-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
           # api-proxy-url: ${{ secrets.KEEL_PROXY_URL }}
           # api-proxy-token: ${{ secrets.KEEL_PROXY_TOKEN }}
           minutes: 30
