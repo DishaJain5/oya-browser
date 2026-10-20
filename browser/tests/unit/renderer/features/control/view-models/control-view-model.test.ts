@@ -204,6 +204,11 @@ describe('the AI Mode / Human Mode switch', () => {
     );
   });
 
+  it('lights Human Mode on your own tab while the agent drives another', () => {
+    const s = switchFor({ mode: 'agent', supported: true, pageInteractive: true });
+    assert.deepEqual([s.agent.on, s.human.on, s.human.disabled, s.status], [false, true, true, '']);
+  });
+
   it('after a pause, AI Mode resumes the agent and the status says it is paused', () => {
     const s = switchFor({ mode: 'paused', supported: true });
     assert.deepEqual([s.agent.on, s.agent.disabled, s.human.on, s.status], [false, false, false, 'Automation paused']);

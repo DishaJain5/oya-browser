@@ -89,7 +89,8 @@ try {
   await page.locator('#btn-manual').click();
   await page.locator('#cfg-key').fill('test');
   await page.locator('#btn-connect').click();
-  await page.locator('#control-agent[aria-pressed="true"]').waitFor();
+  // Connected with no agent at work: the person is using the browser, so Human Mode shows.
+  await page.locator('#control-action[aria-pressed="true"]').waitFor();
   const views = () =>
     app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()[0]
