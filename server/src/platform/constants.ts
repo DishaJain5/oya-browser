@@ -188,6 +188,11 @@ export const GEMINI_MAX_REF_EXPANSIONS = 256;
  * every node built is charged here, and past it a node is sent as a plain string.
  */
 export const GEMINI_MAX_SCHEMA_NODES = 5000;
+/**
+ * How deep one Gemini schema may nest. The rebuild recurses per level, so a 15 KB chain of
+ * `items` 1500 deep overflowed the stack; past this depth a node is sent as a plain string.
+ */
+export const GEMINI_MAX_SCHEMA_DEPTH = 64;
 /** How long one model request may take by default: thinking models can spend minutes on a hard step. */
 export const DEFAULT_LLM_TIMEOUT_MS = 180_000;
 /** How long one model request may take before it is abandoned and, if attempts remain, retried. */

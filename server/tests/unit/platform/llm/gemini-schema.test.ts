@@ -6,7 +6,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { geminiSchema } from '../../../../src/platform/llm/gemini-schema.ts';
-import { GEMINI_MAX_REF_EXPANSIONS, GEMINI_MAX_SCHEMA_NODES } from '../../../../src/platform/constants.ts';
+import {
+  GEMINI_MAX_REF_EXPANSIONS,
+  GEMINI_MAX_SCHEMA_DEPTH,
+  GEMINI_MAX_SCHEMA_NODES,
+} from '../../../../src/platform/constants.ts';
 
 /** The Gemini schema of an object holding `properties`. */
 const sent = (properties) => geminiSchema({ type: 'object', properties }).properties;
@@ -229,6 +233,91 @@ describe('geminiSchema', () => {
     const input = nodes(schema) + nodes(wide);
     assert.ok(nodes(out) <= GEMINI_MAX_SCHEMA_NODES + input, `${nodes(out)} nodes from ${input}`);
     assert.deepEqual(out.properties.u249, { type: 'string' });
+  });
+
+  /** Pydantic's Addr and a Person holding one, for the sibling-branch rules. */
+  const ADDR_AND_PERSON = {
+    Addr: { type: 'object', properties: { city: { type: 'string' } } },
+    Person: { type: 'object', properties: { name: { type: 'string' }, address: { $ref: '#/$defs/Addr' } } },
+  };
+  /** What Addr comes out as. */
+  const ADDR_OUT = { type: 'object', properties: { city: { type: 'string' } } };
+
+  it('follows a ref in one union branch that a sibling branch already followed, as Union[Addr, Person] needs', () => {
+    const schema = {
+      $defs: ADDR_AND_PERSON,
+      type: 'object',
+      properties: { contact: { anyOf: [{ $ref: '#/$defs/Addr' }, { $ref: '#/$defs/Person' }] } },
+    };
+    assert.deepEqual(geminiSchema(schema).properties.contact.anyOf[1].properties.address, ADDR_OUT);
+  });
+
+  it('follows a ref in one allOf member that another member already followed', () => {
+    const schema = {
+      $defs: ADDR_AND_PERSON,
+      type: 'object',
+      properties: { x: { allOf: [{ $ref: '#/$defs/Addr' }, { $ref: '#/$defs/Person' }] } },
+    };
+    assert.deepEqual(geminiSchema(schema).properties.x.properties.address, ADDR_OUT);
+  });
+
+  it('resolves a caller’s # against the caller’s schema, not the return_data wrapper around it', () => {
+    const caller = {
+      type: 'object',
+      properties: { name: { type: 'string' }, children: { type: 'array', items: { $ref: '#' } } },
+    };
+    const out = geminiSchema({ type: 'object', properties: { data: caller }, required: ['data'] }).properties.data;
+    assert.deepEqual(Object.keys(out.properties.children.items.properties), ['name', 'children']);
+  });
+
+  it('resolves a caller’s field named data against the caller’s schema', () => {
+    const caller = { type: 'object', properties: { data: { type: 'integer' }, copy: { $ref: '#/properties/data' } } };
+    assert.deepEqual(sent({ data: caller }).data.properties.copy, { type: 'integer' });
+  });
+
+  it('expands a union branch that names its whole document once, then stops', () => {
+    const schema = {
+      $defs: { Addr: ADDR_OUT },
+      anyOf: [{ $ref: '#' }, { type: 'object', properties: { addr: { $ref: '#/$defs/Addr' } } }],
+    };
+    const out = geminiSchema(schema);
+    assert.deepEqual(out.anyOf[1].properties.addr, ADDR_OUT);
+    assert.ok(JSON.stringify(out).length < JSON.stringify(schema).length * 4, JSON.stringify(out));
+  });
+
+  it('ends a self-reference inside a oneOf that a followed branch brought in', () => {
+    const out = geminiSchema({ $defs: {}, oneOf: [{ $ref: '#' }, { type: 'string' }] });
+    assert.ok(JSON.stringify(out).length < 200, JSON.stringify(out));
+  });
+
+  it('keeps the items of union branches, a schema or true alike', () => {
+    assert.deepEqual(
+      sent({
+        x: {
+          anyOf: [
+            { type: 'array', items: { type: 'number' } },
+            { type: 'array', items: true },
+          ],
+        },
+      }),
+      {
+        x: {
+          anyOf: [
+            { type: 'array', items: { type: 'number' } },
+            { type: 'array', items: { type: 'string' } },
+          ],
+        },
+      },
+    );
+  });
+
+  it('stops nesting past the depth budget, so a deep chain of items cannot overflow the stack', () => {
+    let schema: any = { type: 'string' };
+    for (let i = 0; i < 1500; i += 1) schema = { type: 'array', items: schema };
+    let out = geminiSchema(schema);
+    let depth = 0;
+    while (out.items) [out, depth] = [out.items, depth + 1];
+    assert.ok(depth <= GEMINI_MAX_SCHEMA_DEPTH);
   });
 
   it('types a ref it cannot follow as a string rather than failing the request', () => {

@@ -6,7 +6,7 @@
  * the nearest one is used, and what it loses is written into the description so the
  * model still reads what a value must be.
  */
-import { GEMINI_MAX_REF_EXPANSIONS, GEMINI_MAX_SCHEMA_NODES } from '../constants.ts';
+import { GEMINI_MAX_REF_EXPANSIONS, GEMINI_MAX_SCHEMA_DEPTH, GEMINI_MAX_SCHEMA_NODES } from '../constants.ts';
 
 /** The keywords Gemini's Schema message defines, besides those that hold schemas. */
 const KEPT = new Set([
@@ -49,6 +49,11 @@ type Context = {
   path: any[];
   /** The ref targets followed on this path, by identity, so a cycle ends instead of looping. */
   seen: Set<any>;
+  /**
+   * The context each union branch's or allOf member's children were followed in, keyed by
+   * the fresh copy that carries them, so a ref one sibling followed is not cut in another.
+   */
+  owned: WeakMap<object, Context>;
   /** What this whole schema has left to spend, shared by every path, so fan-out cannot grow without end. */
   budget: {
     /** `$ref` expansions still allowed. */
@@ -69,14 +74,14 @@ export const geminiSchema = (schema) =>
         roots: [schema],
         path: [],
         seen: new Set(),
+        owned: new WeakMap(),
         budget: { refs: GEMINI_MAX_REF_EXPANSIONS, nodes: GEMINI_MAX_SCHEMA_NODES },
       });
 
-/** One schema as Gemini's: references and unions flattened, values and type settled, children rebuilt, within the node budget. */
+/** One schema as Gemini's: references and unions flattened, values and type settled, children rebuilt, within the budgets. */
 function schemaFor(schema, outer: Context) {
-  if (outer.budget.nodes <= 0) return { type: 'string' };
-  outer.budget.nodes -= 1;
-  const [node, flat] = flattened(schema, outer);
+  if (exhausted(outer)) return { type: 'string' };
+  const [node, flat] = flattened(schema, ownContext(schema, outer));
   const [united, ctx] = withUnion(node, flat);
   const settled = shaped(withValues(withType(united)));
   const inner = { ...ctx, path: [...ctx.path, schema] };
@@ -84,11 +89,23 @@ function schemaFor(schema, outer: Context) {
   return Object.fromEntries(kept.map(([k, v]) => [k, Object.hasOwn(CHILDREN, k) ? CHILDREN[k](v, inner) : v]));
 }
 
+/** Whether this schema is past the node or depth budget, which charges it a node when it is not. */
+function exhausted(ctx: Context) {
+  if (ctx.budget.nodes <= 0 || ctx.path.length >= GEMINI_MAX_SCHEMA_DEPTH) return true;
+  ctx.budget.nodes -= 1;
+  return false;
+}
+
+/** The context a schema is rebuilt in: the one its union branch or allOf member was followed in, where it has one. */
+function ownContext(schema, outer: Context): Context {
+  const own = isObject(schema) ? outer.owned.get(schema) : undefined;
+  return own ? { ...outer, roots: own.roots, seen: own.seen } : outer;
+}
+
 /** A schema with its local `$ref` followed and its `allOf` merged in, and the context its children see. */
 function flattened(schema, outer: Context): [any, Context] {
   const node = isObject(schema) ? schema : {};
-  const ctx = isDocument(node) ? { ...outer, roots: [node, ...outer.roots] } : outer;
-  const [resolved, followed] = followRef(node, ctx);
+  const [resolved, followed] = followRef(docless(node), withDocument(outer, node));
   return mergeAll(resolved, followed);
 }
 
@@ -99,6 +116,16 @@ function flattened(schema, outer: Context): [any, Context] {
 const isDocument = (node) => Boolean(node.$defs || node.definitions || node.$schema);
 
 /**
+ * `ctx` with `node` as the innermost document when it is one. Only an original is ever a
+ * root: a copy made while flattening carries no `$defs`, or `#` would name the copy, a new
+ * object each time, and a self-reference would never be seen twice.
+ */
+const withDocument = (ctx: Context, node) => (isDocument(node) ? { ...ctx, roots: [node, ...ctx.roots] } : ctx);
+
+/** A schema without the keywords that make it a document, for a copy that must not become a root. */
+const docless = ({ $defs, definitions, $schema, ...body }: any) => body;
+
+/**
  * A `$ref` followed, each target once per path and within the schema's budget. Gemini
  * cannot say "recursive", so a cycle, a ref past the budget, or one that resolves nowhere
  * ends as the schema's own keywords.
@@ -107,16 +134,20 @@ function followRef({ $ref, ...rest }: any, ctx: Context): [any, Context] {
   const target = typeof $ref === 'string' ? lookup(ctx, $ref) : undefined;
   if (!target || ctx.seen.has(target) || ctx.budget.refs <= 0) return [rest, ctx];
   ctx.budget.refs -= 1;
-  return followRef({ ...target, ...rest }, { ...ctx, seen: new Set([...ctx.seen, target]) });
+  const inner = withDocument({ ...ctx, seen: new Set([...ctx.seen, target]) }, target);
+  return followRef({ ...docless(target), ...rest }, inner);
 }
 
 /**
- * What a local ref names: in the nearest document that has it, else in the nearest enclosing
- * schema from the outside in. A caller's schema without `$defs` or `$schema` (zod's
- * `#/properties/home`) still points into itself, not the tool that wraps it.
+ * What a local ref names, tried in order: the documents inside the tool, innermost first;
+ * then the schemas enclosing this one, outermost first, below the tool's own; then the
+ * tool's own schema. A caller's extract() schema without `$defs` or `$schema` (zod's `#`
+ * or `#/properties/home`) points into itself, not the return_data wrapper around it.
  */
 const lookup = (ctx: Context, ref: string) =>
-  [...ctx.roots, ...ctx.path].map((root) => pointer(root, ref)).find(isObject);
+  [...ctx.roots.slice(0, -1), ...ctx.path.slice(1), ...ctx.roots.slice(-1)]
+    .map((root) => pointer(root, ref))
+    .find(isObject);
 
 /** The value a local JSON pointer (`#/$defs/Item`) names in `root`. */
 function pointer(root, ref: string) {
@@ -126,22 +157,42 @@ function pointer(root, ref: string) {
 }
 
 /**
- * Each schema flattened, and `ctx` with every target they followed. Their children are
- * rebuilt later with that context, so a ref met inside a union or an allOf member is not
- * followed again: Pydantic's `Optional[Node]` is `anyOf: [{$ref: Node}, null]`, and
- * dropping what the branch followed recursed until the stack ran out.
+ * Each schema flattened, its children carried in fresh copies that remember the context
+ * that schema was followed in. Sharing one context across siblings cut a ref one branch
+ * followed in all the others (Pydantic's `Union[Addr, Person]`, Person holding an Addr);
+ * dropping it recursed without end (`Optional[Node]` is `anyOf: [{$ref: Node}, null]`).
  */
-function flattenedAll(schemas: any[], ctx: Context): [any[], Context] {
-  const parts = schemas.map((schema) => flattened(schema, ctx));
-  const seen = new Set([ctx.seen, ...parts.map(([, inner]) => inner.seen)].flatMap((set) => [...set]));
-  return [parts.map(([schema]) => schema), { ...ctx, seen }];
+function flattenedAll(schemas: any[], ctx: Context) {
+  return schemas.map((schema) => {
+    const [node, inner] = flattened(schema, ownContext(schema, ctx));
+    return carried(node, inner);
+  });
+}
+
+/** The keywords whose schemas `carried` copies: the children, and the unions and tuples converted later. */
+const CARRIED = ['items', 'anyOf', 'oneOf', 'prefixItems'];
+
+/** `node` with each child schema replaced by a copy registered to `ctx`, which is where it is rebuilt. */
+function carried(node, ctx: Context) {
+  const copy = (child) => (isObject(child) ? own(child, ctx) : child);
+  const each = (value) => (Array.isArray(value) ? value.map(copy) : copy(value));
+  const named = (value) => Object.fromEntries(Object.entries(value).map(([name, child]) => [name, copy(child)]));
+  const lists = CARRIED.filter((key) => node[key]).map((key) => [key, each(node[key])]);
+  const properties = isObject(node.properties) ? { properties: named(node.properties) } : {};
+  return { ...node, ...properties, ...Object.fromEntries(lists) };
+}
+
+/** A copy of `child` that is rebuilt in `ctx`; an original document stays the root its refs point into. */
+function own(child, ctx: Context) {
+  const copy = docless(child);
+  ctx.owned.set(copy, withDocument(ctx, child));
+  return copy;
 }
 
 /** `allOf` merged into one schema, which Gemini has no word for: every member's properties and required names. */
 function mergeAll({ allOf, ...rest }: any, ctx: Context): [any, Context] {
   if (!Array.isArray(allOf)) return [rest, ctx];
-  const [members, inner] = flattenedAll(allOf, ctx);
-  return [members.reduce(merged, rest), inner];
+  return [flattenedAll(allOf, ctx).reduce(merged, rest), ctx];
 }
 
 /** Two schemas as one, `first` winning where both say something, their properties and required names combined. */
@@ -159,9 +210,9 @@ function merged(first, second) {
 function withUnion({ oneOf, anyOf, ...rest }: any, ctx: Context): [any, Context] {
   const branches = Array.isArray(anyOf) ? anyOf : oneOf;
   if (!Array.isArray(branches)) return [rest, ctx];
-  const [flat, inner] = flattenedAll(branches, ctx);
+  const flat = flattenedAll(branches, ctx);
   const real = flat.filter((branch) => !isNull(branch));
-  return [union(rest, real, real.length < flat.length), inner];
+  return [union(rest, real, real.length < flat.length), ctx];
 }
 
 /** A schema with its non-null branches: kept as anyOf when several, merged in when one or none. */
