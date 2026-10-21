@@ -6,7 +6,7 @@
  * the nearest one is used, and what it loses is written into the description so the
  * model still reads what a value must be.
  */
-import { GEMINI_MAX_REF_EXPANSIONS } from '../constants.ts';
+import { GEMINI_MAX_REF_EXPANSIONS, GEMINI_MAX_SCHEMA_NODES } from '../constants.ts';
 
 /** The keywords Gemini's Schema message defines, besides those that hold schemas. */
 const KEPT = new Set([
@@ -49,10 +49,12 @@ type Context = {
   path: any[];
   /** The ref targets followed on this path, by identity, so a cycle ends instead of looping. */
   seen: Set<any>;
-  /** The ref expansions this whole schema has left, shared by every path, so fan-out cannot grow without end. */
+  /** What this whole schema has left to spend, shared by every path, so fan-out cannot grow without end. */
   budget: {
-    /** Expansions still allowed; one object, so every branch spends from the same count. */
-    left: number;
+    /** `$ref` expansions still allowed. */
+    refs: number;
+    /** Schema nodes still allowed; one expansion can copy a large definition, so nodes are charged too. */
+    nodes: number;
   };
 };
 
@@ -63,10 +65,17 @@ const isObject = (value) => Boolean(value) && typeof value === 'object' && !Arra
 export const geminiSchema = (schema) =>
   schema === undefined
     ? undefined
-    : schemaFor(schema, { roots: [schema], path: [], seen: new Set(), budget: { left: GEMINI_MAX_REF_EXPANSIONS } });
+    : schemaFor(schema, {
+        roots: [schema],
+        path: [],
+        seen: new Set(),
+        budget: { refs: GEMINI_MAX_REF_EXPANSIONS, nodes: GEMINI_MAX_SCHEMA_NODES },
+      });
 
-/** One schema as Gemini's: references and unions flattened, values and type settled, children rebuilt. */
+/** One schema as Gemini's: references and unions flattened, values and type settled, children rebuilt, within the node budget. */
 function schemaFor(schema, outer: Context) {
+  if (outer.budget.nodes <= 0) return { type: 'string' };
+  outer.budget.nodes -= 1;
   const [node, flat] = flattened(schema, outer);
   const [united, ctx] = withUnion(node, flat);
   const settled = shaped(withValues(withType(united)));
@@ -96,8 +105,8 @@ const isDocument = (node) => Boolean(node.$defs || node.definitions || node.$sch
  */
 function followRef({ $ref, ...rest }: any, ctx: Context): [any, Context] {
   const target = typeof $ref === 'string' ? lookup(ctx, $ref) : undefined;
-  if (!target || ctx.seen.has(target) || ctx.budget.left <= 0) return [rest, ctx];
-  ctx.budget.left -= 1;
+  if (!target || ctx.seen.has(target) || ctx.budget.refs <= 0) return [rest, ctx];
+  ctx.budget.refs -= 1;
   return followRef({ ...target, ...rest }, { ...ctx, seen: new Set([...ctx.seen, target]) });
 }
 

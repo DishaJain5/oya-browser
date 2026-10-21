@@ -182,6 +182,12 @@ export const LLM_ERROR_LOG_CHARS = 500;
  * nodes from a tiny extract() schema. Past the budget a ref is sent as a plain string.
  */
 export const GEMINI_MAX_REF_EXPANSIONS = 256;
+/**
+ * The schema nodes one Gemini schema may produce. One ref expansion can copy a large
+ * definition, so counting refs alone still lets a 1 MB extract() schema grow a hundredfold;
+ * every node built is charged here, and past it a node is sent as a plain string.
+ */
+export const GEMINI_MAX_SCHEMA_NODES = 5000;
 /** How long one model request may take by default: thinking models can spend minutes on a hard step. */
 export const DEFAULT_LLM_TIMEOUT_MS = 180_000;
 /** How long one model request may take before it is abandoned and, if attempts remain, retried. */

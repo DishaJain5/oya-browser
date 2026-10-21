@@ -6,7 +6,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { geminiSchema } from '../../../../src/platform/llm/gemini-schema.ts';
-import { GEMINI_MAX_REF_EXPANSIONS } from '../../../../src/platform/constants.ts';
+import { GEMINI_MAX_REF_EXPANSIONS, GEMINI_MAX_SCHEMA_NODES } from '../../../../src/platform/constants.ts';
 
 /** The Gemini schema of an object holding `properties`. */
 const sent = (properties) => geminiSchema({ type: 'object', properties }).properties;
@@ -215,6 +215,20 @@ describe('geminiSchema', () => {
     const refsLeft = (s) =>
       s?.properties ? Object.values(s.properties).reduce((n: number, p) => n + refsLeft(p), 1) : 1;
     assert.ok(refsLeft(out) <= 2 * GEMINI_MAX_REF_EXPANSIONS + 1);
+  });
+
+  it('stops building nodes past the budget, so refs to one large definition grow the output by the input’s size at most, not by the refs', () => {
+    const wide = {
+      type: 'object',
+      properties: Object.fromEntries(Array.from({ length: 400 }, (_, i) => [`f${i}`, { type: 'string' }])),
+    };
+    const uses = Object.fromEntries(Array.from({ length: 250 }, (_, i) => [`u${i}`, { $ref: '#/$defs/Wide' }]));
+    const schema = { $defs: { Wide: wide }, type: 'object', properties: uses };
+    const out = geminiSchema(schema);
+    const nodes = (s) => 1 + Object.values(s?.properties || {}).reduce((n: number, p) => n + nodes(p), 0);
+    const input = nodes(schema) + nodes(wide);
+    assert.ok(nodes(out) <= GEMINI_MAX_SCHEMA_NODES + input, `${nodes(out)} nodes from ${input}`);
+    assert.deepEqual(out.properties.u249, { type: 'string' });
   });
 
   it('types a ref it cannot follow as a string rather than failing the request', () => {
