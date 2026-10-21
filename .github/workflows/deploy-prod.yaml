@@ -523,15 +523,15 @@ jobs:
         sed -i "s|newTag: latest|newTag: ${GITHUB_REF_NAME}|g" k8s/overlays/prod/kustomization.yaml
         grep newTag k8s/overlays/prod/kustomization.yaml
 
-    # The hosted image starts the server directly, so create billing adjustment
-    # tables before any new pod can read them. This additive migration is safe to retry.
-    - name: Apply billing and Keel telemetry migrations
+    # The hosted image starts the server directly, so create billing adjustment and
+    # persona group tables before any new pod can read them. These additive migrations are safe to retry.
+    - name: Apply billing, Keel telemetry and persona group migrations
       env:
         PGDATABASE: ${{ secrets.OYA_MIGRATE_DATABASE_URL || secrets.DATABASE_URL }}
         PGCONNECT_TIMEOUT: '10'
       run: |
         : "${PGDATABASE:?Missing database connection for billing migration}"
-        psql -X --dbname="$PGDATABASE" --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/022_admin_billing.sql --file=server/migrations/023_agent_step_grants.sql --file=server/migrations/024_keel_usage.sql
+        psql -X --dbname="$PGDATABASE" --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/022_admin_billing.sql --file=server/migrations/023_agent_step_grants.sql --file=server/migrations/024_keel_usage.sql --file=server/migrations/025_persona_groups.sql
 
     - name: Deploy with Kustomize
       run: kubectl apply -k k8s/overlays/prod
@@ -862,15 +862,15 @@ jobs:
             type=gha,scope=server-dev
           cache-to: type=gha,mode=max,scope=server-hotfix
 
-      - name: Apply Keel telemetry migration before rollout
+      - name: Apply Keel telemetry and persona group migrations before rollout
         env:
           PGDATABASE: ${{ secrets.OYA_MIGRATE_DATABASE_URL || secrets.DATABASE_URL }}
           PGCONNECT_TIMEOUT: '10'
         shell: bash
         run: |
           set -euo pipefail
-          : "${PGDATABASE:?Missing database connection for Keel telemetry migration}"
-          psql -X --dbname="$PGDATABASE" --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/024_keel_usage.sql
+          : "${PGDATABASE:?Missing database connection for the rollout migrations}"
+          psql -X --dbname="$PGDATABASE" --set=ON_ERROR_STOP=1 --single-transaction --file=server/migrations/024_keel_usage.sql --file=server/migrations/025_persona_groups.sql
 
       - name: Roll out only the server container by immutable digest
         env:
