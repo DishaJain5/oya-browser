@@ -87,14 +87,20 @@ async function readyForCloud(apiKey: string, routine: Routine) {
   if (routine.target === 'cloud') await control().project(apiKey);
 }
 
+/**
+ * An edit's definition. Only a profile given now is checked: one deleted since
+ * must not stop the routine being turned off or fixed (a cloud run re-checks it).
+ */
+function editedFrom(apiKey: string, input: any, current: Routine) {
+  const definition = definitionFrom(input, current);
+  return input?.persona ? owned(apiKey, definition) : definition;
+}
+
 /** Changes a routine's name, prompt or playbook and its values, schedule, profile or on/off; its history is kept. */
 export async function edit(apiKey: string, id: string, input: unknown): Promise<Routine> {
-  // Only a profile given now is checked: one deleted since must not stop the routine being turned off or fixed.
-  const check = (d: ReturnType<typeof definitionFrom>) =>
-    (input as { persona?: unknown })?.persona ? owned(apiKey, d) : d;
   const routine = await change(apiKey, id, (r) => ({
     ...r,
-    ...check(definitionFrom(input, r)),
+    ...editedFrom(apiKey, input, r),
     project: projectId(apiKey),
   }));
   await readyForCloud(apiKey, routine);
