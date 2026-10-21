@@ -90,9 +90,41 @@ const startFailed =
 async function begin(owner: string, routine: Routine): Promise<Begun | undefined> {
   const key = routine.project ? await keyOfProject(routine.project) : null;
   if (!key || fingerprint(key) !== owner) return;
+  return start(key, routine);
+}
+
+/** A run claimed and started: the routine as the claim left it, and the run going on in the background. */
+interface Claimed extends Begun {
+  /** The routine with its new run marked running. */
+  routine: Routine;
+}
+
+/**
+ * Claims a run of `routine` for this replica and starts it. The claim is the lock:
+ * a scheduler tick and a Run now racing for the same run leave exactly one with it,
+ * the other gets the claim's 409.
+ */
+async function start(key: string, routine: Routine): Promise<Claimed> {
   const runId = randomUUID();
-  await claim(key, routine.id, { lastRunAt: routine.lastRunAt, runId });
-  return { done: perform(key, routine, runId) };
+  const claimed = await claim(key, routine.id, { lastRunAt: routine.lastRunAt, runId });
+  return { routine: claimed, done: perform(key, routine, runId) };
+}
+
+/**
+ * Run now: claims a cloud routine's run for the caller's project and answers as soon
+ * as it is claimed, with the routine showing the run as running. The run, which can
+ * take minutes, ends in the routine's history like a scheduled one; it goes through
+ * the same billing, quota and claimed-key gates. A routine turned off can still be
+ * run, as on the desktop.
+ */
+export async function runNow(key: string, id: string): Promise<Routine> {
+  const stored = await repository.one(fingerprint(key), id);
+  if (!stored) throw new HttpError(Status.NOT_FOUND, 'No such routine');
+  if (stored.routine.target !== 'cloud')
+    throw new HttpError(Status.BAD_REQUEST, 'Run now works for cloud routines only.');
+  const started = await start(key, stored.routine);
+  void started.done;
+  return started.routine;
 }
 
 /** One run, start to end: whatever goes wrong is recorded as the run's failure, and the browser always stops. */

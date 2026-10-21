@@ -484,6 +484,9 @@ textarea {
 .profile-data {
   min-width: 1160px;
 }
+.routine-data {
+  min-width: 1040px;
+}
 .data-table tbody tr {
   height: 60px;
 }
