@@ -176,6 +176,12 @@ export const LOOP_LAG_PERCENTILE = 99;
 
 /** Characters of a failed LLM response logged; the body is never returned to the caller. */
 export const LLM_ERROR_LOG_CHARS = 500;
+/**
+ * The `$ref`s one Gemini schema may expand. Each path follows a target once, which ends
+ * cycles but not fan-out: A naming B twice, B naming C twice, and so on, grows to 2^n
+ * nodes from a tiny extract() schema. Past the budget a ref is sent as a plain string.
+ */
+export const GEMINI_MAX_REF_EXPANSIONS = 256;
 /** How long one model request may take by default: thinking models can spend minutes on a hard step. */
 export const DEFAULT_LLM_TIMEOUT_MS = 180_000;
 /** How long one model request may take before it is abandoned and, if attempts remain, retried. */

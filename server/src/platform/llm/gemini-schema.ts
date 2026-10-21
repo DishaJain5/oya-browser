@@ -6,6 +6,7 @@
  * the nearest one is used, and what it loses is written into the description so the
  * model still reads what a value must be.
  */
+import { GEMINI_MAX_REF_EXPANSIONS } from '../constants.ts';
 
 /** The keywords Gemini's Schema message defines, besides those that hold schemas. */
 const KEPT = new Set([
@@ -48,6 +49,11 @@ type Context = {
   path: any[];
   /** The ref targets followed on this path, by identity, so a cycle ends instead of looping. */
   seen: Set<any>;
+  /** The ref expansions this whole schema has left, shared by every path, so fan-out cannot grow without end. */
+  budget: {
+    /** Expansions still allowed; one object, so every branch spends from the same count. */
+    left: number;
+  };
 };
 
 /** Whether a value is a JSON object, the only thing a schema or a ref target can be here. */
@@ -55,7 +61,9 @@ const isObject = (value) => Boolean(value) && typeof value === 'object' && !Arra
 
 /** A caller's JSON schema as a Gemini schema; nothing when there is none. */
 export const geminiSchema = (schema) =>
-  schema === undefined ? undefined : schemaFor(schema, { roots: [schema], path: [], seen: new Set() });
+  schema === undefined
+    ? undefined
+    : schemaFor(schema, { roots: [schema], path: [], seen: new Set(), budget: { left: GEMINI_MAX_REF_EXPANSIONS } });
 
 /** One schema as Gemini's: references and unions flattened, values and type settled, children rebuilt. */
 function schemaFor(schema, outer: Context) {
@@ -82,12 +90,14 @@ function flattened(schema, outer: Context): [any, Context] {
 const isDocument = (node) => Boolean(node.$defs || node.definitions || node.$schema);
 
 /**
- * A `$ref` followed, each target once per path. Gemini cannot say "recursive", so a cycle,
- * or a ref that resolves nowhere, ends as the schema's own keywords.
+ * A `$ref` followed, each target once per path and within the schema's budget. Gemini
+ * cannot say "recursive", so a cycle, a ref past the budget, or one that resolves nowhere
+ * ends as the schema's own keywords.
  */
 function followRef({ $ref, ...rest }: any, ctx: Context): [any, Context] {
   const target = typeof $ref === 'string' ? lookup(ctx, $ref) : undefined;
-  if (!target || ctx.seen.has(target)) return [rest, ctx];
+  if (!target || ctx.seen.has(target) || ctx.budget.left <= 0) return [rest, ctx];
+  ctx.budget.left -= 1;
   return followRef({ ...target, ...rest }, { ...ctx, seen: new Set([...ctx.seen, target]) });
 }
 

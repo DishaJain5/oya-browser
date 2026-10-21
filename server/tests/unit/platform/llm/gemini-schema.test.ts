@@ -6,6 +6,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { geminiSchema } from '../../../../src/platform/llm/gemini-schema.ts';
+import { GEMINI_MAX_REF_EXPANSIONS } from '../../../../src/platform/constants.ts';
 
 /** The Gemini schema of an object holding `properties`. */
 const sent = (properties) => geminiSchema({ type: 'object', properties }).properties;
@@ -200,6 +201,20 @@ describe('geminiSchema', () => {
 
   it('sends an object whose properties are not an object with no properties, rather than throwing', () => {
     assert.deepEqual(geminiSchema({ type: 'object', properties: null }), { type: 'object', properties: {} });
+  });
+
+  it('stops expanding refs past the budget, so a fan-out of definitions cannot grow to 2^n nodes', () => {
+    const depth = 30;
+    const $defs = Object.fromEntries(
+      Array.from({ length: depth }, (_, i) => [
+        `D${i}`,
+        { type: 'object', properties: { a: { $ref: `#/$defs/D${i + 1}` }, b: { $ref: `#/$defs/D${i + 1}` } } },
+      ]),
+    );
+    const out = geminiSchema({ $defs, $ref: '#/$defs/D0' });
+    const refsLeft = (s) =>
+      s?.properties ? Object.values(s.properties).reduce((n: number, p) => n + refsLeft(p), 1) : 1;
+    assert.ok(refsLeft(out) <= 2 * GEMINI_MAX_REF_EXPANSIONS + 1);
   });
 
   it('types a ref it cannot follow as a string rather than failing the request', () => {
