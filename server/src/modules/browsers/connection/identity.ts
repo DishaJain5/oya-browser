@@ -26,10 +26,23 @@ export interface Identity {
  */
 export function identityFor(apiKey: string, persona, provider: string): Identity {
   const fingerprint = container.personas.fingerprintFor(persona);
+  if (persona.proxy?.direct === true) return directIdentity(fingerprint, persona);
   const proxy = proxies.forPersona(personaOwner(apiKey), persona);
   const residential = !proxy && !fingerprint.proxy?.host && residentialFor(apiKey, persona, provider);
   if (proxy || residential) attachProxy(fingerprint, persona, proxy, residential);
   return { fingerprint, residential: !!residential };
+}
+
+/**
+ * A persona that asked for no proxy (`proxy.direct`) runs from the browser's
+ * own network: not an assigned proxy, not the residential gateway. Its
+ * fingerprint carries `{ direct: true }` as its proxy, which is a choice, not
+ * an exit, so it is cleared; and a slot it held from before is given back.
+ */
+function directIdentity(fingerprint, persona): Identity {
+  proxies.unassign(persona.id);
+  fingerprint.proxy = null;
+  return { fingerprint, residential: false };
 }
 
 /** The operator's residential gateway for a cloud browser whose owner's plan includes it, or none. */
