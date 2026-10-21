@@ -150,4 +150,52 @@ describe('cloud routines', () => {
     });
     mock.timers.reset();
   });
+
+  describe('run now', () => {
+    it('runs a cloud routine now, even when off, answering before the run ends', async () => {
+      const made = await routines.create(KEY, { ...CLOUD, enabled: false });
+      mock.method(cloud.steps, 'launch', async () => 'b-cloud');
+      mock.method(cloud.steps, 'connected', async () => {});
+      mock.method(cloud.steps, 'ask', () => new Promise(() => {}));
+      const answered = await cloud.runNow(KEY, made.id);
+      assert.equal(answered.runs[0].status, 'running');
+    });
+
+    it('refuses a routine already running with 409, saying so', async () => {
+      const made = await routines.create(KEY, CLOUD);
+      mock.method(cloud.steps, 'launch', async () => 'b-cloud');
+      mock.method(cloud.steps, 'connected', async () => {});
+      mock.method(cloud.steps, 'ask', () => new Promise(() => {}));
+      await cloud.runNow(KEY, made.id);
+      await assert.rejects(cloud.runNow(KEY, made.id), { status: 409, message: 'This routine is already running.' });
+    });
+
+    it('refuses a desktop routine with 400, and a missing one with 404', async () => {
+      const made = await routines.create(KEY, HOURLY);
+      await assert.rejects(cloud.runNow(KEY, made.id), { status: 400 });
+      await assert.rejects(cloud.runNow(KEY, 'nope'), { status: 404 });
+    });
+
+    it('moves the next run, so the scheduler does not run it again straight after', async () => {
+      const made = await routines.create(KEY, CLOUD);
+      mock.method(cloud.steps, 'launch', async () => 'b-cloud');
+      mock.method(cloud.steps, 'connected', async () => {});
+      mock.method(cloud.steps, 'ask', async () => ({ text: 'DONE' }));
+      const answered = await cloud.runNow(KEY, made.id);
+      assert.ok(answered.lastRunAt >= made.createdAt);
+      assert.deepEqual(await cloud.runDue(answered.lastRunAt + MINUTE), []);
+    });
+
+    it('goes through the cloud gates: a server with no cloud records the run as failed', async () => {
+      const made = await routines.create(KEY, CLOUD);
+      await cloud.runNow(KEY, made.id);
+      let run;
+      for (let i = 0; i < 50 && (!run || run.status === 'running'); i += 1) {
+        await new Promise((resolve) => setImmediate(resolve));
+        run = (await routines.list(KEY)).find((r) => r.id === made.id).runs[0];
+      }
+      assert.equal(run.status, 'failed');
+      assert.match(run.result, /^Error: Oya Cloud browsers are not set up/);
+    });
+  });
 });

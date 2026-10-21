@@ -439,21 +439,37 @@ async function runStep(browserId, step, values, defaults = {}, task = {}) {
  * MFA). When a step no longer fits the page: autoHeal off throws; on, the agent
  * finishes the task and its steps replace the broken ones in the playbook.
  */
-export async function play(apiKey, browserId, pb, vars = {}, { autoHeal = true, checkpoint, requestHuman }: any = {}) {
-  if (pb.schemaVersion === WORKFLOW_SCHEMA) return playWorkflow(browserId, pb, vars, autoHeal);
-  return replaySteps(apiKey, browserId, pb, { ...pb.defaults, ...vars }, { autoHeal, checkpoint, requestHuman });
+export async function play(apiKey, browserId, pb, vars = {}, options: any = {}) {
+  const replay = replayOptions(options);
+  if (pb.schemaVersion === WORKFLOW_SCHEMA) return playWorkflow(browserId, pb, vars, replay.autoHeal);
+  return replaySteps(apiKey, browserId, pb, { ...pb.defaults, ...vars }, replay);
 }
+
+/** What a replay is run with: healing on unless turned off, the checkpoint, the person, and the step reporter. */
+const replayOptions = ({ autoHeal = true, checkpoint, requestHuman, onStep }: any) => ({
+  autoHeal,
+  checkpoint,
+  requestHuman,
+  onStep,
+});
 
 /** Replays the steps in order, running the checkpoint after page-changing ones; a failure heals or throws. */
 async function replaySteps(apiKey, browserId, pb, values, options) {
   pageChanged(browserId); // nothing in hand describes this page yet
   const run = { task: { apiKey, prompt: pb.prompt }, options, signedIn: false };
   for (let i = 0; i < pb.steps.length; i++) {
-    const failed = await stepOrSignIn(browserId, pb, i, values, run);
+    const failed = await reported(browserId, pb, i, values, run);
     if (failed) return recover(apiKey, browserId, pb, i, failed.err, values, options);
     await afterStep(browserId, pb, i, run);
   }
   return { steps: pb.steps.length, total: pb.steps.length, fellBack: false };
+}
+
+/** Step `i` (signing in again if it fails), told to the run's timeline as it ends. */
+async function reported(browserId, pb, i, values, run) {
+  const failed = await stepOrSignIn(browserId, pb, i, values, run);
+  run.options.onStep?.({ index: i, action: pb.steps[i].action, ok: !failed });
+  return failed;
 }
 
 /**

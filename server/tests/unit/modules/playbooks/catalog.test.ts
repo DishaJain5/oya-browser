@@ -204,3 +204,15 @@ describe('playbook catalog', () => {
     });
   });
 });
+
+describe('describing a playbook', () => {
+  it('leaves its secrets’ values out of the defaults a list or save answers', () => {
+    const pb = {
+      name: 'login',
+      steps: [{ action: 'type', text: '{{pw}}' }],
+      defaults: { email: 'a@x', pw: 'hunter2' },
+      secrets: ['pw'],
+    };
+    assert.deepEqual(catalog.describe(pb).defaults, { email: 'a@x' });
+  });
+});
