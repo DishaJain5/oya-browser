@@ -91,6 +91,8 @@ export interface PersonaInfo {
   proxy: {
     /** Two-letter country, optionally a region. */
     geo: string | null;
+    /** Present and true when it runs with no proxy at all. */
+    direct?: boolean;
   } | null;
   /** The proxy it is actually on, once assigned or pinned. */
   exit: {
