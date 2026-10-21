@@ -166,6 +166,21 @@ browsers on one identity, raise that persona's concurrency instead.
 Sign in once in the desktop app and remote browsers on that persona arrive
 already signed in, including flows that use passkeys and WebAuthn.
 
+To spread many browsers across several personas, put them in a persona group
+and start with the group's name. Each start runs as the member with the fewest
+running browsers, then the one used longest ago, skipping members at their cap;
+the default persona cannot be a member. With `queueMs`, a start that finds every
+member full waits on the least busy one. Needs server 1.0.205 or later: an older
+server ignores `personaGroup` and starts as the default persona.
+
+    await oya.personaGroups.create('checkout-pool', [personaA.id, personaB.id]);
+    const browser = await oya.browser.start({ personaGroup: 'checkout-pool' });
+    browser.persona; // the member it runs as
+
+    POST   /api/persona-groups          { name, personaIds }   (409 group_exists)
+    PUT    /api/persona-groups/:name    { personaIds }
+    DELETE /api/persona-groups/:name
+
 ## Human in the loop
 
 - Live view streams a running browser and lets a person take over mid-run.

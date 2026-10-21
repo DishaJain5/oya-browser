@@ -4,7 +4,7 @@
  */
 'use client';
 
-import { Code, Download, Pencil, Play, Trash2 } from 'lucide-react';
+import { Code, Download, FilePen, Pencil, Play, Trash2 } from 'lucide-react';
 import { ago } from '@/lib/api-client';
 import { DRAFT_SUFFIX } from './constants';
 import type { PlaybookBody, PlaybookInfo } from './types';
@@ -17,6 +17,8 @@ export interface RowHandlers {
   onRename: (p: PlaybookInfo) => void;
   /** Opens the run dialog. */
   onRun: (p: PlaybookInfo) => void;
+  /** Opens the editor on the playbook's steps and variables. */
+  onEdit: (p: PlaybookInfo) => void;
   /** Asks to delete a playbook, or `name:draft` for only its draft. */
   onRemove: (name: string) => void;
   /** Makes the healed draft the playbook's steps. */
@@ -118,6 +120,14 @@ function ActionsCell({ p, on }: Omit<RowProps, 'now'>) {
         </button>
         <button className="btn-icon" title="Rename" aria-label={`Rename ${p.name}`} onClick={() => on.onRename(p)}>
           <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          className="btn-icon"
+          title="Edit steps and variables"
+          aria-label={`Edit ${p.name}`}
+          onClick={() => on.onEdit(p)}
+        >
+          <FilePen className="h-4 w-4" />
         </button>
         <button className="btn-icon" title="Run" aria-label={`Run ${p.name}`} onClick={() => on.onRun(p)}>
           <Play className="h-4 w-4" />

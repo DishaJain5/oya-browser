@@ -43,6 +43,8 @@ export interface PersonaDeps {
   credentials: { list(personaId: string): unknown; clearAll(personaId: string): void };
   /** Login state kept for a persona. */
   logins: { summary(personaId: string): unknown; clear(personaId: string): void };
+  /** The persona groups a deleted persona leaves; absent where nothing keeps groups. */
+  groups?: { dropMember(owner: string, personaId: string): Promise<void> };
   /** Gauges and counters the service reports into. */
   metrics: {
     /** Counts starts refused by a persona's concurrency cap. */
@@ -221,6 +223,18 @@ function newPersona(ids: PersonaIds, { name, proxy, maxConcurrent, prefs, prefsC
 /** Least recently used first; never-used personas lead. */
 const byLastUse = (a: Persona, b: Persona) => String(a.lastUsedAt || '').localeCompare(String(b.lastUsedAt || ''));
 
+/**
+ * Takes a deleted persona out of its owner's groups. A mirrored persona's id is
+ * derived from its profile, so re-importing the profile makes the same id, which
+ * must not quietly rejoin the groups it was in. A failure is logged: a start
+ * skips members that no longer exist, so it cannot run as the deleted one.
+ */
+function dropMembership(deps: PersonaDeps, p: Persona) {
+  deps.groups
+    ?.dropMember(p.owner, p.id)
+    .catch((e) => console.error(`[personas] removing ${p.id} from its groups failed:`, e.message));
+}
+
 /** Drops a persona's login state, factors and credentials. */
 function clearSecrets(deps: PersonaDeps, id: string) {
   deps.logins.clear(id);
@@ -319,6 +333,7 @@ export class PersonaService {
     if (p.isDefault) throw new HttpError(Status.BAD_REQUEST, 'The default persona cannot be deleted');
     if (this.activeCount(id) > 0) throw new HttpError(Status.CONFLICT, 'Persona is in use');
     this.forget(id);
+    dropMembership(this.deps, p);
     return true;
   }
 

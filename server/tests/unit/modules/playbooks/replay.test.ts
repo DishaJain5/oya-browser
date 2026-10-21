@@ -114,6 +114,19 @@ describe('play', () => {
     });
   }
 
+  it('tells the run each step as it ends, so the console can show the timeline', async () => {
+    const steps = [
+      { action: 'navigate', url: 'https://a.test/' },
+      { action: 'press_key', key: 'Enter' },
+    ];
+    const seen: unknown[] = [];
+    await play(KEY, BROWSER, pb(steps), {}, { onStep: (e) => seen.push(e) });
+    assert.deepEqual(seen, [
+      { index: 0, action: 'navigate', ok: true },
+      { index: 1, action: 'press_key', ok: true },
+    ]);
+  });
+
   it('replays a hover on the recorded element and history moves as the browser’s own', async () => {
     const steps = [
       { action: 'hover', el: { text: 'Go', type: 'button' } },
@@ -447,6 +460,20 @@ describe('play', () => {
       await keyConfig.savePlaybook(KEY, 'demo', structuredClone(original));
       await play(KEY, BROWSER, original);
       assert.equal(keyConfig.getPlaybook(KEY, 'demo').steps.length, 2);
+    });
+
+    it('saves nothing when it heals an unsaved definition the console tested, even over a playbook named draft', async () => {
+      process.env.OPENAI_API_KEY = 'sk-host';
+      stubLlm([toolReply(['keyboard_type', { text: 'boots' }]), textReply('DONE: finished')]);
+      await keyConfig.savePlaybook(KEY, 'draft', structuredClone(pb([{ action: 'press_key', key: 'Tab' }])));
+      const tested = {
+        ...pb([{ action: 'press_key', key: 'Tab' }, { action: 'teleport' }]),
+        name: 'draft',
+        transient: true,
+      };
+      const result = await play(KEY, BROWSER, tested);
+      assert.equal(result.healed, true);
+      assert.equal(keyConfig.getPlaybook(KEY, 'draft').steps.length, 1);
     });
 
     it('turns what the healing agent typed literally into variables, keeping the ones it had', async () => {

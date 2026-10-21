@@ -283,6 +283,20 @@ function legacyRepository() {
 }
 
 describe('PersonaService.remove', () => {
+  it('takes a deleted persona out of its owner’s groups, so a re-import of a mirrored profile cannot rejoin them', () => {
+    const { service, deps } = personaService();
+    const p = service.create('k');
+    service.remove('k', p.id);
+    assert.deepEqual(deps.groups.dropMember.mock.calls[0].arguments, ['owner:k', p.id]);
+  });
+
+  it('leaves groups alone when erasure forgets an owner: erasure deletes them as rows', () => {
+    const { service, deps } = personaService();
+    service.create('k');
+    service.forgetOwners(new Set(['owner:k']));
+    assert.equal(deps.groups.dropMember.mock.callCount(), 0);
+  });
+
   it('deletes the persona and everything stored for it', () => {
     const { service, deps } = personaService();
     const p = service.create('k');

@@ -26,6 +26,14 @@ describe('oya.browser.start', () => {
     assert.match(calls[0].headers['Idempotency-Key'], /^[0-9a-f-]{36}$/);
   });
 
+  it('sends a persona group as personaGroup, taking profileGroup as its alias', async () => {
+    const { oya, calls } = client({ [START]: { body: { id: 'b1', persona: 'p-2', status: 'ready' } } });
+    const b = await oya.browser.start({ personaGroup: 'pool' });
+    await oya.browser.start({ profileGroup: 'other' });
+    assert.deepEqual([calls[0].body, calls[1].body], [{ personaGroup: 'pool' }, { personaGroup: 'other' }]);
+    assert.equal(b.persona, 'p-2');
+  });
+
   it('uses the caller idempotency key when given', async () => {
     const { oya, calls } = client({ [START]: { body: { id: 'b1', status: 'ready' } } });
     await oya.browser.start({ idempotencyKey: 'retry-1' });

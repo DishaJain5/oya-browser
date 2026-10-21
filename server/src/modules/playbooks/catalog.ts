@@ -16,11 +16,21 @@ import { renderPlaywright } from './playwright.ts';
 /** A valid playbook name. */
 const NAME = /^[\w-]{1,64}$/;
 
+/**
+ * The playbook's defaults without its secrets' values: a list or a save answer
+ * reaches the console and SDK callers, and a secret's value is never sent back
+ * once saved. A run that leaves a secret out still uses the saved one.
+ */
+const shownDefaults = (pb) => {
+  const secrets = new Set((pb.secrets ?? []).map(String));
+  return Object.fromEntries(Object.entries(pb.defaults || {}).filter(([k]) => !secrets.has(k)));
+};
+
 /** What callers see of a playbook: its inputs and its Playwright export. */
 export const describe = (pb) => ({
   name: pb.name,
   variables: namesOf(pb),
-  defaults: pb.defaults || {},
+  defaults: shownDefaults(pb),
   steps: pb.steps.length,
   // The free-text fields the model writes fresh on each run, by variable and question.
   answers: pb.steps.filter((step) => step.answer).map(({ answer }) => ({ key: answer.key, question: answer.question })),
@@ -74,7 +84,7 @@ function fromRun(name, run) {
 }
 
 /** A workflow run keeps its declared variables; their non-secret defaults become the playbook's. */
-function asWorkflow(pb, run) {
+export function asWorkflow(pb, run) {
   pb.schemaVersion = WORKFLOW_SCHEMA;
   pb.variables = run.variables || {};
   pb.defaults = Object.fromEntries(
