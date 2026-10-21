@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.205](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.205) · 2026-10-21
+
 ### Added
 
 - A persona can run with no proxy. Set `proxy: { direct: true }` on create or update, and its browsers connect straight from their own network instead of an assigned proxy or Oya residential. The persona's `exit` reads `null`, and it takes no proxy slot.
