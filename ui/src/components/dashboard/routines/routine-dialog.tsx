@@ -1,6 +1,6 @@
 /**
- * Make or change a routine: its name, what it does, when it repeats, where it
- * runs, and whether it is on. The server's refusal shows above the buttons.
+ * Make or change a routine: its name, what it does (and a playbook's values),
+ * when it repeats, the profile and place it runs, and whether it is on. The server's refusal shows above the buttons.
  */
 'use client';
 
@@ -8,9 +8,12 @@ import Dialog from '@/components/ui/dialog';
 import FieldHelp from './field-help';
 import RepeatField from './repeat-field';
 import TaskField from './task-field';
+import ValuesField from './values-field';
+import ProfileField from './profile-field';
 import { EDITOR_LIMITS, EDITOR_TEXT } from './constants';
 import { useRoutineForm, type RoutineForm } from './use-routine-form';
 import type { Routine } from './types';
+import type { Persona } from '../types';
 
 /** Props for the dialog. */
 interface Props {
@@ -22,6 +25,8 @@ interface Props {
   onClose: () => void;
   /** Receives the saved routine. */
   onSaved: (r: Routine) => void;
+  /** The project's personas, to pick the one it runs as. */
+  personas: Persona[];
 }
 
 /** A labelled checkbox with its help. */
@@ -103,7 +108,7 @@ function Footer({
 }
 
 /** The form in a dialog. */
-export default function RoutineDialog({ apiKey, routine, onClose, onSaved }: Props) {
+export default function RoutineDialog({ apiKey, routine, onClose, onSaved, personas }: Props) {
   const form = useRoutineForm(apiKey, routine, onSaved);
   const { fields, set } = form;
   return (
@@ -115,8 +120,10 @@ export default function RoutineDialog({ apiKey, routine, onClose, onSaved }: Pro
     >
       <form id="routine-form" noValidate onSubmit={(e) => (e.preventDefault(), form.save())}>
         <NameField form={form} />
-        <TaskField apiKey={apiKey} form={form} />
+        <TaskField form={form} />
+        <ValuesField form={form} />
         <RepeatField form={form} />
+        <ProfileField form={form} personas={personas} />
         <Check
           id="rt-cloud"
           label={EDITOR_TEXT.cloud}

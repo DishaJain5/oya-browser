@@ -1,23 +1,28 @@
 /**
- * The playbook editor: the definition as JSON, its variables, the Playwright code
- * for the saved steps, and a tester that runs the edit before it is saved. Save
- * replaces the playbook; Save as keeps the original; leaving with changes asks.
+ * The playbook editor, laid out as VS Code is: an explorer of the playbook's
+ * files (its definition as JSON, its variables, its Playwright code), tabs, a
+ * CodeMirror editor that marks a JSON error where it is, a test panel below
+ * (⌘J) that runs the edit before it is saved, and a status bar. Save replaces
+ * the playbook (⌘S); Save as keeps the original; leaving with changes asks.
  */
 'use client';
 
-import { useState } from 'react';
-import Dialog from '@/components/ui/dialog';
-import SyntaxCode from '@/components/ui/syntax-code';
-import CodeField from './code-field';
+import { createPortal } from 'react-dom';
+import CodeEditor from './code-editor';
+import EditorTabs from './editor-tabs';
+import Explorer from './explorer';
+import StatusBar from './status-bar';
 import TesterPane from './tester-pane';
+import TitleBar from './title-bar';
 import VariablesPane from './variables-pane';
-import { EDITOR_TEXT } from './editor-text';
+import { variableRows } from './definition';
+import { EDITOR_TEXT, type FileId } from './editor-text';
 import { usePlaybookEditor, type PlaybookEditorState } from './use-playbook-editor';
+import { useWorkbench, type Workbench } from './use-workbench';
+import { useWorkbenchKeys } from './use-workbench-keys';
+import { useWorkbenchFocus } from './use-workbench-focus';
 import type { BrowserRow } from '../../types';
 import type { PlaybookInfo } from '../types';
-
-/** The editor's tabs. */
-type Tab = keyof typeof EDITOR_TEXT.tabs;
 
 /** Props for the editor. */
 interface Props {
@@ -33,112 +38,135 @@ interface Props {
   onSaved: () => void;
 }
 
-/** The tab strip. */
-function Tabs({ tab, setTab }: { /** The open tab. */ tab: Tab; /** Opens one. */ setTab: (t: Tab) => void }) {
-  return (
-    <div role="tablist" className="mb-3 flex gap-1 border-b border-border">
-      {(Object.keys(EDITOR_TEXT.tabs) as Tab[]).map((t) => (
-        <button
-          key={t}
-          role="tab"
-          aria-selected={tab === t}
-          className={`-mb-px border-b-2 px-3 py-2 text-[13px] ${tab === t ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
-          onClick={() => setTab(t)}
-        >
-          {EDITOR_TEXT.tabs[t]}
-        </button>
-      ))}
-    </div>
-  );
+/** What the file views need. */
+interface FileProps {
+  /** The editor. */
+  e: PlaybookEditorState;
+  /** The layout. */
+  w: Workbench;
+  /** The editor's props. */
+  props: Props;
 }
 
-/** Discard, Save as and Save, with the unsaved-changes note. */
-function Footer({ e }: { /** The editor. */ e: PlaybookEditorState }) {
-  const saveAs = () => {
-    const name = window.prompt(EDITOR_TEXT.saveAsPrompt);
-    if (name?.trim()) e.saveAs(name.trim());
-  };
-  const ok = Boolean(e.parsed.definition) && !e.busy;
-  return (
-    <>
-      {e.dirty && <span className="mr-auto text-[12px] text-yellow">{EDITOR_TEXT.unsaved}</span>}
-      <button className="btn-ghost" onClick={e.discard} disabled={!e.dirty || e.busy}>
-        {EDITOR_TEXT.discard}
-      </button>
-      <button className="btn-ghost" onClick={saveAs} disabled={!ok}>
-        {EDITOR_TEXT.saveAs}
-      </button>
-      <button className="btn-primary" onClick={e.save} disabled={!ok || !e.dirty}>
-        {e.busy ? EDITOR_TEXT.saving : EDITOR_TEXT.save}
-      </button>
-    </>
-  );
-}
-
-/** The open tab's pane. */
-function Pane({
-  tab,
-  e,
-  props,
-}: {
-  /** The tab. */ tab: Tab;
-  /** The editor. */ e: PlaybookEditorState;
-  /** The editor's props. */ props: Props;
-}) {
-  if (tab === 'definition') return <CodeField value={e.text} onChange={e.setText} error={e.parsed.error} />;
-  if (tab === 'variables')
-    return e.parsed.definition ? (
-      <VariablesPane definition={e.parsed.definition} onChange={e.setText} />
-    ) : (
-      <p className="text-[13px] text-red">{e.parsed.error}</p>
-    );
-  if (tab === 'code')
+/** The file showing: the definition, its variables, the code, or a hint to open one. */
+function FileView({ file, e, w, props }: FileProps & { /** The file. */ file: FileId | null }) {
+  if (file === 'definition')
     return (
-      <div className="space-y-2">
-        <p className="text-[12px] text-text-muted">{EDITOR_TEXT.codeHint}</p>
-        <pre className="max-h-[52dvh] overflow-auto rounded-lg border border-border bg-bg p-3 text-[12px]">
-          <SyntaxCode code={e.code ?? props.playbook.code} language="typescript" />
-        </pre>
+      <CodeEditor
+        language="json"
+        label={EDITOR_TEXT.definitionLabel}
+        value={e.text}
+        onChange={e.setText}
+        onCursor={w.onCursor}
+        onSave={() => e.dirty && e.save()}
+      />
+    );
+  if (file === 'code')
+    return (
+      <CodeEditor
+        language="typescript"
+        label={EDITOR_TEXT.codeHint}
+        readOnly
+        value={e.code ?? props.playbook.code}
+        onCursor={w.onCursor}
+      />
+    );
+  if (file === 'variables')
+    return (
+      <div className="h-full overflow-auto p-4">
+        {e.parsed.definition ? (
+          <VariablesPane definition={e.parsed.definition} onChange={e.setText} />
+        ) : (
+          <p className="text-[13px] text-red">{e.parsed.error}</p>
+        )}
       </div>
     );
-  return <TesterPane apiKey={props.apiKey} definition={e.parsed.definition} browsers={props.browsers} />;
+  return <p className="grid h-full place-items-center text-[13px] text-text-dim">{EDITOR_TEXT.empty}</p>;
 }
 
-/** The editor in a dialog. */
+/** The tabs, the file showing, its problem, and the test panel. */
+function EditorArea({ e, w, props }: FileProps) {
+  return (
+    <main className="flex min-w-0 flex-1 flex-col">
+      <EditorTabs open={w.open} active={w.active} dirty={e.dirty} onShow={w.show} onClose={w.close} />
+      {e.saveError && (
+        <p role="alert" className="border-b border-red/30 bg-red/10 px-3 py-1.5 text-[12px] text-red">
+          {e.saveError}
+        </p>
+      )}
+      <div className="min-h-0 flex-1">
+        <FileView file={w.active} e={e} w={w} props={props} />
+      </div>
+      {e.parsed.error && w.active === 'definition' && (
+        <p
+          role="alert"
+          id="definition-error"
+          className="border-t border-border px-3 py-1 font-mono text-[11.5px] text-red"
+        >
+          {e.parsed.error}
+        </p>
+      )}
+      {w.panel && (
+        <section
+          aria-label={EDITOR_TEXT.testPanel}
+          className="h-[40%] min-h-[200px] shrink-0 overflow-auto border-t border-border bg-bg-sunken p-4"
+        >
+          <TesterPane apiKey={props.apiKey} definition={e.parsed.definition} browsers={props.browsers} />
+        </section>
+      )}
+    </main>
+  );
+}
+
+/** Loading, or why it could not load. */
+function Waiting({ e }: { /** The editor. */ e: PlaybookEditorState }) {
+  return (
+    <p
+      role={e.loadError ? 'alert' : 'status'}
+      className={`grid flex-1 place-items-center text-[13px] ${e.loadError ? 'text-red' : 'text-text-muted'}`}
+    >
+      {e.loadError ?? EDITOR_TEXT.loading}
+    </p>
+  );
+}
+
+/** The workbench, over the whole console. */
 export default function PlaybookEditor(props: Props) {
   const e = usePlaybookEditor(props.apiKey, props.playbook.name, props.onSaved);
-  const [tab, setTab] = useState<Tab>('definition');
+  const w = useWorkbench();
   const close = () => (!e.dirty || window.confirm(EDITOR_TEXT.confirmClose)) && props.onClose();
-  return (
-    <Dialog
-      open
-      onClose={close}
-      size="lg"
-      title={EDITOR_TEXT.title(props.playbook.name)}
-      description={EDITOR_TEXT.description}
-      footer={<Footer e={e} />}
+  const save = () => e.dirty && e.save();
+  useWorkbenchKeys({ save, togglePanel: w.togglePanel, toggleSidebar: w.toggleSidebar, close });
+  const root = useWorkbenchFocus();
+  const variables = e.parsed.definition ? variableRows(e.parsed.definition).length : 0;
+  return createPortal(
+    <div
+      ref={root}
+      role="dialog"
+      aria-modal
+      tabIndex={-1}
+      aria-labelledby="playbook-editor-title"
+      className="fixed inset-0 z-50 flex flex-col bg-bg text-text outline-none"
     >
-      {e.loadError && (
-        <p role="alert" className="text-[13px] text-red">
-          {e.loadError}
-        </p>
-      )}
-      {!e.loadError && e.saved === null && (
-        <p role="status" className="py-8 text-center text-[13px] text-text-muted">
-          {EDITOR_TEXT.loading}
-        </p>
-      )}
-      {e.saved !== null && (
-        <>
-          <Tabs tab={tab} setTab={setTab} />
-          <Pane tab={tab} e={e} props={props} />
-          {e.saveError && (
-            <p role="alert" className="mt-3 text-[13px] text-red">
-              {e.saveError}
-            </p>
+      <TitleBar name={props.playbook.name} active={w.active} e={e} onClose={close} />
+      {e.saved === null ? (
+        <Waiting e={e} />
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          {w.sidebar && (
+            <Explorer
+              name={props.playbook.name}
+              active={w.active}
+              dirty={e.dirty}
+              variables={variables}
+              onOpen={w.show}
+            />
           )}
-        </>
+          <EditorArea e={e} w={w} props={props} />
+        </div>
       )}
-    </Dialog>
+      <StatusBar w={w} error={e.parsed.error} dirty={e.dirty} onProblems={() => w.show('definition')} />
+    </div>,
+    document.body,
   );
 }

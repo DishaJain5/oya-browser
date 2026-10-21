@@ -44,11 +44,19 @@ function serve(list: Routine[], other: (path: string, opts: { method?: string })
   });
 }
 
+/** A playbook with a value, a saved default and a secret. */
+const prices = { name: 'prices', variables: ['item', 'shop', 'pw'], defaults: { shop: 'acme' }, secrets: ['pw'] };
+/** The project's default profile and one named one. */
+const personas = [
+  { id: 'd', name: 'Default', isDefault: true, createdAt: '', lastUsedAt: null, activeBrowsers: 0 },
+  { id: 'p1', name: 'Work', isDefault: false, createdAt: '', lastUsedAt: null, activeBrowsers: 0 },
+];
+
 /** Renders the tab and waits for the first load. */
 async function setup() {
   render(
     <ToastProvider>
-      <RoutinesTab apiKey="k" now={NOW} />
+      <RoutinesTab apiKey="k" now={NOW} personas={personas as never} />
     </ToastProvider>,
   );
   await act(async () => {});
@@ -109,6 +117,47 @@ describe('RoutinesTab', () => {
     });
     expect(body.tz).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
     expect(within(rowOf('Inbox')).getByText('Every 2 hours')).toBeTruthy();
+  });
+
+  it('saves a playbook routine’s typed values (never a secret or a blank) and the profile picked', async () => {
+    serve([], (path, opts) => (path === '/routines' && opts.method === 'POST' ? routine({ id: 'r2' }) : {}));
+    apiMock.mockImplementation(async (path, opts) => {
+      if (path === '/routines' && !opts?.method) return { routines: [] };
+      if (path === '/playbooks') return { playbooks: [prices] };
+      return path === '/routines' ? routine({ id: 'r2' }) : {};
+    });
+    await setup();
+    await userEvent.click(screen.getByRole('button', { name: /New routine/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Tea');
+    await userEvent.selectOptions(screen.getByLabelText('Does'), 'prices');
+    await userEvent.type(screen.getByLabelText('item'), 'tea');
+    expect(screen.getByLabelText('shop').getAttribute('placeholder')).toBe('acme');
+    expect(screen.getByLabelText('pw').getAttribute('placeholder')).toBe('Uses the playbook’s saved value');
+    expect(screen.queryByRole('option', { name: 'Default', hidden: false })).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText('Profile'), 'p1');
+    expect(screen.getByText('A desktop runs it only while it is on this profile.')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Save routine' }));
+    const body = apiMock.mock.calls.find(([p, o]) => p === '/routines' && o?.method === 'POST')?.[1]?.body;
+    expect(body).toMatchObject({ playbook: 'prices', prompt: '', values: { item: 'tea' }, persona: 'p1' });
+  });
+
+  it('sends no profile for the default, and no values with a prompt', async () => {
+    serve([], (path, opts) => (path === '/routines' && opts.method === 'POST' ? routine({ id: 'r2' }) : {}));
+    await setup();
+    await userEvent.click(screen.getByRole('button', { name: /New routine/ }));
+    await userEvent.type(screen.getByLabelText('Name'), 'Inbox');
+    await userEvent.type(screen.getByLabelText('Prompt'), 'Summarize');
+    await userEvent.click(screen.getByRole('button', { name: 'Save routine' }));
+    const body = apiMock.mock.calls.find(([p, o]) => p === '/routines' && o?.method === 'POST')?.[1]?.body as object;
+    expect(body).toMatchObject({ persona: null });
+    expect('values' in body).toBe(false);
+  });
+
+  it('keeps a routine’s profile that is no longer listed, by its id', async () => {
+    serve([routine({ persona: 'gone' })]);
+    await setup();
+    await userEvent.click(within(rowOf('Prices')).getByRole('button', { name: /Edit/ }));
+    expect((screen.getByLabelText('Profile') as HTMLSelectElement).value).toBe('gone');
   });
 
   it('says what is missing instead of saving an empty routine', async () => {

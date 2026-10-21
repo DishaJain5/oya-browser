@@ -121,7 +121,7 @@ function TabContent({ c }: Props) {
       {view.tab === 'playbooks' && (
         <PlaybooksTab key={project ?? ''} apiKey={apiKey} browsers={c.browsers} personas={c.personas} now={c.now} />
       )}
-      {view.tab === 'routines' && <RoutinesTab key={project ?? ''} apiKey={apiKey} now={c.now} />}
+      {view.tab === 'routines' && <RoutinesTab key={project ?? ''} apiKey={apiKey} now={c.now} personas={c.personas} />}
       {view.tab === 'control' && (
         <div className="h-full min-w-0 overflow-hidden">
           <ControlTab key={project ?? ''} apiKey={apiKey} />

@@ -71,4 +71,28 @@ describe('routine routes', () => {
     forgetStranger();
     assert.equal(res.status, 404);
   });
+
+  it('keeps a playbook routine’s values and profile, refusing another key’s profile and resetting to the default with null', async () => {
+    const { container } = await import('../../../../src/app/container.ts');
+    const mine = container.personas.create(KEY, { name: 'mine' });
+    const stranger = 'routine-routes-profile-stranger';
+    const forgetStranger = allowKey(stranger);
+    const theirs = container.personas.create(stranger, { name: 'theirs' });
+    const body = { ...HOURLY, prompt: '', playbook: 'search', values: { q: 'mug' }, persona: mine.id };
+    const made = await call('POST', '/routines', body);
+    assert.deepEqual([made.status, made.body.values, made.body.persona], [201, { q: 'mug' }, mine.id]);
+    assert.equal((await call('POST', '/routines', { ...body, persona: theirs.id })).status, 404);
+    assert.equal((await call('PATCH', `/routines/${made.body.id}`, { persona: null })).body.persona, undefined);
+    forgetStranger();
+  });
+
+  it('still turns off a routine whose profile was deleted, and checks only a profile given anew', async () => {
+    const { container } = await import('../../../../src/app/container.ts');
+    const gone = container.personas.create(KEY, { name: 'gone' });
+    const made = await call('POST', '/routines', { ...HOURLY, persona: gone.id });
+    container.personas.remove(KEY, gone.id);
+    const off = await call('PATCH', `/routines/${made.body.id}`, { enabled: false });
+    assert.deepEqual([off.status, off.body.enabled], [200, false]);
+    assert.equal((await call('PATCH', `/routines/${made.body.id}`, { persona: gone.id })).status, 404);
+  });
 });

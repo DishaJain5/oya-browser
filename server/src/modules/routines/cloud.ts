@@ -149,18 +149,31 @@ async function stop(key: string, browser: Started) {
 
 /** Starts the browser (noting it in `browser` so it can be stopped), waits for it, and asks the agent. */
 async function runOnCloud(key: string, routine: Routine, browser: Started) {
-  browser.id = await steps.launch(key, routine.name);
+  browser.id = await steps.launch(key, routine.name, personaOf(key, routine));
   await steps.connected(key, browser.id);
-  return routine.playbook ? steps.play(key, browser.id, routine.playbook) : steps.ask(key, browser.id, routine.prompt);
+  if (!routine.playbook) return steps.ask(key, browser.id, routine.prompt);
+  return steps.play(key, browser.id, routine.playbook, routine.values ?? {});
 }
 
-/** Starts one cloud browser, held to the same gates as starting one through the API. */
-async function launch(key: string, name: string): Promise<string> {
+/**
+ * The profile the run's browser starts on: the routine's own, checked again now,
+ * since it may have been deleted after the routine was saved. A deleted one fails
+ * the run rather than starting it as the default profile, which has other logins.
+ */
+function personaOf(key: string, routine: Routine): string | undefined {
+  if (!routine.persona) return undefined;
+  if (!container.personas.get(key, routine.persona))
+    throw new Error(`The profile ${routine.persona} no longer exists; pick another for this routine.`);
+  return routine.persona;
+}
+
+/** Starts one cloud browser on `persona` (the default when absent), held to the same gates as starting one through the API. */
+async function launch(key: string, name: string, persona?: string): Promise<string> {
   if (!sandboxConfigured(key)) throw refuse('Oya Cloud browsers are not set up on this server.');
   if (await isUnclaimedAgentKey(key)) throw refuse('Cloud routines need a claimed key.');
   await container.billing.entitlements.admitCloud(key, 1);
   if (!checkHourly('sandboxesPerHour', key).allowed) throw refuse('The hourly cloud browser quota is used up.');
-  const made = await createSandbox({ apiKey: key, name: `Routine: ${name}` });
+  const made = await createSandbox({ apiKey: key, name: `Routine: ${name}`, persona });
   bookProvision(key, 1, [made], []);
   return made.browserId;
 }
@@ -211,11 +224,11 @@ async function api<T>(key: string, path: string, body?: object): Promise<T> {
 }
 
 /**
- * Plays the saved playbook on the browser through the runs route and waits for its end.
+ * Plays the saved playbook on the browser with the routine's values, through the runs route, and waits for its end.
  * A run that stops to ask a person failed: nobody is at a cloud run to answer.
  */
-async function play(key: string, browserId: string, playbook: string): Promise<ChatAnswer> {
-  let run = await api<PlaybookRun>(key, `browsers/${encodeURIComponent(browserId)}/runs`, { playbook });
+async function play(key: string, browserId: string, playbook: string, values = {}): Promise<ChatAnswer> {
+  let run = await api<PlaybookRun>(key, `browsers/${encodeURIComponent(browserId)}/runs`, { playbook, data: values });
   if (!run.id) throw new Error(run.error || 'The playbook could not start.');
   for (const deadline = Date.now() + ROUTINE_PLAY_MS; run.status === 'running' && Date.now() < deadline;) {
     await pause(ROUTINE_CLOUD_POLL_MS);

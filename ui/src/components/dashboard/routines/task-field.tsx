@@ -5,22 +5,19 @@
 'use client';
 
 import FieldHelp from './field-help';
-import { usePlaybookNames } from './use-playbook-names';
 import { EDITOR_LIMITS, EDITOR_TEXT } from './constants';
 import type { RoutineForm } from './use-routine-form';
 
 /** Props for the task fields. */
 interface Props {
-  /** The caller's API key, for the playbook list. */
-  apiKey: string;
-  /** The form. */
+  /** The form, with the playbooks to choose from. */
   form: RoutineForm;
 }
 
 /** The Does choice and, when it asks a prompt, the prompt. */
-export default function TaskField({ apiKey, form }: Props) {
-  const { names, error } = usePlaybookNames(apiKey);
-  const { fields, set, errors } = form;
+export default function TaskField({ form }: Props) {
+  const { fields, set, errors, playbooks } = form;
+  const { names, error } = playbooks;
   const options = fields.playbook && !names.includes(fields.playbook) ? [fields.playbook, ...names] : names;
   return (
     <>

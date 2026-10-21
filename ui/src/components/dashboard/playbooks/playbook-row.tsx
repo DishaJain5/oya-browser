@@ -4,14 +4,14 @@
  */
 'use client';
 
-import { Code, Download, FilePen, Pencil, Play, Trash2 } from 'lucide-react';
+import { Download, FilePen, Pencil, Play, Trash2 } from 'lucide-react';
 import { ago } from '@/lib/api-client';
 import { DRAFT_SUFFIX } from './constants';
 import type { PlaybookBody, PlaybookInfo } from './types';
 
 /** What a row's buttons open or do. */
 export interface RowHandlers {
-  /** Shows a playbook's (or draft's) Playwright code. */
+  /** Shows a healed draft's Playwright code, to review before promoting it. */
   onCode: (body: PlaybookBody) => void;
   /** Opens the rename dialog. */
   onRename: (p: PlaybookInfo) => void;
@@ -97,19 +97,11 @@ function DraftCell({ p, now, on }: RowProps) {
   );
 }
 
-/** Code, export, rename, run and delete. */
+/** Export, rename, edit (its code is in the editor), run and delete. */
 function ActionsCell({ p, on }: Omit<RowProps, 'now'>) {
   return (
     <td className="px-2 py-3">
       <div className="flex justify-end gap-1">
-        <button
-          className="btn-icon"
-          title="Playwright code"
-          aria-label={`Playwright code for ${p.name}`}
-          onClick={() => on.onCode(p)}
-        >
-          <Code className="h-4 w-4" />
-        </button>
         <button
           className="btn-icon"
           title="Export to move it to another environment"

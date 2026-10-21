@@ -66,7 +66,7 @@ interface Ctx {
 function actions(c: Ctx) {
   const def = c.parsed.definition as Definition;
   return {
-    save: () => def && attempt(c, () => saveDefinition(c.apiKey, c.name, def)),
+    save: () => def && !c.state.busy && attempt(c, () => saveDefinition(c.apiKey, c.name, def)),
     saveAs: (as: string) => def && attempt(c, () => saveDefinitionAs(c.apiKey, as, def)),
     discard: () => c.state.saved !== null && c.patch({ text: c.state.saved }),
   };

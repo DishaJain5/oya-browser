@@ -629,3 +629,58 @@ textarea {
     height: 40px;
   }
 }
+
+/* The playbook editor's CodeMirror syntax (classHighlighter's tok-* classes), in the shared code palette. */
+.cm-editor .tok-comment {
+  color: #8d9689;
+  font-style: italic;
+}
+.cm-editor .tok-keyword {
+  color: #c5aff4;
+}
+.cm-editor .tok-string {
+  color: #afd79b;
+}
+.cm-editor .tok-number,
+.cm-editor .tok-bool,
+.cm-editor .tok-null {
+  color: #edbd86;
+}
+.cm-editor .tok-propertyName {
+  color: #8fc7ee;
+}
+.cm-editor .tok-typeName,
+.cm-editor .tok-className {
+  color: #d6c49e;
+}
+.cm-editor .tok-variableName {
+  color: #90d3cb;
+}
+.cm-editor .tok-punctuation,
+.cm-editor .tok-operator {
+  color: #b1b2a8;
+}
+:root[data-theme='light'] .cm-editor .tok-comment {
+  color: #687364;
+}
+:root[data-theme='light'] .cm-editor .tok-keyword {
+  color: #7849a1;
+}
+:root[data-theme='light'] .cm-editor .tok-string {
+  color: #3d6a2a;
+}
+:root[data-theme='light'] .cm-editor :is(.tok-number, .tok-bool, .tok-null) {
+  color: #99541f;
+}
+:root[data-theme='light'] .cm-editor .tok-propertyName {
+  color: #226797;
+}
+:root[data-theme='light'] .cm-editor :is(.tok-typeName, .tok-className) {
+  color: #80601b;
+}
+:root[data-theme='light'] .cm-editor .tok-variableName {
+  color: #21746b;
+}
+:root[data-theme='light'] .cm-editor :is(.tok-punctuation, .tok-operator) {
+  color: #65695f;
+}

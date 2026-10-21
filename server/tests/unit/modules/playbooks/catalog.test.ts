@@ -215,4 +215,9 @@ describe('describing a playbook', () => {
     };
     assert.deepEqual(catalog.describe(pb).defaults, { email: 'a@x' });
   });
+
+  it('names its secrets, recorded or declared on a variable, without their values', () => {
+    const pb = { name: 'w', steps: [], secrets: ['pw'], variables: { pin: { secret: true }, q: { default: 'x' } } };
+    assert.deepEqual(catalog.describe(pb).secrets, ['pw', 'pin']);
+  });
 });

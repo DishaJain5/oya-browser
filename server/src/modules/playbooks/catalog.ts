@@ -22,8 +22,18 @@ const NAME = /^[\w-]{1,64}$/;
  * once saved. A run that leaves a secret out still uses the saved one.
  */
 const shownDefaults = (pb) => {
-  const secrets = new Set((pb.secrets ?? []).map(String));
+  const secrets = new Set(secretNames(pb));
   return Object.fromEntries(Object.entries(pb.defaults || {}).filter(([k]) => !secrets.has(k)));
+};
+
+/**
+ * The names (never the values) of the playbook's secrets, recorded or declared
+ * on a workflow's variables, so a form that sets its values (a routine's) can say
+ * the saved value is used instead of asking for it again.
+ */
+const secretNames = (pb): string[] => {
+  const declared = Object.entries(pb.variables || {}).filter(([, v]: [string, any]) => v?.secret);
+  return [...new Set([...(pb.secrets ?? []).map(String), ...declared.map(([k]) => k)])];
 };
 
 /** What callers see of a playbook: its inputs and its Playwright export. */
@@ -31,6 +41,7 @@ export const describe = (pb) => ({
   name: pb.name,
   variables: namesOf(pb),
   defaults: shownDefaults(pb),
+  secrets: secretNames(pb),
   steps: pb.steps.length,
   // The free-text fields the model writes fresh on each run, by variable and question.
   answers: pb.steps.filter((step) => step.answer).map(({ answer }) => ({ key: answer.key, question: answer.question })),

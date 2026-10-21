@@ -6,7 +6,9 @@
 import { useState } from 'react';
 import { errorMessage } from '@/lib/api-client';
 import { createRoutine, editRoutine } from './api';
+import { usePlaybookNames } from './use-playbook-names';
 import { DEFAULT_SCHEDULE, EDITOR_TEXT, EVERY_MAX } from './constants';
+import type { PlaybookBody } from '../playbooks/types';
 import type { Routine, RoutineBody } from './types';
 
 /** The form's fields. */
@@ -29,6 +31,10 @@ export interface RoutineFields {
   cloud: boolean;
   /** Runs on its schedule. */
   enabled: boolean;
+  /** What it sets the playbook's variables to; a blank one uses the playbook's own. */
+  values: Record<string, string>;
+  /** The persona it runs as, or '' for the default. */
+  persona: string;
 }
 
 /** What is wrong with the fields, by field. */
@@ -51,6 +57,13 @@ function scheduleFields(routine: Routine | null) {
   return { kind: s?.kind ?? 'every', n, unit: s?.unit ?? DEFAULT_SCHEDULE.unit, at: s?.at ?? DEFAULT_SCHEDULE.at };
 }
 
+/** Where and as whom it runs, and whether it is on, from a routine or a new one's. */
+const placeFields = (routine: Routine | null) => ({
+  cloud: routine?.target === 'cloud',
+  enabled: routine?.enabled ?? true,
+  persona: routine?.persona ?? '',
+});
+
 /** The fields for editing `routine`, or a new routine's when it is null. */
 export function fieldsOf(routine: Routine | null): RoutineFields {
   return {
@@ -58,9 +71,19 @@ export function fieldsOf(routine: Routine | null): RoutineFields {
     playbook: routine?.playbook ?? '',
     prompt: routine?.prompt ?? '',
     ...(scheduleFields(routine) as Pick<RoutineFields, 'kind' | 'n' | 'unit' | 'at'>),
-    cloud: routine?.target === 'cloud',
-    enabled: routine?.enabled ?? true,
+    ...placeFields(routine),
+    values: { ...routine?.values },
   };
+}
+
+/**
+ * The values to save: only those `playbook` uses, not its secrets, and not blank
+ * (a blank one plays the playbook's own). With the list not loaded, what the
+ * routine had is kept.
+ */
+export function valuesFor(playbook: PlaybookBody | undefined, values: Record<string, string>) {
+  const kept = Object.entries(values).filter(([k, v]) => v !== '' && !playbook?.secrets?.includes(k));
+  return Object.fromEntries(playbook ? kept.filter(([k]) => playbook.variables.includes(k)) : kept);
 }
 
 /** Whether an every count is a whole number in range. */
@@ -79,28 +102,36 @@ export function errorsOf(f: RoutineFields): FieldErrors {
 const scheduleOf = (f: RoutineFields) =>
   f.kind === 'daily' ? { kind: f.kind, at: f.at } : { kind: f.kind, n: Number(f.n), unit: f.unit };
 
-/** What saving `f` sends; a playbook replaces the prompt, null asks the prompt again. */
-export function bodyOf(f: RoutineFields): RoutineBody {
+/** What saving `f` sends; a playbook replaces the prompt (with its values), null asks the prompt again. */
+export function bodyOf(f: RoutineFields, chosen?: PlaybookBody): RoutineBody {
   const playbook = f.playbook || null;
   const target = f.cloud ? 'cloud' : 'desktop';
-  const prompt = playbook ? '' : f.prompt.trim();
-  return { name: f.name.trim(), prompt, playbook, schedule: scheduleOf(f), enabled: f.enabled, target, tz: ownZone() };
+  const task = playbook ? { prompt: '', values: valuesFor(chosen, f.values) } : { prompt: f.prompt.trim() };
+  const where = { target, tz: ownZone(), persona: f.persona || null } as const;
+  return { name: f.name.trim(), playbook, ...task, schedule: scheduleOf(f), enabled: f.enabled, ...where };
 }
 
 /** Sends the save: a new routine, or the edit of `routine`. */
 const send = (apiKey: string, routine: Routine | null, body: RoutineBody) =>
   routine ? editRoutine(apiKey, routine.id, body) : createRoutine(apiKey, body);
 
-/** The form's state, its errors, and save, which hands the saved routine to `onSaved`. */
-export function useRoutineForm(apiKey: string, routine: Routine | null, onSaved: (r: Routine) => void) {
-  const [fields, setFields] = useState(() => fieldsOf(routine));
-  const [tried, setTried] = useState(false);
+/** Whether a save is in flight, and the server's last refusal. */
+function useSaveState() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const errors = tried ? errorsOf(fields) : {};
+  return { saving, setSaving, saveError, setSaveError };
+}
+
+/** The form's state, its errors, and save, which hands the saved routine to `onSaved`. */
+export function useRoutineForm(apiKey: string, routine: Routine | null, onSaved: (r: Routine) => void) {
+  const playbooks = usePlaybookNames(apiKey);
+  const [fields, setFields] = useState(() => fieldsOf(routine));
+  const [tried, setTried] = useState(false);
+  const { setSaving, setSaveError, ...saveState } = useSaveState();
   const set = (change: Partial<RoutineFields>) => setFields((f) => ({ ...f, ...change }));
-  const save = () => submit({ apiKey, routine, fields, onSaved, setTried, setSaving, setSaveError });
-  return { fields, set, errors, saving, saveError, save };
+  const chosen = playbooks.list.find((p) => p.name === fields.playbook);
+  const save = () => submit({ apiKey, routine, fields, chosen, onSaved, setTried, setSaving, setSaveError });
+  return { fields, set, errors: tried ? errorsOf(fields) : {}, ...saveState, save, playbooks, chosen };
 }
 
 /** What a save needs from the form. */
@@ -111,6 +142,8 @@ interface Submit {
   routine: Routine | null;
   /** The fields to save. */
   fields: RoutineFields;
+  /** The playbook chosen, as listed, to keep only the values it uses. */
+  chosen?: PlaybookBody;
   /** Receives the saved routine. */
   onSaved: (r: Routine) => void;
   /** Marks that a save was tried, so errors show. */
@@ -134,7 +167,7 @@ async function submit(s: Submit) {
 /** Sends the save and hands on the saved routine, or keeps the refusal. */
 async function sendSave(s: Submit) {
   try {
-    s.onSaved(await send(s.apiKey, s.routine, bodyOf(s.fields)));
+    s.onSaved(await send(s.apiKey, s.routine, bodyOf(s.fields, s.chosen)));
   } catch (err) {
     s.setSaveError(errorMessage(err));
   }

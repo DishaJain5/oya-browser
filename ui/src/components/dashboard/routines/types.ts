@@ -54,6 +54,10 @@ export interface Routine {
   target: 'desktop' | 'cloud';
   /** The time zone a daily time is read in. */
   tz?: string;
+  /** What it sets its playbook's variables to. */
+  values?: Record<string, string>;
+  /** The persona it runs as; absent for the default. */
+  persona?: string | null;
   /** When it last started (ms). */
   lastRunAt: number | null;
   /** When it runs next (ms), worked out by the server; null when off. */
@@ -81,4 +85,8 @@ export interface RoutineBody {
   target: 'desktop' | 'cloud';
   /** The time zone a daily time is read in: the person's own. */
   tz: string;
+  /** What it sets its playbook's variables to; only with a playbook. */
+  values?: Record<string, string>;
+  /** The persona it runs as, or null for the default. */
+  persona: string | null;
 }

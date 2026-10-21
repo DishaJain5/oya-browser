@@ -11,6 +11,7 @@ import RoutineTable from './routines/routine-table';
 import TabHeader from './routines/tab-header';
 import { ROUTINES_TEXT } from './routines/constants';
 import { useRoutinesTab } from './routines/use-routines-tab';
+import type { Persona } from './types';
 
 /** Props for the tab. */
 interface Props {
@@ -18,10 +19,12 @@ interface Props {
   apiKey: string;
   /** The clock times are worded against. */
   now: number;
+  /** The project's personas, to pick the one a routine runs as. */
+  personas?: Persona[];
 }
 
 /** The header, the load error, the table, the editor and the delete confirmation. */
-export default function RoutinesTab({ apiKey, now }: Props) {
+export default function RoutinesTab({ apiKey, now, personas = [] }: Props) {
   const { list, actions, editing, setEditing, saved } = useRoutinesTab(apiKey);
   const confirming = actions.state.confirming;
   return (
@@ -42,6 +45,7 @@ export default function RoutinesTab({ apiKey, now }: Props) {
           routine={editing === 'new' ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={saved}
+          personas={personas}
         />
       )}
       <Confirm

@@ -104,6 +104,13 @@ export const EDITOR_TEXT = {
   needName: 'Give the routine a name.',
   needPrompt: 'Write the prompt, or pick a playbook.',
   badEvery: `Every 1 to ${EVERY_MAX} minutes or hours.`,
+  values: 'Values',
+  valuesHint: 'Leave a value blank to use the playbook’s own.',
+  secret: 'Uses the playbook’s saved value',
+  profile: 'Profile',
+  defaultProfile: 'Default',
+  profileHint: 'A desktop runs it only while it is on this profile.',
+  profileCloudHint: 'The cloud browser runs as this profile.',
 } as const;
 
 /** The editor's field sizes (the server's limits on a name and a prompt). */

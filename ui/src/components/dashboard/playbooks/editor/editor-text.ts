@@ -6,7 +6,19 @@
 export const EDITOR_TEXT = {
   title: (name: string) => `Edit ${name}`,
   description: 'The steps and variables a replay uses. Every save is checked as an import is; nothing here runs code.',
-  tabs: { definition: 'Definition', variables: 'Variables', code: 'Code', test: 'Test' },
+  explorer: 'Explorer',
+  explorerHint: 'Edits are checked as an import is when you save.',
+  closeTab: (name: string) => `Close ${name}`,
+  empty: 'Open a file from the explorer.',
+  readOnly: 'Read-only',
+  testPanel: 'Test',
+  togglePanel: 'Toggle the test panel',
+  toggleSidebar: 'Toggle the explorer',
+  problems: (n: number) => (n === 1 ? '1 problem' : `${n} problems`),
+  noProblems: 'No problems',
+  saved: 'Saved',
+  cursor: (line: number, col: number) => `Ln ${line}, Col ${col}`,
+  spaces: 'Spaces: 2',
   loading: 'Loading the playbook…',
   definitionLabel: 'Playbook definition (JSON)',
   noVariables: 'The steps use no {{variables}} yet. Put {{name}} in a step’s text or URL to make one.',
@@ -32,6 +44,16 @@ export const EDITOR_TEXT = {
   unsaved: 'Unsaved changes',
   confirmClose: 'Discard your unsaved changes?',
 } as const;
+
+/** The files the explorer lists, in order: what each is called, its language and whether it can be typed in. */
+export const FILES = {
+  definition: { name: 'playbook.json', language: 'JSON', readOnly: false },
+  variables: { name: 'variables', language: 'Variables', readOnly: false },
+  code: { name: 'playwright.ts', language: 'TypeScript', readOnly: true },
+} as const;
+
+/** A file the workbench can open. */
+export type FileId = keyof typeof FILES;
 
 /** The run's state as the tester says it. */
 export const RUN_STATUS: Readonly<Record<string, string>> = {
