@@ -66,8 +66,9 @@ export class TabEvents {
     this.wireLoadState(tab);
     this.wireFailures(tab);
     this.wireRendererLoss(tab);
-    wireHome(this.deps.tabs, tab);
-    wireFavicon(this.deps.tabs, tab);
+    // Read on each event, not now: `deps` resolves the tab's current window, which a tear-off changes.
+    wireHome(() => this.deps.tabs, tab);
+    wireFavicon(() => this.deps.tabs, tab);
   }
 
   /** Shortcuts, focus, and the loading / failed state the tab strip shows. */

@@ -10,7 +10,7 @@ import { VIEW_SOURCE_LIGHT } from '../../../../src/main/tabs/tab-events.ts';
 import { mainCtx, FakeBrowserView } from '../../support/main-ctx.cjs';
 import { flush } from '../../support/fakes.cjs';
 import { incognitoSession } from '../../support/incognito.ts';
-import { TAB_UNPROTECTED_DESKTOP, TAB_PROBE_MS } from '../../../../src/main/tabs/constants.ts';
+import { TAB_UNPROTECTED_DESKTOP, TAB_PROBE_MS, HOME_URL } from '../../../../src/main/tabs/constants.ts';
 
 describe('tab events', () => {
   let ctx, tab;
@@ -69,6 +69,27 @@ describe('tab events', () => {
     tab.view.webContents.emit('zoom-changed', {}, 'in');
     mock.timers.tick(1);
     assert.equal(ctx.shell.sentOn('page-zoom').length, before);
+  });
+
+  it('shows a start-page tab, and its icon changes, in the window it was moved to, not the one it was made in', () => {
+    const made = ctx.tabs;
+    let owner = made;
+    const forTab = (_tab, deps) => new Proxy(deps, { get: (d, key) => (key === 'tabs' ? owner : d[key]) });
+    ctx.windows = { forTab, allocateTabId: () => 99 };
+    const moved = made.find(made.createTab(HOME_URL));
+    const shown = [];
+    const lists = mock.fn();
+    const local = { activeTabId: moved.id, showInShell: (t) => shown.push(t.id), sendTabList: lists };
+    owner = new Proxy(made, { get: (t, key) => (Object.hasOwn(local, key) ? local[key] : Reflect.get(t, key)) });
+    const oldShow = mock.method(made, 'showInShell', () => {});
+    const oldLists = mock.method(made, 'sendTabList', () => {});
+    moved.view.webContents.emit('did-start-navigation', { url: 'https://youtube.com/', isMainFrame: true });
+    moved.favicon = 'data:image/png;base64,x';
+    moved.view.webContents.emit('did-navigate', {}, 'https://youtube.com/');
+    assert.deepEqual(shown, [moved.id]);
+    assert.equal(moved.favicon, null);
+    assert.equal(oldShow.mock.callCount() + oldLists.mock.callCount(), 0);
+    assert.ok(lists.mock.callCount() > 0);
   });
 
   /** A tab whose setup answers each of `answers` in turn. */
