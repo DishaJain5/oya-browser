@@ -6,6 +6,8 @@ Add what a change does under **Unreleased** as it lands. `make release` refuses 
 
 ## Unreleased
 
+## [1.0.206](https://github.com/OyadotAI/oya-browser/releases/tag/v1.0.206) · 2026-10-22
+
 ### Fixed
 
 - A new tab dragged out into its own window now opens the site you type or pick there. It used to keep loading with a blank page, and Reload did not help, until you opened another tab in that window. Site icons on a dragged-out tab now update too.
