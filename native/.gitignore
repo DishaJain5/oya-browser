@@ -1,0 +1,2 @@
+# Native compiler outputs stay local; source and the lockfile are retained.
+/target/

@@ -1,0 +1,166 @@
+/** Pollable bounded NDJSON keeps stdin and blocked stdout outside the window lifetime. */
+use super::broker::{Command, POLL};
+use crate::{
+    constants::FRAME_BYTES,
+    protocol::{EngineError, EngineResult, Request, Response, decode, encode},
+    runtime::authority::{self, Owner, Permit, SharedAuthority},
+};
+use std::{
+    io,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{Receiver, SyncSender},
+    },
+    thread::{self, JoinHandle},
+};
+
+/** OS descriptor flags are restored after both tasks relinquish their descriptors. */
+struct Descriptor {
+    fd: i32,
+    flags: i32,
+}
+impl Descriptor {
+    /** Nonblocking descriptors make cancellation effective even with an idle pipe. */
+    fn new(fd: i32) -> EngineResult<Self> {
+        let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+        if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+            return Err(EngineError::invalid(
+                "Cannot configure cancellable agent pipes.",
+            ));
+        }
+        Ok(Self { fd, flags })
+    }
+}
+impl Drop for Descriptor {
+    /** Restore the caller-owned stream flags after use. */
+    fn drop(&mut self) {
+        unsafe { libc::fcntl(self.fd, libc::F_SETFL, self.flags) };
+    }
+}
+
+/// Separate pollable reader observes EOF even while a previous agent mutation is in flight.
+pub(super) fn start(
+    commands: SyncSender<Command>,
+    output: Receiver<Response>,
+    authority: SharedAuthority,
+    cancel: Arc<AtomicBool>,
+    connected: Arc<AtomicBool>,
+) -> EngineResult<Vec<JoinHandle<()>>> {
+    let input = Descriptor::new(libc::STDIN_FILENO)?;
+    let stdout = Descriptor::new(libc::STDOUT_FILENO)?;
+    let (guard, stop, live) = (authority.clone(), cancel.clone(), connected.clone());
+    let reader = thread::spawn(move || {
+        read(input, &commands, &guard, &stop);
+        disconnect(&guard, &live);
+    });
+    let writer = thread::spawn(move || {
+        write(stdout, output, &cancel);
+        disconnect(&authority, &connected);
+    });
+    Ok(vec![reader, writer])
+}
+/** EOF, malformed framing and saturated admission all revoke ownership immediately. */
+fn read(
+    input: Descriptor,
+    commands: &SyncSender<Command>,
+    authority: &SharedAuthority,
+    cancel: &AtomicBool,
+) {
+    let mut pending = Vec::new();
+    let mut bytes = [0_u8; 4096];
+    while !cancel.load(Ordering::Relaxed) {
+        if !ready(input.fd, libc::POLLIN) {
+            continue;
+        }
+        let count = unsafe { libc::read(input.fd, bytes.as_mut_ptr().cast(), bytes.len()) };
+        if count <= 0 {
+            if count < 0 && io::Error::last_os_error().kind() == io::ErrorKind::WouldBlock {
+                continue;
+            }
+            return;
+        }
+        for byte in &bytes[..count as usize] {
+            if *byte == b'\n' {
+                let Ok(request) = decode::<Request>(&pending) else {
+                    return;
+                };
+                if request.validate().is_err() {
+                    return;
+                }
+                pending.clear();
+                let Ok(state) = authority::lock(authority) else {
+                    return;
+                };
+                let key = request
+                    .params
+                    .get("tab_id")
+                    .and_then(serde_json::Value::as_str)
+                    .and_then(|id| crate::runtime::tab_key(id).ok());
+                let permit = key
+                    .and_then(|id| state.observe_for(Owner::Agent, id).ok())
+                    .unwrap_or(Permit {
+                        owner: Owner::Agent,
+                        epoch: state.epoch,
+                        tab_id: key,
+                    });
+                drop(state);
+                if commands.try_send(Command::Agent(request, permit)).is_err() {
+                    return;
+                }
+            } else {
+                pending.push(*byte);
+                if pending.len() >= FRAME_BYTES {
+                    return;
+                }
+            }
+        }
+    }
+}
+/** Partial writes and pipe backpressure are bounded by cancellation, not a blocking flush. */
+fn write(output: Descriptor, responses: Receiver<Response>, cancel: &AtomicBool) {
+    while !cancel.load(Ordering::Relaxed) {
+        let response = match responses.recv_timeout(POLL) {
+            Ok(response) => response,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(_) => return,
+        };
+        let Ok(bytes) = encode(&response) else {
+            return;
+        };
+        let mut offset = 0;
+        while offset < bytes.len() && !cancel.load(Ordering::Relaxed) {
+            if !ready(output.fd, libc::POLLOUT) {
+                continue;
+            }
+            let count = unsafe {
+                libc::write(
+                    output.fd,
+                    bytes[offset..].as_ptr().cast(),
+                    bytes.len() - offset,
+                )
+            };
+            if count > 0 {
+                offset += count as usize;
+            } else if io::Error::last_os_error().kind() != io::ErrorKind::WouldBlock {
+                return;
+            }
+        }
+    }
+}
+/** Fixed short polling intervals cap shutdown latency without busy waiting. */
+fn ready(fd: i32, events: i16) -> bool {
+    let mut descriptor = libc::pollfd {
+        fd,
+        events,
+        revents: 0,
+    };
+    unsafe { libc::poll(&mut descriptor, 1, POLL.as_millis() as i32) > 0 }
+}
+/** Disconnect invalidates both queued admissions and work already waiting on an engine. */
+fn disconnect(authority: &SharedAuthority, connected: &AtomicBool) {
+    connected.store(false, Ordering::Relaxed);
+    if let Ok(mut state) = authority::lock(authority) {
+        state.change(Owner::Human);
+    }
+}
