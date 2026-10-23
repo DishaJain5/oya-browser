@@ -1,6 +1,10 @@
 /** Tests interoperability through the installed official MCP SDK and an explicitly isolated native window. */
 import assert from 'node:assert/strict';
+import console from 'node:console';
+import process from 'node:process';
+import { clearTimeout, setTimeout } from 'node:timers';
 import { setTimeout as delay } from 'node:timers/promises';
+import { URL } from 'node:url';
 
 /** Resolve the existing dependency without installing clients or changing the repository lockfile. */
 const sdk = new URL('../../../server/node_modules/@modelcontextprotocol/sdk/dist/esm/', import.meta.url);
