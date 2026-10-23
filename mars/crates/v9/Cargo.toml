@@ -1,0 +1,13 @@
+# V9 owns bounded JavaScript execution independently of the Mars application.
+[package]
+name = "mars-v9"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "V9: Mars's bounded, Rust-owned JavaScript runtime"
+
+[dependencies]
+mars-core = { path = "../core" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+ryu-js = "=1.0.3"
