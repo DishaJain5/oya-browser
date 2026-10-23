@@ -1,0 +1,17 @@
+# Eye owns document, style and rendering; platform bindings supply only text metrics.
+[package]
+name = "mars-eye"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+mars-core = { path = "../core" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+url = "=2.5.8"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.4"
+objc2-foundation = "=0.3.2"
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "objc2-core-foundation", "NSColor", "NSFont", "NSStringDrawing", "NSAttributedString"] }

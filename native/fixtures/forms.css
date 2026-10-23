@@ -1,6 +1,0 @@
-/* A documented basic cascade; required visibility is resolved before publication. */
-main.panel { max-width: 620px; padding: 12px; border: 1px solid #808080; }
-h1 { color: #008080; }
-label { font-weight: bold; margin-top: 8px; }
-form input, form select, form textarea { width: 100%; }
-.concealed { display: none; }

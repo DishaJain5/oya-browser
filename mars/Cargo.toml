@@ -1,0 +1,55 @@
+# Mars composes independent Rust browser engines and native agent control.
+[workspace]
+members = ["crates/core", "crates/eye", "crates/v9", "crates/relay"]
+default-members = [".", "crates/core", "crates/eye", "crates/v9", "crates/relay"]
+resolver = "3"
+
+[package]
+name = "mars"
+version = "0.1.0"
+edition = "2024"
+publish = false
+default-run = "mars"
+
+[features]
+test-support = []
+
+[dependencies]
+mars-core = { path = "crates/core" }
+mars-eye = { path = "crates/eye" }
+mars-v9 = { path = "crates/v9" }
+mars-relay = { path = "crates/relay" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+rustls = { version = "=0.23.45", default-features = false, features = ["std", "ring", "tls12"] }
+url = "=2.5.8"
+libc = "=0.2.191"
+png = "=0.17.16"
+jpeg-decoder = "=0.3.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.4"
+objc2-foundation = "=0.3.2"
+objc2-app-kit = { version = "=0.3.2", default-features = false, features = ["std", "objc2-core-foundation", "NSApplication", "NSWindow", "NSView", "NSButton", "NSButtonCell", "NSTextField", "NSSecureTextField", "NSPopUpButton", "NSPopUpButtonCell", "NSTextView", "NSControl", "NSResponder", "NSScrollView", "NSClipView", "NSColor", "NSColorSpace", "NSFont", "NSStringDrawing", "NSGraphics", "NSGraphicsContext", "NSEvent", "NSMenu", "NSMenuItem", "NSImage", "NSImageRep", "NSBitmapImageRep", "NSAccessibility", "NSAccessibilityProtocols", "NSAccessibilityElement", "NSText", "NSCell", "NSAttributedString", "NSAppearance", "NSBezierPath", "NSRunningApplication", "NSAlert"] }
+security-framework = "=3.7.0"
+security-framework-sys = "=2.17.0"
+
+[lib]
+name = "mars"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mars"
+path = "src/main.rs"
+
+[[bin]]
+name = "mars-test-service"
+path = "tests/support/service.rs"
+required-features = ["test-support"]
+test = false
+bench = false
+
+[[test]]
+name = "failures"
+path = "tests/failures.rs"
+required-features = ["test-support"]
